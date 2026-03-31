@@ -133,44 +133,48 @@ export const createProject = async (
   broadcast({ type: "status", status: "building" });
 
   let buildResolved = false;
-  const buildPromise = new Promise<void>((resolve) => {
-    const timeout = setTimeout(() => {
-      if (!buildResolved) {
-        buildResolved = true;
-        resolve();
-      }
-    }, 30000);
 
-    startExpo(projectSlug, projectPath, (event) => {
-      broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
+  // Start Expo first (awaited — registers port in activeProcesses)
+  const { port: expoPort } = await startExpo(projectSlug, projectPath, (event) => {
+    broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
 
-      if (event.type === "build_success" && !buildResolved) {
-        buildResolved = true;
-        clearTimeout(timeout);
-        resolve();
-      }
+    if (event.type === "build_success" && !buildResolved) {
+      buildResolved = true;
+    }
 
-      if (event.type === "build_error" && event.error) {
-        const parsed = parseMetroError(event.error);
-        if (parsed) {
-          handleAutoFix(projectSlug, {
-            type: parsed.type,
-            file: parsed.file,
-            line: parsed.line,
-            raw: parsed.raw,
-          }, lmStudioUrl);
-        }
+    if (event.type === "build_error" && event.error) {
+      const parsed = parseMetroError(event.error);
+      if (parsed) {
+        handleAutoFix(projectSlug, {
+          type: parsed.type,
+          file: parsed.file,
+          line: parsed.line,
+          raw: parsed.raw,
+        }, lmStudioUrl);
       }
-    });
+    }
   });
 
-  await buildPromise;
+  // Wait for build_success or timeout (30s)
+  if (!buildResolved) {
+    await new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (buildResolved) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 500);
+      setTimeout(() => {
+        clearInterval(check);
+        resolve();
+      }, 30000);
+    });
+  }
 
-  const port = getActivePort(projectSlug) ?? 0;
-  setPreviewPort(port || null);
-  broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
+  setPreviewPort(expoPort || null);
+  broadcast({ type: "preview_ready", port: expoPort, proxyUrl: "/preview/" });
 
-  return { projectName: projectSlug, port, plan };
+  return { projectName: projectSlug, port: expoPort, plan };
 };
 
 export const iterateProject = async (

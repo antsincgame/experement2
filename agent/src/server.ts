@@ -65,18 +65,29 @@ app.get("/api/projects/:name/export", async (req, res) => {
 
 // Preview proxy — dynamically routes to active Expo port
 let activePreviewPort: number | null = null;
+let cachedProxy: ReturnType<typeof createPreviewProxy> | null = null;
+let cachedProxyPort: number | null = null;
 
 app.use("/preview", (req, res, next) => {
   if (!activePreviewPort) {
     res.status(503).send("No preview available yet. Metro is not running.");
     return;
   }
-  const proxy = createPreviewProxy(activePreviewPort);
-  proxy(req, res, next);
+  // Reuse proxy if port hasn't changed
+  if (!cachedProxy || cachedProxyPort !== activePreviewPort) {
+    cachedProxy = createPreviewProxy(activePreviewPort);
+    cachedProxyPort = activePreviewPort;
+  }
+  cachedProxy(req, res, next);
 });
 
 export const setPreviewPort = (port: number | null) => {
+  if (port !== activePreviewPort) {
+    cachedProxy = null;
+    cachedProxyPort = null;
+  }
   activePreviewPort = port;
+  console.log(`[Preview] Port set to: ${port}`);
 };
 
 // ── WebSocket ────────────────────────────────────────────

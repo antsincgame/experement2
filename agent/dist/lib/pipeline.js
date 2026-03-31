@@ -81,38 +81,42 @@ export const createProject = async (options) => {
     // ── Step 5: Start Metro ───────────────────────────────
     broadcast({ type: "status", status: "building" });
     let buildResolved = false;
-    const buildPromise = new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-            if (!buildResolved) {
-                buildResolved = true;
-                resolve();
+    // Start Expo first (awaited — registers port in activeProcesses)
+    const { port: expoPort } = await startExpo(projectSlug, projectPath, (event) => {
+        broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
+        if (event.type === "build_success" && !buildResolved) {
+            buildResolved = true;
+        }
+        if (event.type === "build_error" && event.error) {
+            const parsed = parseMetroError(event.error);
+            if (parsed) {
+                handleAutoFix(projectSlug, {
+                    type: parsed.type,
+                    file: parsed.file,
+                    line: parsed.line,
+                    raw: parsed.raw,
+                }, lmStudioUrl);
             }
-        }, 30000);
-        startExpo(projectSlug, projectPath, (event) => {
-            broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
-            if (event.type === "build_success" && !buildResolved) {
-                buildResolved = true;
-                clearTimeout(timeout);
-                resolve();
-            }
-            if (event.type === "build_error" && event.error) {
-                const parsed = parseMetroError(event.error);
-                if (parsed) {
-                    handleAutoFix(projectSlug, {
-                        type: parsed.type,
-                        file: parsed.file,
-                        line: parsed.line,
-                        raw: parsed.raw,
-                    }, lmStudioUrl);
-                }
-            }
-        });
+        }
     });
-    await buildPromise;
-    const port = getActivePort(projectSlug) ?? 0;
-    setPreviewPort(port || null);
-    broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
-    return { projectName: projectSlug, port, plan };
+    // Wait for build_success or timeout (30s)
+    if (!buildResolved) {
+        await new Promise((resolve) => {
+            const check = setInterval(() => {
+                if (buildResolved) {
+                    clearInterval(check);
+                    resolve();
+                }
+            }, 500);
+            setTimeout(() => {
+                clearInterval(check);
+                resolve();
+            }, 30000);
+        });
+    }
+    setPreviewPort(expoPort || null);
+    broadcast({ type: "preview_ready", port: expoPort, proxyUrl: "/preview/" });
+    return { projectName: projectSlug, port: expoPort, plan };
 };
 export const iterateProject = async (options) => {
     const { projectName, userRequest, chatHistory, lmStudioUrl } = options;
