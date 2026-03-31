@@ -1,89 +1,94 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-const RECONNECT_INTERVAL = 3000;
-const MAX_RECONNECT_ATTEMPTS = 50;
+// ── Module-level WebSocket singleton ──
+// React 18 StrictMode double-mounts components, which causes
+// useEffect cleanup to close the WS immediately after opening.
+// Solution: keep WS outside React lifecycle as a module singleton.
 
-export const useWebSocket = () => {
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isConnecting = useRef(false);
+let ws: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT = 100;
+const RECONNECT_MS = 3000;
 
-  const send = useCallback((message: Record<string, unknown>) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) {
-      console.warn("[WS] Not connected, cannot send");
-      return;
-    }
-    wsRef.current.send(JSON.stringify(message));
-  }, []);
+const getWsUrl = (): string => {
+  const agentUrl = useSettingsStore.getState().agentUrl;
+  return agentUrl.replace("http://", "ws://").replace("https://", "wss://");
+};
 
-  // Stable connect — reads URL from store at call time, no deps
-  useEffect(() => {
-    const doConnect = () => {
-      if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting.current) return;
+const connectWs = (): void => {
+  if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
 
-      const agentUrl = useSettingsStore.getState().agentUrl;
-      const wsUrl = agentUrl.replace("http://", "ws://").replace("https://", "wss://");
+  const wsUrl = getWsUrl();
+  console.log("[WS] Connecting to:", wsUrl);
 
-      isConnecting.current = true;
+  try {
+    ws = new WebSocket(wsUrl);
 
-      console.log("[WS] Connecting to:", wsUrl);
+    ws.onopen = () => {
+      console.log("[WS] Connected ✓");
+      reconnectAttempts = 0;
+      useProjectStore.getState().setConnected(true);
+    };
 
+    ws.onmessage = (event) => {
       try {
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          console.log("[WS] Connected to agent at", wsUrl);
-          isConnecting.current = false;
-          reconnectAttempts.current = 0;
-          useProjectStore.getState().setConnected(true);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            useProjectStore.getState().handleWsMessage(msg);
-          } catch {
-            console.error("[WS] Invalid message");
-          }
-        };
-
-        ws.onclose = () => {
-          console.log("[WS] Disconnected");
-          isConnecting.current = false;
-          useProjectStore.getState().setConnected(false);
-
-          if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS && !reconnectTimer.current) {
-            reconnectAttempts.current++;
-            reconnectTimer.current = setTimeout(() => {
-              reconnectTimer.current = null;
-              doConnect();
-            }, RECONNECT_INTERVAL);
-          }
-        };
-
-        ws.onerror = (e) => {
-          console.error("[WS] Error connecting to", wsUrl, e);
-          isConnecting.current = false;
-        };
+        const msg = JSON.parse(event.data);
+        useProjectStore.getState().handleWsMessage(msg);
       } catch {
-        isConnecting.current = false;
-        useProjectStore.getState().setConnected(false);
+        console.error("[WS] Invalid message");
       }
     };
 
-    doConnect();
-
-    return () => {
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      reconnectTimer.current = null;
-      wsRef.current?.close();
-      wsRef.current = null;
+    ws.onclose = () => {
+      console.log("[WS] Disconnected");
+      ws = null;
+      useProjectStore.getState().setConnected(false);
+      scheduleReconnect();
     };
-  }, []); // No deps — stable, runs once
+
+    ws.onerror = (e) => {
+      console.error("[WS] Error:", e);
+    };
+  } catch (err) {
+    console.error("[WS] Failed to create:", err);
+    ws = null;
+    scheduleReconnect();
+  }
+};
+
+const scheduleReconnect = (): void => {
+  if (reconnectTimer) return;
+  if (reconnectAttempts >= MAX_RECONNECT) return;
+  reconnectAttempts++;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectWs();
+  }, RECONNECT_MS);
+};
+
+// Auto-connect on module load
+connectWs();
+
+// ── React hook (thin wrapper) ──
+
+export const useWebSocket = () => {
+  // Ensure connection on mount (no cleanup — singleton lives forever)
+  useEffect(() => {
+    if (!ws || ws.readyState === WebSocket.CLOSED) {
+      connectWs();
+    }
+  }, []);
+
+  const send = useCallback((message: Record<string, unknown>) => {
+    if (ws?.readyState !== WebSocket.OPEN) {
+      console.warn("[WS] Not connected, cannot send");
+      return;
+    }
+    ws.send(JSON.stringify(message));
+  }, []);
 
   const createProject = useCallback(
     (description: string) => {
@@ -108,9 +113,7 @@ export const useWebSocket = () => {
     [send]
   );
 
-  const abortGeneration = useCallback(() => {
-    send({ type: "abort_generation" });
-  }, [send]);
+  const abortGeneration = useCallback(() => send({ type: "abort_generation" }), [send]);
 
   const revertVersion = useCallback(
     (commitHash: string) => {
