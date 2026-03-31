@@ -27,7 +27,7 @@ import {
   WORKSPACE_OPERATION_QUEUE_KEY,
 } from "./services/project-operation-lock.js";
 import { createPreviewProxy } from "./services/preview-proxy.js";
-import { killAll, startExpo } from "./services/process-manager.js";
+import { killAll, startExpo, getActivePort } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 
 const PORT = Number(process.env.AGENT_PORT ?? 3100);
@@ -287,8 +287,19 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
       );
       return;
 
-    case "start_preview":
+    case "start_preview": {
       console.log("[WS] Start preview:", message.projectName);
+
+      // Fast path: if project is already running, just switch the proxy
+      const existingPort = getActivePort(message.projectName as string);
+      if (existingPort) {
+        console.log(`[WS] Project ${message.projectName} already running on port ${existingPort}, switching proxy`);
+        setPreviewPort(existingPort);
+        broadcast({ type: "preview_ready", port: existingPort, proxyUrl: "/preview/" });
+        broadcast({ type: "status", status: "ready" });
+        return;
+      }
+
       runQueuedOperation(
         clientId,
         getProjectOperationQueueKey(message.projectName),
@@ -372,6 +383,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
         }
       );
       return;
+    }
 
     case "revert_version":
       console.log("[WS] Revert:", message.projectName, message.commitHash);
