@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, TextInput, Pressable, Modal, Platform, ScrollView } from "react-native";
-import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown } from "lucide-react-native";
+import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info } from "lucide-react-native";
 import { apiClient, type LmModel } from "@/shared/lib/api-client";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useProjectStore } from "@/stores/project-store";
@@ -107,8 +107,8 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             loading={modelsLoading}
             open={modelDropdownOpen}
             onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setEnhancerDropdownOpen(false); }}
-            onSelect={(id) => { /* stored on agent side, just show info */ setModelDropdownOpen(false); }}
-            currentModel={models[0]?.id ?? "auto (first loaded)"}
+            onSelect={(id) => { settings.setModel(id); setModelDropdownOpen(false); }}
+            currentModel={settings.model || models[0]?.id || "auto (first loaded)"}
           />
 
           <View className="flex-row gap-4">
@@ -149,6 +149,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               currentModel={settings.enhancerModel || "same as generation"}
             />
           </View>
+
+          {/* Error Logs */}
+          <ErrorLogPanel />
         </ScrollView>
       </View>
     </Modal>
@@ -261,5 +264,123 @@ const Field = ({ label, value, onChange, keyboardType = "default" }: FieldProps)
     />
   </View>
 );
+
+// ── Error Log Panel ──
+const ErrorLogPanel = () => {
+  const errorLogs = useSettingsStore((s) => s.errorLogs);
+  const clearErrorLogs = useSettingsStore((s) => s.clearErrorLogs);
+  const [expanded, setExpanded] = useState(false);
+
+  const copyAllLogs = useCallback(() => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      const text = errorLogs
+        .map((log) => {
+          const time = new Date(log.timestamp).toLocaleTimeString();
+          return `[${time}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}${log.details ? `\n  ${log.details}` : ""}`;
+        })
+        .join("\n\n");
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+  }, [errorLogs]);
+
+  const copySingleLog = useCallback((log: typeof errorLogs[number]) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      const time = new Date(log.timestamp).toLocaleTimeString();
+      const text = `[${time}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}${log.details ? `\n${log.details}` : ""}`;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+  }, []);
+
+  return (
+    <View
+      className="rounded-xl overflow-hidden"
+      style={{
+        backgroundColor: errorLogs.length > 0 ? "rgba(255, 51, 102, 0.04)" : "rgba(0,0,0,0.02)",
+        borderWidth: 1,
+        borderColor: errorLogs.length > 0 ? "rgba(255, 51, 102, 0.15)" : "rgba(0,0,0,0.04)",
+      }}
+    >
+      <Pressable
+        onPress={() => setExpanded(!expanded)}
+        className="flex-row items-center justify-between px-4 py-3"
+      >
+        <View className="flex-row items-center gap-2">
+          <AlertTriangle size={13} color={errorLogs.length > 0 ? "#FF3366" : "#8888AA"} strokeWidth={1.5} />
+          <Text className="text-ink-base text-xs font-semibold">
+            Error Log
+          </Text>
+          {errorLogs.length > 0 && (
+            <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,51,102,0.15)" }}>
+              <Text style={{ fontSize: 9, color: "#FF3366", fontWeight: "700" }}>{errorLogs.length}</Text>
+            </View>
+          )}
+        </View>
+        <View className="flex-row items-center gap-2">
+          {errorLogs.length > 0 && (
+            <>
+              <Pressable onPress={copyAllLogs} className="p-1">
+                <Copy size={12} color="#8888AA" strokeWidth={1.5} />
+              </Pressable>
+              <Pressable onPress={clearErrorLogs} className="p-1">
+                <Trash2 size={12} color="#FF3366" strokeWidth={1.5} />
+              </Pressable>
+            </>
+          )}
+          <ChevronDown
+            size={12}
+            color="#8888AA"
+            strokeWidth={1.5}
+            style={{ transform: [{ rotate: expanded ? "180deg" : "0deg" }] }}
+          />
+        </View>
+      </Pressable>
+
+      {expanded && (
+        <View className="px-3 pb-3" style={{ maxHeight: 300 }}>
+          {errorLogs.length === 0 ? (
+            <View className="items-center py-4">
+              <Info size={16} color="#8888AA" strokeWidth={1} />
+              <Text style={{ fontSize: 10, color: "#8888AA", marginTop: 4 }}>No errors logged</Text>
+            </View>
+          ) : (
+            <ScrollView style={{ maxHeight: 280 }}>
+              {[...errorLogs].reverse().map((log) => {
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const levelColor = log.level === "error" ? "#FF3366" : log.level === "warn" ? "#FFD700" : "#00E5FF";
+                return (
+                  <Pressable
+                    key={log.id}
+                    onPress={() => copySingleLog(log)}
+                    className="mb-2 p-2 rounded-lg"
+                    style={{ backgroundColor: "rgba(0,0,0,0.03)" }}
+                  >
+                    <View className="flex-row items-center gap-1.5 mb-1">
+                      <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: levelColor }} />
+                      <Text style={{ fontSize: 9, color: "#8888AA", fontFamily: "monospace" }}>{time}</Text>
+                      <Text style={{ fontSize: 9, color: levelColor, fontWeight: "600" }}>{log.level.toUpperCase()}</Text>
+                      <Text style={{ fontSize: 9, color: "#666" }}>[{log.source}]</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: "#4A4A6A", lineHeight: 16 }} numberOfLines={2}>
+                      {log.message}
+                    </Text>
+                    {log.details && (
+                      <Text
+                        style={{ fontSize: 9, color: "#888", fontFamily: "monospace", marginTop: 3, lineHeight: 13 }}
+                        numberOfLines={4}
+                      >
+                        {log.details}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 8, color: "#AAA", marginTop: 2 }}>tap to copy</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
 
 export default SettingsDrawer;

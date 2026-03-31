@@ -1,6 +1,7 @@
 import { View, Text, ScrollView } from "react-native";
 import { Platform } from "react-native";
 import { useProjectStore } from "@/stores/project-store";
+import MatrixRain from "./matrix-rain";
 
 let SyntaxHighlighter: typeof import("react-syntax-highlighter").default | null = null;
 let vscDarkPlus: Record<string, React.CSSProperties> | null = null;
@@ -27,18 +28,21 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   if (!filepath && status === "generating") {
     return (
-      <ScrollView
-        className="flex-1"
-        style={{ backgroundColor: "#09090B" }}
-        contentContainerStyle={{ padding: 16 }}
-      >
-        <Text className="text-accent-cyan text-xs font-mono opacity-40 mb-2">
-          Generating...
-        </Text>
-        <Text className="text-status-success font-mono text-xs opacity-70 leading-5">
-          {streamingContent}
-        </Text>
-      </ScrollView>
+      <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
+        <MatrixRain />
+        <ScrollView
+          className="flex-1"
+          style={{ backgroundColor: "transparent" }}
+          contentContainerStyle={{ padding: 16 }}
+        >
+          <Text className="text-accent-cyan text-xs font-mono opacity-40 mb-2">
+            Generating...
+          </Text>
+          <Text style={{ color: "#00FF41", fontFamily: "monospace", fontSize: 12, opacity: 0.9, lineHeight: 20 }}>
+            {streamingContent}
+          </Text>
+        </ScrollView>
+      </View>
     );
   }
 
@@ -46,9 +50,10 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     return (
       <View
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "#09090B" }}
+        style={{ backgroundColor: "#09090B", position: "relative" as const }}
       >
-        <Text className="text-txt-dim text-xs">Select a file to view</Text>
+        <MatrixRain />
+        <Text style={{ color: "#00FF41", fontSize: 12, opacity: 0.6, zIndex: 1 }}>Select a file to view</Text>
       </View>
     );
   }
@@ -59,9 +64,10 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     return (
       <View
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "#09090B" }}
+        style={{ backgroundColor: "#09090B", position: "relative" as const }}
       >
-        <Text className="text-txt-dim text-xs">Loading {filepath}...</Text>
+        <MatrixRain />
+        <Text style={{ color: "#00FF41", fontSize: 12, opacity: 0.6, zIndex: 1 }}>Loading {filepath}...</Text>
       </View>
     );
   }
@@ -81,63 +87,70 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     const Highlighter = SyntaxHighlighter!;
     const theme = vscDarkPlus!;
     return (
-      <ScrollView className="flex-1" style={{ backgroundColor: "#09090B" }}>
-        <Highlighter
-          language={lang}
-          style={theme}
-          showLineNumbers
-          lineNumberStyle={{
-            minWidth: 40,
-            paddingRight: 16,
-            color: "#52525B",
-            fontSize: 12,
-            userSelect: "none",
-          }}
-          customStyle={{
-            margin: 0,
-            padding: 16,
-            backgroundColor: "#09090B",
-            fontSize: 13,
-            lineHeight: 1.6,
-            fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-          }}
-          codeTagProps={{
-            style: {
-              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
+        <MatrixRain />
+        <ScrollView className="flex-1" style={{ backgroundColor: "transparent", zIndex: 1 }}>
+          <Highlighter
+            language={lang}
+            style={theme}
+            showLineNumbers
+            lineNumberStyle={{
+              minWidth: 40,
+              paddingRight: 16,
+              color: "#00FF41",
+              fontSize: 12,
+              userSelect: "none",
+              opacity: 0.3,
+            }}
+            customStyle={{
+              margin: 0,
+              padding: 16,
+              backgroundColor: "rgba(9, 9, 11, 0.75)",
               fontSize: 13,
-            },
-          }}
-        >
-          {content}
-        </Highlighter>
-      </ScrollView>
+              lineHeight: 1.6,
+              fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+            }}
+            codeTagProps={{
+              style: {
+                fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                fontSize: 13,
+              },
+            }}
+          >
+            {content}
+          </Highlighter>
+        </ScrollView>
+      </View>
     );
   }
 
   // Fallback: plain text with line numbers
   const lines = content.split("\n");
   return (
-    <ScrollView
-      className="flex-1"
-      style={{ backgroundColor: "#09090B" }}
-      horizontal
-    >
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        {lines.map((line, i) => (
-          <View key={i} className="flex-row" style={{ minHeight: 20 }}>
-            <Text
-              className="text-txt-dim font-mono text-xs text-right"
-              style={{ width: 40, paddingRight: 16, userSelect: "none" } as never}
-            >
-              {i + 1}
-            </Text>
-            <Text className="text-txt-main font-mono text-xs flex-1">
-              {line || " "}
-            </Text>
-          </View>
-        ))}
+    <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
+      <MatrixRain />
+      <ScrollView
+        className="flex-1"
+        style={{ backgroundColor: "transparent", zIndex: 1 }}
+        horizontal
+      >
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
+          {lines.map((line, i) => (
+            <View key={i} className="flex-row" style={{ minHeight: 20 }}>
+              <Text
+                className="font-mono text-xs text-right"
+                style={{ width: 40, paddingRight: 16, userSelect: "none", color: "#00FF41", opacity: 0.3 } as never}
+              >
+                {i + 1}
+              </Text>
+              <Text className="font-mono text-xs flex-1" style={{ color: "#00FF41" }}>
+                {line || " "}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
       </ScrollView>
-    </ScrollView>
+    </View>
   );
 };
 

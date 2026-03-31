@@ -242,6 +242,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           createOperation = createProject({
             description: message.description,
             lmStudioUrl: message.lmStudioUrl,
+            model: message.model,
+            temperature: message.temperature,
+            maxTokens: message.maxTokens,
             onProjectNameResolved: (projectName) => {
               if (createOperation) {
                 attachOperationToQueueKey(
@@ -274,6 +277,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           userRequest: message.userRequest,
           chatHistory: message.chatHistory,
           lmStudioUrl: message.lmStudioUrl,
+          model: message.model,
+          temperature: message.temperature,
+          maxTokens: message.maxTokens,
         }),
         (result) => {
           broadcast({ type: "iteration_result", ...result });

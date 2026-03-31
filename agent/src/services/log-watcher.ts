@@ -1,7 +1,7 @@
 // Classifies Metro output so autofix can react differently to dependency, syntax, and runtime failures.
 import type { ChildProcess } from "child_process";
 
-const METRO_ERROR_MAX_LENGTH = 500;
+const METRO_ERROR_MAX_LENGTH = 1200;
 
 export type BuildStatus = "building" | "success" | "error" | "idle";
 export type BuildIssueCategory =
@@ -41,18 +41,25 @@ const isErrorLine = (line: string): boolean =>
   ERROR_PATTERNS.some((pattern) => pattern.test(line));
 
 const isNoiseLine = (line: string): boolean => {
-  const lower = line.toLowerCase();
+  const trimmed = line.trim();
+  const lower = trimmed.toLowerCase();
   return (
     lower.includes("warning") ||
     lower.includes("deprecat") ||
     lower.includes("experimentalwarning") ||
-    lower.includes("info") ||
-    line.trim().startsWith("at node:") ||
-    line.trim().startsWith("at Object.") ||
-    line.includes("node_modules") ||
-    line.trim() === ""
+    (lower.startsWith("info") && !lower.includes("error")) ||
+    trimmed.startsWith("at node:") ||
+    trimmed.startsWith("at Object.") ||
+    trimmed.startsWith("at Module.") ||
+    trimmed.startsWith("at require") ||
+    trimmed.startsWith("at async") ||
+    (line.includes("node_modules") && !line.includes("Unable to resolve")) ||
+    trimmed === ""
   );
 };
+
+const isUserFileLine = (line: string): boolean =>
+  /src\//.test(line) && !line.includes("node_modules");
 
 const truncateError = (errorText: string): string => {
   if (errorText.length <= METRO_ERROR_MAX_LENGTH) return errorText;
@@ -120,19 +127,25 @@ export const parseMetroError = (output: string): ParsedError | null => {
       file = metroFileMatch[1];
     }
 
-    if (!isNoiseLine(l) && stackLines.length < 5) {
-      stackLines.push(l.trim());
+    if (!isNoiseLine(l)) {
+      if (isUserFileLine(l)) {
+        stackLines.unshift(l.trim()); // user files first
+      } else if (stackLines.length < 8) {
+        stackLines.push(l.trim());
+      }
     }
   }
 
-  const raw = `${errorType}\n  File: ${file}:${line}\n  ${stackLines.join("\n  ")}`;
+  // Deduplicate and limit
+  const uniqueStack = [...new Set(stackLines)].slice(0, 8);
+  const raw = `${errorType}\n  File: ${file}:${line}\n  ${uniqueStack.join("\n  ")}`;
 
   return {
     type: errorType,
     category: categorizeError(errorType),
     file,
     line,
-    stack: stackLines.join("\n"),
+    stack: uniqueStack.join("\n"),
     raw: truncateError(raw),
   };
 };

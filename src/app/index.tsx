@@ -1,4 +1,5 @@
 ﻿import { useState, useCallback, useRef, useEffect } from "react";
+import { useRouter } from "expo-router";
 import {
   View,
   Text,
@@ -18,6 +19,7 @@ import {
   WifiOff,
   Download,
   FolderOpen,
+  Users,
 } from "lucide-react-native";
 
 import { apiClient, type ProjectListItem } from "@/shared/lib/api-client";
@@ -38,6 +40,7 @@ import LotusToast from "@/shared/components/effects/lotus-toast";
 // react-resizable-panels disabled: uses import.meta which breaks Hermes bundler
 
 export default function AppFactoryScreen() {
+  const router = useRouter();
   const { createProject, iterate, abortGeneration, revertVersion, startPreview } = useWebSocket();
 
   const projectName = useProjectStore((s) => s.projectName);
@@ -146,11 +149,10 @@ export default function AppFactoryScreen() {
 
   const handleCreate = useCallback(
     (text: string) => {
-      addMessage(createUserMessage(text));
       setStatus("planning");
       createProject(text);
     },
-    [addMessage, setStatus, createProject]
+    [setStatus, createProject]
   );
 
   const handleChatSend = useCallback(
@@ -283,6 +285,20 @@ export default function AppFactoryScreen() {
               <Text className="text-ink-muted text-sm">
                 Describe your app. AI builds it locally.
               </Text>
+              <Pressable
+                onPress={() => router.push('/playground')}
+                className="mt-3 flex-row items-center gap-1.5 px-3 py-1.5 rounded-full"
+                style={{
+                  backgroundColor: "rgba(124, 77, 255, 0.08)",
+                  borderWidth: 1,
+                  borderColor: "rgba(124, 77, 255, 0.15)",
+                }}
+              >
+                <Users size={12} color="#7C4DFF" strokeWidth={1.5} />
+                <Text style={{ color: "#7C4DFF", fontSize: 12, fontWeight: "500" }}>
+                  Agent Playground
+                </Text>
+              </Pressable>
             </View>
 
             {/* Glass input */}

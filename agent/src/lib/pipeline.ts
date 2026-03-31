@@ -25,6 +25,9 @@ import type { SupportedNavigationType } from "./generation-contract.js";
 interface CreateOptions {
   description: string;
   lmStudioUrl?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
   onProjectNameResolved?: (projectName: string) => void;
 }
 
@@ -39,6 +42,9 @@ interface IterateOptions {
   userRequest: string;
   chatHistory: Array<{ role: "user" | "assistant"; content: string }>;
   lmStudioUrl?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
 }
 
 interface IterateResult {
@@ -163,7 +169,7 @@ const runProjectQualityGates = async (
 export const createProject = async (
   options: CreateOptions
 ): Promise<CreateResult> => {
-  const { description, lmStudioUrl, onProjectNameResolved } = options;
+  const { description, lmStudioUrl, model, temperature, maxTokens, onProjectNameResolved } = options;
 
   // ── Step 1: Plan ──────────────────────────────────────
   broadcast({ type: "status", status: "planning" });
@@ -171,6 +177,9 @@ export const createProject = async (
   const plan = await planApp({
     description,
     lmStudioUrl,
+    model,
+    temperature,
+    maxTokens,
     onChunk: (chunk) => broadcast({ type: "plan_chunk", chunk }),
   });
 
@@ -205,6 +214,9 @@ export const createProject = async (
     projectPath,
     plan,
     lmStudioUrl,
+    model,
+    temperature,
+    maxTokens,
     onFileStart: (filepath, index, total) =>
       broadcast({
         type: "file_generating",
@@ -342,7 +354,7 @@ export const createProject = async (
 export const iterateProject = async (
   options: IterateOptions
 ): Promise<IterateResult> => {
-  const { projectName, userRequest, chatHistory, lmStudioUrl } = options;
+  const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens } = options;
   const projectPath = getProjectPath(projectName);
 
   broadcast({ type: "status", status: "analyzing" });
@@ -352,6 +364,9 @@ export const iterateProject = async (
     userRequest,
     chatHistory,
     lmStudioUrl,
+    model,
+    temperature,
+    maxTokens,
     onThinking: (text) => broadcast({ type: "thinking", content: text }),
     onAnalysis: (action) =>
       broadcast({

@@ -10,6 +10,9 @@ export interface ChatMessage {
   timestamp: number;
   status: MessageStatus;
   isHidden?: boolean;
+  isError?: boolean;
+  errorFile?: string;
+  errorDetails?: string;
 }
 
 export const createUserMessage = (content: string): ChatMessage => ({
@@ -41,4 +44,19 @@ export const createSystemMessage = (
   timestamp: Date.now(),
   status: "complete",
   isHidden,
+});
+
+export const createErrorMessage = (
+  content: string,
+  errorDetails?: string,
+  errorFile?: string,
+): ChatMessage => ({
+  id: crypto.randomUUID(),
+  role: "assistant",
+  content,
+  timestamp: Date.now(),
+  status: "complete",
+  isError: true,
+  errorDetails,
+  errorFile,
 });

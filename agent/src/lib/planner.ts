@@ -3,17 +3,19 @@ import { streamCompletion } from "../services/llm-proxy.js";
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
 import { validateAppPlan } from "./project-validator.js";
+import { safeJsonParse } from "./json-repair.js";
 
 interface PlannerOptions {
   description: string;
   temperature?: number;
   maxTokens?: number;
   lmStudioUrl?: string;
+  model?: string;
   onChunk?: (chunk: string) => void;
 }
 
 export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
-  const { description, temperature = 0.3, maxTokens = 32768, lmStudioUrl, onChunk } = options;
+  const { description, temperature = 0.3, maxTokens = 32768, lmStudioUrl, model, onChunk } = options;
 
   const messages = [
     { role: "system" as const, content: SYSTEM_PLANNER },
@@ -26,6 +28,7 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
     temperature,
     maxTokens,
     lmStudioUrl,
+    model,
   });
 
   for await (const chunk of generator) {
@@ -37,13 +40,11 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed);
+    parsed = safeJsonParse(trimmed);
   } catch (err) {
-    const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error(`Planner returned invalid JSON: ${trimmed.slice(0, 200)}`);
-    }
-    parsed = JSON.parse(jsonMatch[0]);
+    throw new Error(
+      `Planner returned invalid JSON: ${err instanceof Error ? err.message : "parse error"}\n${trimmed.slice(0, 300)}`
+    );
   }
 
   const result = AppPlanSchema.safeParse(parsed);

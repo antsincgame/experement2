@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { MessageSquare } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
@@ -24,6 +24,27 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
     }, 50);
     return () => clearTimeout(timer);
   }, [visibleMessages.length]);
+
+  const handleFixError = useCallback(
+    (errorContent: string, errorDetails?: string, errorFile?: string) => {
+      const parts: string[] = ["Fix the following error:"];
+
+      if (errorFile) {
+        parts.push(`File: ${errorFile}`);
+      }
+
+      parts.push(`Error: ${errorContent}`);
+
+      if (errorDetails) {
+        parts.push(`Details: ${errorDetails}`);
+      }
+
+      parts.push("Analyze the error and apply the fix.");
+
+      onSend(parts.join("\n"));
+    },
+    [onSend],
+  );
 
   return (
     <View className="flex-1" style={{ backgroundColor: "rgba(255,255,255,0.4)" }}>
@@ -57,7 +78,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
           </View>
         )}
         {visibleMessages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+          <ChatMessage key={msg.id} message={msg} onFixError={handleFixError} />
         ))}
       </ScrollView>
 

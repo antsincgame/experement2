@@ -14,6 +14,7 @@ import {
   SYSTEM_EDITOR_GENERATE,
 } from "../prompts/system-editor.js";
 import { npmInstall } from "../services/process-manager.js";
+import { safeJsonParse } from "./json-repair.js";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -25,6 +26,9 @@ interface EditorOptions {
   userRequest: string;
   chatHistory: ChatMessage[];
   lmStudioUrl?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
   onThinking?: (text: string) => void;
   onBlock?: (block: SearchReplaceBlock) => void;
   onAnalysis?: (action: EditAction) => void;
@@ -37,11 +41,20 @@ interface EditorResult {
   errors: string[];
 }
 
+const normalizeLine = (line: string): string => line.replace(/\s+$/g, "").replace(/\t/g, "  ");
+
+const fuzzyLineMatch = (contentLine: string, searchLine: string): boolean => {
+  if (contentLine.trim() === searchLine.trim()) return true;
+  if (normalizeLine(contentLine) === normalizeLine(searchLine)) return true;
+  return false;
+};
+
 const applySearchReplace = (
   content: string,
   search: string,
   replace: string
 ): { result: string | null; error: string | null } => {
+  // Exact match
   if (content.includes(search)) {
     const count = content.split(search).length - 1;
     if (count > 1) {
@@ -53,20 +66,76 @@ const applySearchReplace = (
     return { result: content.replace(search, replace), error: null };
   }
 
+  const contentLines = content.split("\n");
+  const searchLines = search.split("\n").filter((l) => l.trim() !== "" || search.includes("\n\n"));
+
+  // Skip empty-only search blocks
+  if (searchLines.length === 0) {
+    return { result: null, error: "Empty search block." };
+  }
+
+  // Fuzzy line-by-line matching (handles whitespace differences)
+  for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
+    let matched = true;
+    let contentIdx = i;
+    let searchIdx = 0;
+
+    while (searchIdx < searchLines.length && contentIdx < contentLines.length) {
+      const searchLine = searchLines[searchIdx];
+
+      // Skip blank lines in search that don't match
+      if (searchLine.trim() === "" && contentLines[contentIdx].trim() !== "") {
+        searchIdx++;
+        continue;
+      }
+
+      if (fuzzyLineMatch(contentLines[contentIdx], searchLine)) {
+        searchIdx++;
+        contentIdx++;
+      } else {
+        matched = false;
+        break;
+      }
+    }
+
+    if (matched && searchIdx === searchLines.length) {
+      const matchLength = contentIdx - i;
+      // Detect indentation of matched block to preserve it
+      const originalIndent = contentLines[i].match(/^(\s*)/)?.[1] ?? "";
+      const searchIndent = searchLines[0].match(/^(\s*)/)?.[1] ?? "";
+
+      let adjustedReplace = replace;
+      if (originalIndent !== searchIndent) {
+        const replaceLines = replace.split("\n");
+        adjustedReplace = replaceLines.map((rl) => {
+          if (rl.startsWith(searchIndent)) {
+            return originalIndent + rl.slice(searchIndent.length);
+          }
+          return rl;
+        }).join("\n");
+      }
+
+      const before = contentLines.slice(0, i);
+      const after = contentLines.slice(i + matchLength);
+      return {
+        result: [...before, adjustedReplace, ...after].join("\n"),
+        error: null,
+      };
+    }
+  }
+
+  // Last resort: normalized full-text match
   const normalizedContent = content.replace(/^\s+/gm, "").replace(/\s+$/gm, "");
   const normalizedSearch = search.replace(/^\s+/gm, "").replace(/\s+$/gm, "");
 
   if (normalizedContent.includes(normalizedSearch)) {
-    const lines = content.split("\n");
-    const searchLines = search.split("\n");
     const normalSearchLines = normalizedSearch.split("\n");
-
-    for (let i = 0; i <= lines.length - searchLines.length; i++) {
-      const slice = lines.slice(i, i + searchLines.length);
+    for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
+      const slice = contentLines.slice(i, i + searchLines.length);
       const normalSlice = slice.map((l) => l.trim()).join("\n");
       if (normalSlice === normalSearchLines.join("\n")) {
-        const before = lines.slice(0, i);
-        const after = lines.slice(i + searchLines.length);
+        const before = contentLines.slice(0, i);
+        const after = contentLines.slice(i + searchLines.length);
         return {
           result: [...before, replace, ...after].join("\n"),
           error: null,
@@ -89,6 +158,9 @@ export const editProject = async (
     userRequest,
     chatHistory,
     lmStudioUrl,
+    model,
+    temperature,
+    maxTokens,
     onThinking,
     onBlock,
     onAnalysis,
@@ -110,9 +182,10 @@ export const editProject = async (
 
   let actionJson = "";
   const analyzeGen = await streamCompletion(analyzeMessages, {
-    temperature: 0.3,
+    temperature: temperature ?? 0.3,
     maxTokens: 2048,
     lmStudioUrl,
+    model,
   });
 
   for await (const chunk of analyzeGen) {
@@ -121,12 +194,11 @@ export const editProject = async (
 
   let action: EditAction;
   try {
-    const jsonMatch = actionJson.trim().match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch?.[0] ?? actionJson);
+    const parsed = safeJsonParse(actionJson);
     action = EditActionSchema.parse(parsed);
   } catch (err) {
     throw new Error(
-      `Editor analysis failed: ${err instanceof Error ? err.message : "Invalid JSON"}`
+      `Editor analysis failed: ${err instanceof Error ? err.message : "Invalid JSON"}\n${actionJson.slice(0, 300)}`
     );
   }
 
@@ -160,9 +232,10 @@ export const editProject = async (
   ];
 
   const generateGen = await streamCompletion(generateMessages, {
-    temperature: 0.4,
-    maxTokens: 32768,
+    temperature: temperature ?? 0.4,
+    maxTokens: maxTokens ?? 32768,
     lmStudioUrl,
+    model,
   });
 
   let appliedBlocks = 0;

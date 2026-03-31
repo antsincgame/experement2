@@ -4,6 +4,13 @@ import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
+const logError = (source: string, message: string, details?: string) => {
+  useSettingsStore.getState().addErrorLog({ level: "error", source, message, details });
+};
+const logWarn = (source: string, message: string) => {
+  useSettingsStore.getState().addErrorLog({ level: "warn", source, message });
+};
+
 interface WsRuntime {
   currentUrl?: string;
   initialized?: boolean;
@@ -72,7 +79,9 @@ const handleSocketMessage = (payload: string): void => {
   try {
     useProjectStore.getState().handleWsMessage(JSON.parse(payload));
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error("[WS] Failed to parse message", error);
+    logError("websocket", `Failed to parse message: ${msg}`, payload.slice(0, 500));
   }
 };
 
@@ -129,6 +138,7 @@ const ensureConnected = (): void => {
 
   socket.onerror = () => {
     console.warn(`[WS] Socket error for ${nextUrl}`);
+    logWarn("websocket", `Connection error: ${nextUrl}`);
   };
 };
 
@@ -176,10 +186,14 @@ export const useWebSocket = () => {
   }, []);
 
   const createProject = useCallback((description: string) => {
+    const { lmStudioUrl, model, temperature, maxTokens } = useSettingsStore.getState();
     send({
       type: "create_project",
       description,
-      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+      lmStudioUrl,
+      ...(model ? { model } : {}),
+      temperature,
+      maxTokens,
     });
   }, [send]);
 
@@ -199,20 +213,26 @@ export const useWebSocket = () => {
         content: message.content,
       }));
 
+    const { lmStudioUrl, model, temperature, maxTokens } = useSettingsStore.getState();
     send({
       type: "iterate",
       projectName,
       userRequest,
       chatHistory,
-      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+      lmStudioUrl,
+      ...(model ? { model } : {}),
+      temperature,
+      maxTokens,
     });
   }, [send]);
 
   const startPreview = useCallback((projectName: string) => {
+    const { lmStudioUrl, model } = useSettingsStore.getState();
     send({
       type: "start_preview",
       projectName,
-      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+      lmStudioUrl,
+      ...(model ? { model } : {}),
     });
   }, [send]);
 
@@ -226,11 +246,13 @@ export const useWebSocket = () => {
       return;
     }
 
+    const { lmStudioUrl, model } = useSettingsStore.getState();
     send({
       type: "revert_version",
       projectName,
       commitHash,
-      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+      lmStudioUrl,
+      ...(model ? { model } : {}),
     });
   }, [send]);
 

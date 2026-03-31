@@ -6,6 +6,15 @@ import {
   LM_STUDIO_DEFAULT_URL,
 } from "@/shared/lib/constants";
 
+export interface ErrorLogEntry {
+  id: string;
+  timestamp: number;
+  level: "error" | "warn" | "info";
+  source: string;
+  message: string;
+  details?: string;
+}
+
 interface SettingsState {
   lmStudioUrl: string;
   model: string;
@@ -15,6 +24,7 @@ interface SettingsState {
   agentUrl: string;
   enhancerModel: string;
   enhancerEnabled: boolean;
+  errorLogs: ErrorLogEntry[];
 
   setLmStudioUrl: (url: string) => void;
   setModel: (model: string) => void;
@@ -24,6 +34,8 @@ interface SettingsState {
   setAgentUrl: (url: string) => void;
   setEnhancerModel: (model: string) => void;
   setEnhancerEnabled: (enabled: boolean) => void;
+  addErrorLog: (entry: Omit<ErrorLogEntry, "id" | "timestamp">) => void;
+  clearErrorLogs: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -37,6 +49,7 @@ export const useSettingsStore = create<SettingsState>()(
       agentUrl: AGENT_HTTP_URL,
       enhancerModel: "",
       enhancerEnabled: true,
+      errorLogs: [],
 
       setLmStudioUrl: (lmStudioUrl) => set({ lmStudioUrl }),
       setModel: (model) => set({ model }),
@@ -46,6 +59,14 @@ export const useSettingsStore = create<SettingsState>()(
       setAgentUrl: (agentUrl) => set({ agentUrl }),
       setEnhancerModel: (enhancerModel) => set({ enhancerModel }),
       setEnhancerEnabled: (enhancerEnabled) => set({ enhancerEnabled }),
+      addErrorLog: (entry) =>
+        set((s) => ({
+          errorLogs: [
+            ...s.errorLogs.slice(-99),
+            { ...entry, id: crypto.randomUUID(), timestamp: Date.now() },
+          ],
+        })),
+      clearErrorLogs: () => set({ errorLogs: [] }),
     }),
     {
       name: "app-factory-settings",

@@ -4,7 +4,9 @@ import type { ChatMessage } from "@/features/chat/schemas/message.schema";
 import {
   createAssistantMessage,
   createSystemMessage,
+  createErrorMessage,
 } from "@/features/chat/schemas/message.schema";
+import { useSettingsStore } from "@/stores/settings-store";
 
 export type AppStatus =
   | "idle"
@@ -425,9 +427,17 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       case "thinking":
         store.addMessage(createAssistantMessage(msg.content as string));
         break;
-      case "analysis_complete":
-        store.addMessage(createSystemMessage(`Analysis: reading ${(msg.files as string[]).join(", ")}`, true));
+      case "analysis_complete": {
+        const thinking = msg.thinking as string | undefined;
+        if (thinking) {
+          store.addMessage(createAssistantMessage(thinking));
+        }
+        const files = msg.files as string[] | undefined;
+        if (files && files.length > 0) {
+          store.addMessage(createSystemMessage(`Analyzing: ${files.join(", ")}`, true));
+        }
         break;
+      }
       case "block_applied":
         store.addMessage(createSystemMessage(`Modified: ${msg.filepath}`, true));
         break;
@@ -435,11 +445,22 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       case "iteration_complete": {
         const applied = msg.applied as number;
         const failed = msg.failed as number;
-        store.addMessage(createAssistantMessage(
-          failed > 0
-            ? `Applied ${applied} changes, ${failed} errors`
-            : `Applied ${applied} changes [ok]`
-        ));
+        if (failed > 0) {
+          const errors = (msg.errors as string[] | undefined) ?? [];
+          store.addMessage(createErrorMessage(
+            `Applied ${applied} changes, ${failed} errors`,
+            errors.join("\n") || undefined,
+          ));
+          useSettingsStore.getState().addErrorLog({
+            level: "error",
+            source: "iteration",
+            message: `${failed} blocks failed to apply`,
+            details: errors.join("\n"),
+          });
+        } else if (applied > 0) {
+          store.addMessage(createAssistantMessage(`Applied ${applied} changes [ok]`));
+        }
+        store.setStatus("ready");
         break;
       }
 
@@ -459,14 +480,34 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         store.addMessage(createAssistantMessage(`Error fixed (attempt ${msg.attempts}) [ok]`));
         break;
       case "autofix_failed":
-        store.addMessage(createAssistantMessage(`Could not fix after ${msg.attempts} attempts.`));
+        store.addMessage(createErrorMessage(
+          `Could not fix after ${msg.attempts} attempts.`,
+          msg.error as string | undefined,
+          msg.file as string | undefined,
+        ));
+        useSettingsStore.getState().addErrorLog({
+          level: "error",
+          source: "autofix",
+          message: `Autofix failed after ${msg.attempts} attempts`,
+          details: `File: ${msg.file ?? "unknown"}\n${msg.error ?? ""}`,
+        });
         store.setStatus("error");
         break;
       case "reloading_preview":
         store.addMessage(createSystemMessage("Reverting version, reloading preview...", false));
         break;
       case "system_error":
-        store.addMessage(createAssistantMessage(`Error: ${msg.error}`));
+        store.addMessage(createErrorMessage(
+          `Error: ${msg.error}`,
+          msg.error as string | undefined,
+          msg.file as string | undefined,
+        ));
+        useSettingsStore.getState().addErrorLog({
+          level: "error",
+          source: "system",
+          message: String(msg.error),
+          details: msg.file ? `File: ${msg.file}` : undefined,
+        });
         store.setStatus("error");
         break;
       case "generation_aborted":

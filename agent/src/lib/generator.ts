@@ -24,6 +24,9 @@ interface GeneratorOptions {
   projectPath: string;
   plan: AppPlan;
   lmStudioUrl?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
   onFileStart?: (filepath: string, index: number, total: number) => void;
   onChunk?: (chunk: string) => void;
   onFileComplete?: (filepath: string) => void;
@@ -170,6 +173,9 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     projectPath,
     plan,
     lmStudioUrl,
+    model,
+    temperature,
+    maxTokens,
     onFileStart,
     onChunk,
     onFileComplete,
@@ -240,9 +246,10 @@ Generate the complete code for: ${fileSpec.path}`;
     let responseBuffer = "";
 
     const generator = await streamCompletion(messages, {
-      temperature: 0.4,
-      maxTokens: 32768,
+      temperature: temperature ?? 0.4,
+      maxTokens: maxTokens ?? 32768,
       lmStudioUrl,
+      model,
     });
 
     for await (const chunk of generator) {

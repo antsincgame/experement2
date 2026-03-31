@@ -1,4 +1,4 @@
-﻿// Uses the shared API client for preview URLs so external opens respect the current agent URL.
+// Uses the shared API client for preview URLs so external opens respect the current agent URL.
 import { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable, Linking } from "react-native";
 import { Globe, RotateCw, ExternalLink, Loader } from "lucide-react-native";
@@ -7,17 +7,32 @@ import { useProjectStore } from "@/stores/project-store";
 
 const PreviewPanel = () => {
   const previewPort = useProjectStore((state) => state.previewPort);
+  const projectName = useProjectStore((state) => state.projectName);
   const status = useProjectStore((state) => state.status);
   const [refreshKey, setRefreshKey] = useState(0);
   const prevPort = useRef(previewPort);
+  const prevProject = useRef(projectName);
 
+  // Refresh when port changes
   useEffect(() => {
     if (previewPort && previewPort !== prevPort.current) {
       const timeout = setTimeout(() => setRefreshKey((key) => key + 1), 2000);
       prevPort.current = previewPort;
       return () => clearTimeout(timeout);
     }
+    prevPort.current = previewPort;
   }, [previewPort]);
+
+  // Force refresh when project switches
+  useEffect(() => {
+    if (projectName !== prevProject.current) {
+      prevProject.current = projectName;
+      if (previewPort) {
+        const timeout = setTimeout(() => setRefreshKey((key) => key + 1), 1500);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [projectName, previewPort]);
 
   const isLoading = [
     "planning",
@@ -66,7 +81,7 @@ const PreviewPanel = () => {
             }}
           >
             <Text className="text-ink-light text-[10px] font-mono">
-              port:{previewPort}
+              {projectName ? `${projectName} — port:${previewPort}` : `port:${previewPort}`}
             </Text>
           </View>
           <Pressable onPress={handleOpenExternal}>
@@ -103,7 +118,7 @@ const PreviewPanel = () => {
         <View className="flex-1">
           {typeof window !== "undefined" && (
             <iframe
-              key={refreshKey}
+              key={`${projectName}-${refreshKey}`}
               src={proxyUrl}
               style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FAFAFF" }}
               title="App Preview"
