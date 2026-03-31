@@ -112,7 +112,6 @@ export const editProject = async (
   const analyzeGen = await streamCompletion(analyzeMessages, {
     temperature: 0.3,
     maxTokens: 2048,
-    responseFormat: { type: "json_object" },
     lmStudioUrl,
   });
 

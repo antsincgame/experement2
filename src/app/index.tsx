@@ -21,20 +21,7 @@ import FlowerOfLife from "@/shared/components/sacred-geometry/flower-of-life";
 import Mandala from "@/shared/components/sacred-geometry/mandala";
 import LotusToast from "@/shared/components/effects/lotus-toast";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-let RPGroup: any = null;
-let RPPanel: any = null;
-let RPSeparator: any = null;
-
-if (Platform.OS === "web") {
-  try {
-    const rp = require("react-resizable-panels");
-    RPGroup = rp.Group;
-    RPPanel = rp.Panel;
-    RPSeparator = rp.Separator;
-  } catch { /* fallback */ }
-}
-/* eslint-enable @typescript-eslint/no-explicit-any */
+// react-resizable-panels disabled: uses import.meta which breaks Hermes bundler
 
 export default function AppFactoryScreen() {
   const { createProject, iterate, abortGeneration, revertVersion } = useWebSocket();
@@ -246,92 +233,7 @@ export default function AppFactoryScreen() {
   }
 
   // ── WORKSPACE ──────────────────────────────────────────
-  const SplitterV = () => {
-    if (!RPSeparator) return <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />;
-    return (
-      <RPSeparator
-        style={{
-          width: 1,
-          backgroundColor: "rgba(0,0,0,0.08)",
-          cursor: "col-resize",
-          transition: "background-color 0.2s, width 0.2s",
-        }}
-        className="hover:bg-neon-cyan/40 hover:w-[3px]"
-      />
-    );
-  };
-
-  const SplitterH = () => {
-    if (!RPSeparator) return <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />;
-    return (
-      <RPSeparator
-        style={{
-          height: 1,
-          backgroundColor: "rgba(0,0,0,0.08)",
-          cursor: "row-resize",
-          transition: "background-color 0.2s, height 0.2s",
-        }}
-        className="hover:bg-neon-cyan/40 hover:h-[3px]"
-      />
-    );
-  };
-
-  const workspace = () => {
-    if (RPGroup && RPPanel) {
-      return (
-        <RPGroup direction="horizontal" style={{ flex: 1 }}>
-          <RPPanel defaultSize={28} minSize={20} maxSize={45}>
-            <ChatPanel onSend={handleChatSend} onAbort={abortGeneration} />
-          </RPPanel>
-          <SplitterV />
-          <RPPanel defaultSize={44} minSize={30}>
-            <RPGroup direction="vertical">
-              <RPPanel defaultSize={terminalVisible ? 75 : 100} minSize={40}>
-                <View className="flex-1 flex-row" style={{ backgroundColor: "rgba(255,255,255,0.5)" }}>
-                  {fileTreeVisible && (
-                    <View
-                      style={{
-                        width: 200,
-                        backgroundColor: "rgba(255,255,255,0.6)",
-                        borderRightWidth: 1,
-                        borderRightColor: "rgba(0,0,0,0.06)",
-                      }}
-                    >
-                      <View className="h-10 px-3 flex-row items-center"
-                        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" }}
-                      >
-                        <Text className="text-ink-muted text-[10px] uppercase tracking-widest font-semibold">
-                          Explorer
-                        </Text>
-                      </View>
-                      <FileTree nodes={fileTree} activeFile={activeFile} onFilePress={openFile} />
-                    </View>
-                  )}
-                  <View className="flex-1">
-                    <FileTabBar openFiles={openFiles} activeFile={activeFile} onSelect={setActiveFile} onClose={closeFile} />
-                    <CodeViewer filepath={activeFile} />
-                  </View>
-                </View>
-              </RPPanel>
-              {terminalVisible && (
-                <>
-                  <SplitterH />
-                  <RPPanel defaultSize={25} minSize={10} maxSize={50}>
-                    <TerminalPanel />
-                  </RPPanel>
-                </>
-              )}
-            </RPGroup>
-          </RPPanel>
-          <SplitterV />
-          <RPPanel defaultSize={28} minSize={20} maxSize={45}>
-            <PreviewPanel />
-          </RPPanel>
-        </RPGroup>
-      );
-    }
-
-    return (
+  const workspace = () => (
       <View className="flex-1 flex-row">
         <View style={{ width: "28%" }}>
           <ChatPanel onSend={handleChatSend} onAbort={abortGeneration} />
@@ -356,8 +258,7 @@ export default function AppFactoryScreen() {
           <PreviewPanel />
         </View>
       </View>
-    );
-  };
+  );
 
   return (
     <AuroraBackground intensity="subtle">

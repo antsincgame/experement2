@@ -23,7 +23,6 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   const generator = await streamCompletion(messages, {
     temperature,
     maxTokens,
-    responseFormat: { type: "json_object" },
     lmStudioUrl,
   });
 
