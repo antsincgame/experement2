@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Globe, RotateCw, ExternalLink, Loader } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
@@ -9,6 +9,17 @@ const PreviewPanel = () => {
   const status = useProjectStore((s) => s.status);
   const agentUrl = useSettingsStore((s) => s.agentUrl);
   const [refreshKey, setRefreshKey] = useState(0);
+  const prevPort = useRef(previewPort);
+
+  // Auto-refresh iframe when previewPort changes (new preview ready)
+  useEffect(() => {
+    if (previewPort && previewPort !== prevPort.current) {
+      // Delay to let Metro finish serving
+      const t = setTimeout(() => setRefreshKey((k) => k + 1), 2000);
+      prevPort.current = previewPort;
+      return () => clearTimeout(t);
+    }
+  }, [previewPort]);
 
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
   const proxyUrl = `${agentUrl}/preview/`;

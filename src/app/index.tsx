@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { View, Text, TextInput, Pressable, Platform, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Pressable, Platform, ActivityIndicator, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus, FolderOpen } from "lucide-react-native";
 
@@ -160,7 +160,7 @@ export default function AppFactoryScreen() {
                   My Projects ({allProjects.length})
                 </Text>
               </View>
-              <View className="flex-1 py-1">
+              <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 4 }}>
                 {allProjects.map((p) => (
                   <Pressable
                     key={p.name}
@@ -178,7 +178,7 @@ export default function AppFactoryScreen() {
                     </Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
             </View>
           )}
 
