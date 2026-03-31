@@ -8,15 +8,15 @@ interface AuroraBackgroundProps {
 
 const GRADIENT_STYLES = {
   subtle: {
-    background: "linear-gradient(135deg, #E8F0FF 0%, #F5E6FF 25%, #E6FFF5 50%, #FFF0E6 75%, #E8F0FF 100%)",
+    backgroundImage: "linear-gradient(135deg, #E8F0FF 0%, #F5E6FF 25%, #E6FFF5 50%, #FFF0E6 75%, #E8F0FF 100%)",
     backgroundSize: "400% 400%",
   },
   medium: {
-    background: "linear-gradient(135deg, #C5E8FF 0%, #E0C5FF 20%, #C5FFE8 40%, #FFC5E8 60%, #C5E8FF 80%, #FFE8C5 100%)",
+    backgroundImage: "linear-gradient(135deg, #C5E8FF 0%, #E0C5FF 20%, #C5FFE8 40%, #FFC5E8 60%, #C5E8FF 80%, #FFE8C5 100%)",
     backgroundSize: "400% 400%",
   },
   vivid: {
-    background: "linear-gradient(135deg, #80F0FF 0%, #FF80CC 20%, #80FFB0 40%, #B388FF 60%, #80F0FF 80%, #FFD700 100%)",
+    backgroundImage: "linear-gradient(135deg, #80F0FF 0%, #FF80CC 20%, #80FFB0 40%, #B388FF 60%, #80F0FF 80%, #FFD700 100%)",
     backgroundSize: "400% 400%",
   },
 };
