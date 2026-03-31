@@ -2,6 +2,35 @@ import type { Request, Response } from "express";
 
 const DEFAULT_LM_STUDIO_URL = "http://localhost:1234";
 
+// Auto-detect first loaded model from LM Studio
+let cachedModelId: string | null = null;
+let modelFetchPromise: Promise<string | null> | null = null;
+
+const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
+  if (cachedModelId) return cachedModelId;
+  if (modelFetchPromise) return modelFetchPromise;
+
+  modelFetchPromise = (async () => {
+    try {
+      const resp = await fetch(`${baseUrl}/v1/models`);
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      const models = data.data ?? [];
+      // Prefer qwen3-coder, then any first model
+      const preferred = models.find((m: { id: string }) => m.id.includes("qwen3-coder"));
+      cachedModelId = preferred?.id ?? models[0]?.id ?? null;
+      console.log(`[LLM] Auto-detected model: ${cachedModelId}`);
+      return cachedModelId;
+    } catch {
+      return null;
+    } finally {
+      modelFetchPromise = null;
+    }
+  })();
+
+  return modelFetchPromise;
+};
+
 interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -35,12 +64,14 @@ export const streamCompletion = async (
 
   activeControllers.set(taskId, controller);
 
+  const resolvedModel = options.model || await getDefaultModel(baseUrl);
+
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.4,
     max_tokens: options.maxTokens ?? 32768,
     stream: true,
-    model: options.model ?? "",
+    ...(resolvedModel ? { model: resolvedModel } : {}),
   };
 
   if (options.responseFormat) {
@@ -116,12 +147,14 @@ export const completeNonStreaming = async (
 ): Promise<string> => {
   const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
 
+  const resolvedModel = options.model || await getDefaultModel(baseUrl);
+
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.3,
     max_tokens: options.maxTokens ?? 32768,
     stream: false,
-    model: options.model ?? "",
+    ...(resolvedModel ? { model: resolvedModel } : {}),
   };
 
   if (options.responseFormat) {
