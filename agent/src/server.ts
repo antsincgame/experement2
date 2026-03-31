@@ -11,7 +11,7 @@ import { abortAll } from "./services/llm-proxy.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { createPreviewProxy } from "./services/preview-proxy.js";
 import { startExpo } from "./services/process-manager.js";
-import { getProjectPath } from "./services/file-manager.js";
+import { getProjectPath, projectExists } from "./services/file-manager.js";
 
 const PORT = 3100;
 const app = express();
@@ -189,7 +189,7 @@ const handleWsMessage = (
       const projName = message.projectName as string;
       console.log("[WS] Start preview:", projName);
       const projPath = getProjectPath(projName);
-      if (!projPath || !require("fs").existsSync(projPath)) {
+      if (!projectExists(projName)) {
         broadcast({ type: "system_error", error: `Project not found: ${projName}` });
         break;
       }
