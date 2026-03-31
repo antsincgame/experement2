@@ -38,6 +38,7 @@ export const TEMPLATE_PACKAGE_DEPENDENCIES = {
     "react-native-reanimated": "4.2.1",
     nativewind: "^4.0.0",
     tailwindcss: "^3.4.0",
+    "@expo/vector-icons": "^14.0.0",
 };
 export const TEMPLATE_PACKAGE_DEV_DEPENDENCIES = {
     "@types/react": "~19.2.2",

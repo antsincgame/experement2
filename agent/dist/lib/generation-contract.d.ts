@@ -33,6 +33,7 @@ export declare const TEMPLATE_PACKAGE_DEPENDENCIES: {
     readonly "react-native-reanimated": "4.2.1";
     readonly nativewind: "^4.0.0";
     readonly tailwindcss: "^3.4.0";
+    readonly "@expo/vector-icons": "^14.0.0";
 };
 export declare const TEMPLATE_PACKAGE_DEV_DEPENDENCIES: {
     readonly "@types/react": "~19.2.2";
