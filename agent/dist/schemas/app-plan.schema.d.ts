@@ -17,7 +17,7 @@ export declare const FileInPlanSchema: z.ZodObject<{
 }>;
 export type FileInPlan = z.infer<typeof FileInPlanSchema>;
 export declare const NavigationScreenSchema: z.ZodObject<{
-    path: z.ZodString;
+    path: z.ZodDefault<z.ZodOptional<z.ZodString>>;
     name: z.ZodString;
     icon: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
@@ -26,7 +26,7 @@ export declare const NavigationScreenSchema: z.ZodObject<{
     icon?: string | undefined;
 }, {
     name: string;
-    path: string;
+    path?: string | undefined;
     icon?: string | undefined;
 }>;
 export declare const AppPlanSchema: z.ZodObject<{
@@ -53,7 +53,7 @@ export declare const AppPlanSchema: z.ZodObject<{
     navigation: z.ZodOptional<z.ZodObject<{
         type: z.ZodDefault<z.ZodEnum<["stack", "tabs"]>>;
         screens: z.ZodDefault<z.ZodArray<z.ZodObject<{
-            path: z.ZodString;
+            path: z.ZodDefault<z.ZodOptional<z.ZodString>>;
             name: z.ZodString;
             icon: z.ZodOptional<z.ZodString>;
         }, "strip", z.ZodTypeAny, {
@@ -62,7 +62,7 @@ export declare const AppPlanSchema: z.ZodObject<{
             icon?: string | undefined;
         }, {
             name: string;
-            path: string;
+            path?: string | undefined;
             icon?: string | undefined;
         }>, "many">>;
     }, "strip", z.ZodTypeAny, {
@@ -76,7 +76,7 @@ export declare const AppPlanSchema: z.ZodObject<{
         type?: "stack" | "tabs" | undefined;
         screens?: {
             name: string;
-            path: string;
+            path?: string | undefined;
             icon?: string | undefined;
         }[] | undefined;
     }>>;
@@ -114,7 +114,7 @@ export declare const AppPlanSchema: z.ZodObject<{
         type?: "stack" | "tabs" | undefined;
         screens?: {
             name: string;
-            path: string;
+            path?: string | undefined;
             icon?: string | undefined;
         }[] | undefined;
     } | undefined;

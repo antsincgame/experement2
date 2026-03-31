@@ -12,7 +12,7 @@ export const FileInPlanSchema = z.object({
 export type FileInPlan = z.infer<typeof FileInPlanSchema>;
 
 export const NavigationScreenSchema = z.object({
-  path: z.string(),
+  path: z.string().optional().default(""),
   name: z.string(),
   icon: z.string().optional(),
 });
