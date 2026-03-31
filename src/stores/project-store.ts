@@ -30,8 +30,17 @@ export interface Version {
   timestamp: number;
 }
 
+export interface ProjectEntry {
+  name: string;
+  displayName: string;
+  status: AppStatus;
+  port: number | null;
+  createdAt: number;
+}
+
 interface ProjectState {
   projectName: string | null;
+  projectList: ProjectEntry[];
   status: AppStatus;
   plan: Record<string, unknown> | null;
   messages: ChatMessage[];
@@ -71,6 +80,9 @@ interface ProjectState {
   clearStreamingContent: () => void;
   toggleFileTree: () => void;
   toggleTerminal: () => void;
+  addProject: (entry: ProjectEntry) => void;
+  removeProject: (name: string) => void;
+  switchProject: (name: string) => void;
   reset: () => void;
 
   handleWsMessage: (msg: Record<string, unknown>) => void;
@@ -78,6 +90,7 @@ interface ProjectState {
 
 const initialState = {
   projectName: null as string | null,
+  projectList: [] as ProjectEntry[],
   status: "idle" as AppStatus,
   plan: null as Record<string, unknown> | null,
   messages: [] as ChatMessage[],
@@ -173,6 +186,46 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     set((state) => ({ fileTreeVisible: !state.fileTreeVisible })),
   toggleTerminal: () =>
     set((state) => ({ terminalVisible: !state.terminalVisible })),
+
+  addProject: (entry) =>
+    set((state) => ({
+      projectList: [...state.projectList.filter((p) => p.name !== entry.name), entry],
+    })),
+
+  removeProject: (name) =>
+    set((state) => {
+      const newList = state.projectList.filter((p) => p.name !== name);
+      const isActive = state.projectName === name;
+      return {
+        projectList: newList,
+        ...(isActive
+          ? {
+              projectName: newList[0]?.name ?? null,
+              status: newList[0]?.status ?? "idle",
+              messages: [],
+              fileTree: [],
+              openFiles: [],
+              activeFile: null,
+              fileContents: {},
+              versions: [],
+              streamingContent: "",
+            }
+          : {}),
+      };
+    }),
+
+  switchProject: (name) =>
+    set(() => ({
+      projectName: name,
+      messages: [],
+      fileTree: [],
+      openFiles: [],
+      activeFile: null,
+      fileContents: {},
+      versions: [],
+      streamingContent: "",
+      status: "ready",
+    })),
 
   reset: () => set(initialState),
 
@@ -344,9 +397,18 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         set({ status: "ready" });
         break;
 
-      case "project_created":
-        set({ projectName: msg.projectName as string });
+      case "project_created": {
+        const pName = msg.projectName as string;
+        set({ projectName: pName });
+        store.addProject({
+          name: pName,
+          displayName: pName,
+          status: "ready",
+          port: (msg.port as number) ?? null,
+          createdAt: Date.now(),
+        });
         break;
+      }
 
       case "iteration_result":
         // already handled by iteration_complete

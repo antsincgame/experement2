@@ -8,6 +8,8 @@ interface SettingsState {
   maxTokens: number;
   maxContextTokens: number;
   agentUrl: string;
+  enhancerModel: string;
+  enhancerEnabled: boolean;
 
   setLmStudioUrl: (url: string) => void;
   setModel: (model: string) => void;
@@ -15,6 +17,8 @@ interface SettingsState {
   setMaxTokens: (tokens: number) => void;
   setMaxContextTokens: (tokens: number) => void;
   setAgentUrl: (url: string) => void;
+  setEnhancerModel: (model: string) => void;
+  setEnhancerEnabled: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -26,6 +30,8 @@ export const useSettingsStore = create<SettingsState>()(
       maxTokens: 32768,
       maxContextTokens: 65536,
       agentUrl: "http://localhost:3100",
+      enhancerModel: "",
+      enhancerEnabled: true,
 
       setLmStudioUrl: (lmStudioUrl) => set({ lmStudioUrl }),
       setModel: (model) => set({ model }),
@@ -33,6 +39,8 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxTokens: (maxTokens) => set({ maxTokens }),
       setMaxContextTokens: (maxContextTokens) => set({ maxContextTokens }),
       setAgentUrl: (agentUrl) => set({ agentUrl }),
+      setEnhancerModel: (enhancerModel) => set({ enhancerModel }),
+      setEnhancerEnabled: (enhancerEnabled) => set({ enhancerEnabled }),
     }),
     {
       name: "app-factory-settings",

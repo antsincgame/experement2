@@ -56,8 +56,34 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               <Field label="Temperature" value={String(settings.temperature)} onChange={(v) => settings.setTemperature(parseFloat(v) || 0.4)} keyboardType="numeric" />
             </View>
             <View className="flex-1">
-              <Field label="Max Tokens" value={String(settings.maxTokens)} onChange={(v) => settings.setMaxTokens(parseInt(v, 10) || 8192)} keyboardType="numeric" />
+              <Field label="Max Tokens" value={String(settings.maxTokens)} onChange={(v) => settings.setMaxTokens(parseInt(v, 10) || 32768)} keyboardType="numeric" />
             </View>
+          </View>
+
+          {/* Prompt Enhancer */}
+          <View
+            className="rounded-xl px-4 py-3 mt-2"
+            style={{ backgroundColor: "rgba(124, 77, 255, 0.06)", borderWidth: 1, borderColor: "rgba(124, 77, 255, 0.15)" }}
+          >
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-ink-base text-xs font-semibold">Prompt Enhancer</Text>
+              <Pressable
+                onPress={() => settings.setEnhancerEnabled(!settings.enhancerEnabled)}
+                className="px-2 py-0.5 rounded"
+                style={{
+                  backgroundColor: settings.enhancerEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
+                }}
+              >
+                <Text style={{ fontSize: 10, color: settings.enhancerEnabled ? "#00E5FF" : "#8888AA" }}>
+                  {settings.enhancerEnabled ? "ON" : "OFF"}
+                </Text>
+              </Pressable>
+            </View>
+            <Field
+              label="Enhancer Model (optional)"
+              value={settings.enhancerModel}
+              onChange={settings.setEnhancerModel}
+            />
           </View>
         </View>
       </View>

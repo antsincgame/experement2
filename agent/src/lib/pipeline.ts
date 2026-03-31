@@ -1,4 +1,5 @@
 import { execSync } from "child_process";
+import fs from "fs";
 import { broadcast, setPreviewPort } from "../server.js";
 import { createProjectFromCache } from "../services/template-cache.js";
 import {
@@ -83,24 +84,32 @@ export const createProject = async (
     onChunk: (chunk) => broadcast({ type: "plan_chunk", chunk }),
   });
 
-  broadcast({ type: "plan_complete", plan });
+  // Deduplicate project name
+  let projectSlug = plan.name;
+  let suffix = 0;
+  while (fs.existsSync(getProjectPath(projectSlug))) {
+    suffix++;
+    projectSlug = `${plan.name}-${suffix}`;
+  }
+
+  broadcast({ type: "plan_complete", plan: { ...plan, name: projectSlug } });
 
   // ── Step 2: Scaffold ──────────────────────────────────
   broadcast({ type: "status", status: "scaffolding" });
 
   const projectPath = await createProjectFromCache(
-    plan.name,
+    projectSlug,
     plan.displayName,
     plan.extraDependencies
   );
 
-  broadcast({ type: "scaffold_complete", projectName: plan.name });
+  broadcast({ type: "scaffold_complete", projectName: projectSlug });
 
   // ── Step 3: Generate files ────────────────────────────
   broadcast({ type: "status", status: "generating" });
 
   const files = await generateFiles({
-    projectName: plan.name,
+    projectName: projectSlug,
     projectPath,
     plan,
     lmStudioUrl,
@@ -132,7 +141,7 @@ export const createProject = async (
       }
     }, 30000);
 
-    startExpo(plan.name, projectPath, (event) => {
+    startExpo(projectSlug, projectPath, (event) => {
       broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
 
       if (event.type === "build_success" && !buildResolved) {
@@ -144,7 +153,7 @@ export const createProject = async (
       if (event.type === "build_error" && event.error) {
         const parsed = parseMetroError(event.error);
         if (parsed) {
-          handleAutoFix(plan.name, {
+          handleAutoFix(projectSlug, {
             type: parsed.type,
             file: parsed.file,
             line: parsed.line,
@@ -157,11 +166,11 @@ export const createProject = async (
 
   await buildPromise;
 
-  const port = getActivePort(plan.name) ?? 0;
+  const port = getActivePort(projectSlug) ?? 0;
   setPreviewPort(port || null);
   broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
 
-  return { projectName: plan.name, port, plan };
+  return { projectName: projectSlug, port, plan };
 };
 
 export const iterateProject = async (

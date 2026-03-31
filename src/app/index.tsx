@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { View, Text, TextInput, Pressable, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Settings, Zap, Sparkles, Wifi, WifiOff, Download } from "lucide-react-native";
+import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus } from "lucide-react-native";
 
-import { useProjectStore } from "@/stores/project-store";
+import { useProjectStore, fetchProjectFiles } from "@/stores/project-store";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { createUserMessage } from "@/features/chat/schemas/message.schema";
 
@@ -34,11 +34,14 @@ export default function AppFactoryScreen() {
   const activeFile = useProjectStore((s) => s.activeFile);
   const fileTreeVisible = useProjectStore((s) => s.fileTreeVisible);
   const terminalVisible = useProjectStore((s) => s.terminalVisible);
+  const projectList = useProjectStore((s) => s.projectList);
   const addMessage = useProjectStore((s) => s.addMessage);
   const openFile = useProjectStore((s) => s.openFile);
   const closeFile = useProjectStore((s) => s.closeFile);
   const setActiveFile = useProjectStore((s) => s.setActiveFile);
   const setStatus = useProjectStore((s) => s.setStatus);
+  const switchProject = useProjectStore((s) => s.switchProject);
+  const removeProject = useProjectStore((s) => s.removeProject);
 
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [welcomeInput, setWelcomeInput] = useState("");
@@ -316,6 +319,59 @@ export default function AppFactoryScreen() {
             </Pressable>
           </View>
         </View>
+
+        {/* Project Tabs */}
+        {projectList.length > 1 && (
+          <View
+            className="h-8 flex-row items-center px-2 gap-1"
+            style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)", backgroundColor: "rgba(255,255,255,0.3)" }}
+          >
+            {projectList.map((p) => (
+              <View key={p.name} className="flex-row items-center">
+                <Pressable
+                  onPress={() => {
+                    switchProject(p.name);
+                    fetchProjectFiles("http://localhost:3100", p.name);
+                  }}
+                  className="flex-row items-center gap-1 px-2.5 py-1 rounded-md"
+                  style={{
+                    backgroundColor: p.name === projectName ? "rgba(0,229,255,0.12)" : "transparent",
+                    borderWidth: p.name === projectName ? 1 : 0,
+                    borderColor: "rgba(0,229,255,0.3)",
+                  }}
+                >
+                  <View
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: p.status === "ready" ? "#00FF88" : "#FFD700" }}
+                  />
+                  <Text
+                    className="text-[10px]"
+                    style={{ color: p.name === projectName ? "#00E5FF" : "#4A4A6A" }}
+                    numberOfLines={1}
+                  >
+                    {p.displayName}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => removeProject(p.name)}
+                  className="ml-0.5 opacity-40"
+                >
+                  <X size={10} color="#4A4A6A" strokeWidth={1.5} />
+                </Pressable>
+              </View>
+            ))}
+            <Pressable
+              onPress={() => {
+                setStatus("idle");
+                useProjectStore.setState({ projectName: null });
+              }}
+              className="ml-auto w-5 h-5 rounded items-center justify-center"
+              style={{ backgroundColor: "rgba(0,0,0,0.04)" }}
+            >
+              <Plus size={11} color="#4A4A6A" strokeWidth={1.5} />
+            </Pressable>
+          </View>
+        )}
 
         {workspace()}
 

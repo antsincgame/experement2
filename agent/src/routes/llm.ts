@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { handleLLMProxyRoute } from "../services/llm-proxy.js";
+import { handleLLMProxyRoute, completeNonStreaming } from "../services/llm-proxy.js";
 
 export const llmRouter = Router();
 
@@ -10,6 +10,45 @@ llmRouter.post("/complete", (req, res) => {
       res.status(500).json({ error: message, code: "INTERNAL_ERROR" });
     }
   });
+});
+
+llmRouter.post("/enhance", async (req, res) => {
+  const { prompt, model, lmStudioUrl } = req.body;
+  if (!prompt) {
+    res.status(400).json({ error: "prompt required" });
+    return;
+  }
+
+  try {
+    const enhanced = await completeNonStreaming(
+      [
+        {
+          role: "system",
+          content: `You are a prompt engineering expert. The user will give you a short app description.
+Your task: expand it into a detailed, specific prompt that will produce a better React Native (Expo) application.
+
+Rules:
+- Keep the core idea but add specific features, UI details, and tech choices
+- Mention screens, navigation, components, colors, animations
+- Be specific about data models and user flows
+- Output ONLY the improved prompt text, no explanation
+- Write in the same language as the input
+- 3-5 sentences max`,
+        },
+        { role: "user", content: prompt },
+      ],
+      {
+        temperature: 0.7,
+        maxTokens: 1024,
+        model: model || undefined,
+        lmStudioUrl: lmStudioUrl || undefined,
+      }
+    );
+    res.json({ data: enhanced });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(502).json({ error: message });
+  }
 });
 
 llmRouter.get("/health", async (_req, res) => {
