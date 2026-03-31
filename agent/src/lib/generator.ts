@@ -22,10 +22,16 @@ const extractCodeFromResponse = (response: string): { filepath: string; code: st
   const filepath = filepathMatch[1].trim();
   let code = response.slice(response.indexOf("\n", response.indexOf(filepathMatch[0])) + 1);
 
+  // Aggressively strip ALL markdown code fences (LLM sometimes wraps in triple backticks)
   code = code
-    .replace(/^```(?:typescript|tsx|ts|jsx|js)?\n?/, "")
-    .replace(/\n?```\s*$/, "")
+    .replace(/^```\w*\s*\n?/, "")    // opening fence with any language tag
+    .replace(/\n?```\s*$/, "")        // closing fence
+    .replace(/^```\s*\n?/, "")        // bare opening fence (no language)
     .trim();
+  // Double-check: if first line is still a code fence, remove it
+  if (code.startsWith("```")) {
+    code = code.replace(/^```\w*\s*\n?/, "").trim();
+  }
 
   return { filepath, code };
 };
