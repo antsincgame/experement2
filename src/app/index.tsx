@@ -217,19 +217,23 @@ export default function AppFactoryScreen() {
                   </View>
                   <View className="flex-row items-center gap-2">
                   {/* Enhance button */}
-                  {enhancerEnabled && welcomeInput.trim().length > 0 && (
+                  {enhancerEnabled && (
                     <Pressable
                       onPress={handleEnhance}
-                      disabled={enhancing}
+                      disabled={enhancing || !welcomeInput.trim()}
                       className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl"
-                      style={{ backgroundColor: "rgba(124, 77, 255, 0.12)", borderWidth: 1, borderColor: "rgba(124,77,255,0.2)" }}
+                      style={{
+                        backgroundColor: welcomeInput.trim() ? "rgba(124, 77, 255, 0.12)" : "rgba(0,0,0,0.03)",
+                        borderWidth: 1,
+                        borderColor: welcomeInput.trim() ? "rgba(124,77,255,0.2)" : "rgba(0,0,0,0.04)",
+                      }}
                     >
                       {enhancing ? (
                         <ActivityIndicator size="small" color="#7C4DFF" />
                       ) : (
-                        <Sparkles size={13} color="#7C4DFF" strokeWidth={1.5} />
+                        <Sparkles size={13} color={welcomeInput.trim() ? "#7C4DFF" : "#AAAACC"} strokeWidth={1.5} />
                       )}
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: "#7C4DFF" }}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: welcomeInput.trim() ? "#7C4DFF" : "#AAAACC" }}>
                         {enhancing ? "Improving..." : "Enhance"}
                       </Text>
                     </Pressable>
