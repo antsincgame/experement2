@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { View, Text, TextInput, Pressable, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus } from "lucide-react-native";
+import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus, FolderOpen } from "lucide-react-native";
 
 import { useProjectStore, fetchProjectFiles } from "@/stores/project-store";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
@@ -235,13 +235,105 @@ export default function AppFactoryScreen() {
     );
   }
 
+  // ── PROJECT SIDEBAR ──────────────────────────────────────
+  const projectSidebar = () => (
+    <View
+      style={{
+        width: 180,
+        backgroundColor: "rgba(255,255,255,0.45)",
+        borderRightWidth: 1,
+        borderRightColor: "rgba(0,0,0,0.06)",
+        ...(Platform.OS === "web" ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
+      } as never}
+    >
+      {/* Sidebar Header */}
+      <View className="px-3 py-2.5 flex-row items-center justify-between"
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" }}
+      >
+        <View className="flex-row items-center gap-1.5">
+          <FolderOpen size={12} color="#7C4DFF" strokeWidth={1.5} />
+          <Text style={{ fontSize: 10, fontWeight: "700", color: "#4A4A6A", letterSpacing: 1, textTransform: "uppercase" }}>
+            Projects
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => {
+            setStatus("idle");
+            useProjectStore.setState({ projectName: null });
+          }}
+          className="w-5 h-5 rounded items-center justify-center"
+          style={{ backgroundColor: "rgba(0,229,255,0.1)" }}
+        >
+          <Plus size={11} color="#00E5FF" strokeWidth={2} />
+        </Pressable>
+      </View>
+
+      {/* Project List */}
+      <View className="flex-1 py-1">
+        {projectList.map((p) => {
+          const isActive = p.name === projectName;
+          return (
+            <Pressable
+              key={p.name}
+              onPress={() => {
+                switchProject(p.name);
+                fetchProjectFiles("http://localhost:3100", p.name);
+              }}
+              className="flex-row items-center px-3 py-2 mx-1 rounded-lg"
+              style={{
+                backgroundColor: isActive ? "rgba(0,229,255,0.1)" : "transparent",
+                borderWidth: isActive ? 1 : 0,
+                borderColor: "rgba(0,229,255,0.25)",
+              }}
+            >
+              <View className="flex-row items-center gap-2 flex-1" style={{ minWidth: 0 }}>
+                <View
+                  className="w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: p.status === "ready" ? "#00FF88" : p.status === "error" ? "#FF3366" : "#FFD700",
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: isActive ? "600" : "400",
+                    color: isActive ? "#00BCD4" : "#4A4A6A",
+                  }}
+                  numberOfLines={1}
+                >
+                  {p.displayName}
+                </Text>
+              </View>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  removeProject(p.name);
+                }}
+                className="w-4 h-4 items-center justify-center rounded opacity-30"
+                style={{ marginLeft: 4 }}
+              >
+                <X size={9} color="#4A4A6A" strokeWidth={1.5} />
+              </Pressable>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+
   // ── WORKSPACE ──────────────────────────────────────────
   const workspace = () => (
       <View className="flex-1 flex-row">
-        <View style={{ width: "28%" }}>
+        {/* Project Sidebar */}
+        {projectList.length > 0 && projectSidebar()}
+
+        {/* Chat Panel */}
+        <View style={{ width: "25%" }}>
           <ChatPanel onSend={handleChatSend} onAbort={abortGeneration} />
         </View>
         <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
+
+        {/* Code Area */}
         <View className="flex-1">
           <View className="flex-1 flex-row">
             {fileTreeVisible && (
@@ -257,7 +349,9 @@ export default function AppFactoryScreen() {
           {terminalVisible && <TerminalPanel />}
         </View>
         <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
-        <View style={{ width: "28%" }}>
+
+        {/* Preview */}
+        <View style={{ width: "25%" }}>
           <PreviewPanel />
         </View>
       </View>
@@ -319,59 +413,6 @@ export default function AppFactoryScreen() {
             </Pressable>
           </View>
         </View>
-
-        {/* Project Tabs */}
-        {projectList.length > 1 && (
-          <View
-            className="h-8 flex-row items-center px-2 gap-1"
-            style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)", backgroundColor: "rgba(255,255,255,0.3)" }}
-          >
-            {projectList.map((p) => (
-              <View key={p.name} className="flex-row items-center">
-                <Pressable
-                  onPress={() => {
-                    switchProject(p.name);
-                    fetchProjectFiles("http://localhost:3100", p.name);
-                  }}
-                  className="flex-row items-center gap-1 px-2.5 py-1 rounded-md"
-                  style={{
-                    backgroundColor: p.name === projectName ? "rgba(0,229,255,0.12)" : "transparent",
-                    borderWidth: p.name === projectName ? 1 : 0,
-                    borderColor: "rgba(0,229,255,0.3)",
-                  }}
-                >
-                  <View
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: p.status === "ready" ? "#00FF88" : "#FFD700" }}
-                  />
-                  <Text
-                    className="text-[10px]"
-                    style={{ color: p.name === projectName ? "#00E5FF" : "#4A4A6A" }}
-                    numberOfLines={1}
-                  >
-                    {p.displayName}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => removeProject(p.name)}
-                  className="ml-0.5 opacity-40"
-                >
-                  <X size={10} color="#4A4A6A" strokeWidth={1.5} />
-                </Pressable>
-              </View>
-            ))}
-            <Pressable
-              onPress={() => {
-                setStatus("idle");
-                useProjectStore.setState({ projectName: null });
-              }}
-              className="ml-auto w-5 h-5 rounded items-center justify-center"
-              style={{ backgroundColor: "rgba(0,0,0,0.04)" }}
-            >
-              <Plus size={11} color="#4A4A6A" strokeWidth={1.5} />
-            </Pressable>
-          </View>
-        )}
 
         {workspace()}
 
