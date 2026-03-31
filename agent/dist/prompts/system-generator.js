@@ -21,6 +21,11 @@ Your task: generate complete, production-ready code for a single file.
 8. Keep files under 200 lines.
 9. Import paths use @/ alias (e.g., import { Todo } from "@/types/todo")
 10. Use const + arrow functions for components.
+11. For tab navigation layout (_layout.tsx): import icons DIRECTLY from @expo/vector-icons.
+    NEVER use undefined components like TabBarIcon. Use Ionicons/MaterialIcons directly:
+    \`tabBarIcon: ({ color }) => <Ionicons name="list" size={24} color={color} />\`
+12. EVERY component/function you reference must be imported or defined in the same file.
+    NEVER assume external components exist unless they are from node_modules.
 
 ## Response Format
 Start your response with:

@@ -12,6 +12,7 @@ import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js"
 import { createPreviewProxy } from "./services/preview-proxy.js";
 import { startExpo } from "./services/process-manager.js";
 import { getProjectPath, projectExists } from "./services/file-manager.js";
+import { parseMetroError } from "./services/log-watcher.js";
 
 const PORT = 3100;
 const app = express();
@@ -194,8 +195,29 @@ const handleWsMessage = (
         break;
       }
       broadcast({ type: "status", status: "building" });
+      const lmUrl = (message.lmStudioUrl as string) || undefined;
       startExpo(projName, projPath, (event) => {
         broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
+        // Auto-fix Metro errors
+        if (event.type === "build_error" && event.error) {
+          const parsed = parseMetroError(event.error);
+          if (parsed) {
+            import("./lib/auto-fixer.js").then(({ autoFix }) => {
+              broadcast({ type: "autofix_start", file: parsed.file, error: parsed.raw });
+              autoFix({
+                projectName: projName,
+                error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
+                lmStudioUrl: lmUrl,
+                maxAttempts: 3,
+                onAttempt: (attempt, max) => broadcast({ type: "autofix_attempt", attempt, maxAttempts: max }),
+                onFix: (block) => broadcast({ type: "autofix_block", filepath: block.filepath }),
+              }).then((result) => {
+                if (result.success) broadcast({ type: "autofix_success", attempts: result.attempts });
+                else broadcast({ type: "autofix_failed", attempts: result.attempts, error: result.lastError });
+              });
+            });
+          }
+        }
       }).then(({ port }) => {
         setPreviewPort(port);
         broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
