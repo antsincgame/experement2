@@ -104,6 +104,28 @@ export const editProject = async (
     return { action, appliedBlocks: 0, failedBlocks: 0, errors: [] };
   }
 
+  // Handle install_package: install deps first, then read files and generate changes
+  if (action.action === "install_package" && action.newDependencies.length > 0) {
+    const { validateDependencies } = await import("./dependency-validator.js");
+    const { valid, rejected } = await validateDependencies(action.newDependencies);
+    if (rejected.length > 0) {
+      console.warn(`[Editor] Rejected deps: ${rejected.join(", ")}`);
+    }
+    if (valid.length > 0) {
+      try {
+        await npmInstall(getProjectPath(projectName), valid);
+      } catch {
+        for (const dep of valid) {
+          try { await npmInstall(getProjectPath(projectName), [dep]); } catch { /* skip */ }
+        }
+      }
+    }
+    // If there are also files to edit, continue; otherwise treat as done
+    if (action.files.length === 0) {
+      return { action, appliedBlocks: 0, failedBlocks: 0, errors: [] };
+    }
+  }
+
   // ── Read target files ─────────────────────────────────
   const targetFiles: Record<string, string> = {};
   for (const filepath of action.files) {

@@ -8,6 +8,7 @@ import {
   TEMPLATE_PACKAGE_DEV_DEPENDENCIES,
   TEMPLATE_PACKAGE_SCRIPTS,
 } from "../lib/generation-contract.js";
+import { validateDependencies } from "../lib/dependency-validator.js";
 
 const TEMPLATE_DIR_NAME = "template_cache";
 
@@ -176,10 +177,26 @@ export const createProjectFromCache = async (
   );
 
   if (extraDependencies?.length) {
-    console.log(
-      `[TemplateCache] Installing extra deps: ${extraDependencies.join(", ")}...`
-    );
-    await npmInstall(projectPath, extraDependencies);
+    const { valid, rejected } = await validateDependencies(extraDependencies);
+    if (rejected.length > 0) {
+      console.warn(`[TemplateCache] Rejected dependencies (not found on npm): ${rejected.join(", ")}`);
+    }
+    if (valid.length > 0) {
+      console.log(`[TemplateCache] Installing extra deps: ${valid.join(", ")}...`);
+      try {
+        await npmInstall(projectPath, valid);
+      } catch (err) {
+        // Fallback: install one by one, skip failures
+        console.warn(`[TemplateCache] Batch install failed, trying individually...`);
+        for (const dep of valid) {
+          try {
+            await npmInstall(projectPath, [dep]);
+          } catch {
+            console.warn(`[TemplateCache] Failed to install ${dep}, skipping`);
+          }
+        }
+      }
+    }
   }
 
   return projectPath;

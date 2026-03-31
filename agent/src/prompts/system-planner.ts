@@ -38,6 +38,18 @@ Your task: create a detailed JSON plan for the app described by the user.
 16. navigation.screens[].path is REQUIRED and must point to a file in files[]
 17. Do NOT use drawer navigation unless it is explicitly supported by the scaffold. It is currently unsupported.
 
+## FORBIDDEN DEPENDENCIES (DO NOT USE):
+- three, @react-three/fiber, @react-three/drei, @react-native-three/* — WebGL/3D not supported in Expo
+- react-native-webgl — not supported
+- any package starting with @react-native-three/
+- If the user asks for 3D — use SVG or 2D Canvas instead
+
+## SAFE extra dependencies (prefer these):
+zustand, react-native-svg, expo-linear-gradient, expo-haptics, expo-clipboard,
+expo-image-picker, expo-camera, expo-location, expo-sensors, expo-av,
+date-fns, dayjs, axios, @react-native-async-storage/async-storage,
+react-native-chart-kit, react-native-calendars, react-native-modal, burnt
+
 ## Output Format
 Respond with a single JSON object. No markdown, no explanation, no code fences.
 Start with { and end with }
