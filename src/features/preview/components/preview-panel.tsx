@@ -7,32 +7,29 @@ import { useProjectStore } from "@/stores/project-store";
 
 const PreviewPanel = () => {
   const previewPort = useProjectStore((state) => state.previewPort);
+  const previewUrl = useProjectStore((state) => state.previewUrl);
   const projectName = useProjectStore((state) => state.projectName);
   const status = useProjectStore((state) => state.status);
   const [refreshKey, setRefreshKey] = useState(0);
-  const prevPort = useRef(previewPort);
-  const prevProject = useRef(projectName);
 
-  // Refresh when port changes
+  // Subscribe to store changes — force refresh whenever previewPort or projectName changes
   useEffect(() => {
-    if (previewPort && previewPort !== prevPort.current) {
-      const timeout = setTimeout(() => setRefreshKey((key) => key + 1), 2000);
-      prevPort.current = previewPort;
-      return () => clearTimeout(timeout);
-    }
-    prevPort.current = previewPort;
-  }, [previewPort]);
+    const unsub = useProjectStore.subscribe(
+      (state, prevState) => {
+        const portChanged = state.previewPort !== prevState.previewPort;
+        const projectChanged = state.projectName !== prevState.projectName;
 
-  // Force refresh when project switches
-  useEffect(() => {
-    if (projectName !== prevProject.current) {
-      prevProject.current = projectName;
-      if (previewPort) {
-        const timeout = setTimeout(() => setRefreshKey((key) => key + 1), 1500);
-        return () => clearTimeout(timeout);
-      }
-    }
-  }, [projectName, previewPort]);
+        if (portChanged && state.previewPort) {
+          // Port changed — new preview ready, refresh after brief delay for proxy to settle
+          setTimeout(() => setRefreshKey((k) => k + 1), 800);
+        } else if (projectChanged && state.previewPort) {
+          // Project switched but port may be same — still force refresh after proxy switch
+          setTimeout(() => setRefreshKey((k) => k + 1), 1500);
+        }
+      },
+    );
+    return unsub;
+  }, []);
 
   const isLoading = [
     "planning",
@@ -118,7 +115,7 @@ const PreviewPanel = () => {
         <View className="flex-1">
           {typeof window !== "undefined" && (
             <iframe
-              key={`${projectName}-${refreshKey}`}
+              key={`${projectName}-${previewPort}-${refreshKey}`}
               src={proxyUrl}
               style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FAFAFF" }}
               title="App Preview"

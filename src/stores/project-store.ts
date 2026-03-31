@@ -338,7 +338,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
             previewPort: s.previewPort,
           })
         : s.projectChats;
-      // Restore target project
+      // Restore target project (preview reset — will be set by start_preview response)
       const chat = saved[name] ?? EMPTY_CHAT;
       return {
         projectName: name,
@@ -351,8 +351,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         fileContents: chat.fileContents,
         versions: chat.versions,
         streamingContent: chat.streamingContent,
-        previewUrl: chat.previewUrl,
-        previewPort: chat.previewPort,
+        previewUrl: null,
+        previewPort: null,
       };
     }),
 
