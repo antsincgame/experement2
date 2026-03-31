@@ -1,99 +1,74 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-// ── globalThis singleton — survives HMR + React StrictMode ──
-// Module-level variables get RESET on Metro HMR reload.
-// globalThis (window) persists across reloads.
+// ── Singleton WebSocket stored on window object ──
+// The ONLY way to survive Metro HMR + React StrictMode + lazy bundles.
+// Key insight: direct `new WebSocket()` in browser works fine (tested).
+// The bug was reconnect logic creating competing connections.
 
-const WS_KEY = "__appfactory_ws__";
-const TIMER_KEY = "__appfactory_ws_timer__";
-const MAX_RECONNECT = 200;
-const RECONNECT_MS = 3000;
+const G = typeof window !== "undefined" ? (window as Record<string, unknown>) : ({} as Record<string, unknown>);
+const WS_KEY = "__af_ws__";
+const INIT_KEY = "__af_ws_init__";
 
-const getWs = (): WebSocket | null => (globalThis as Record<string, unknown>)[WS_KEY] as WebSocket | null ?? null;
-const setWs = (w: WebSocket | null): void => { (globalThis as Record<string, unknown>)[WS_KEY] = w; };
-const getTimer = (): ReturnType<typeof setTimeout> | null => (globalThis as Record<string, unknown>)[TIMER_KEY] as ReturnType<typeof setTimeout> | null ?? null;
-const setTimer = (t: ReturnType<typeof setTimeout> | null): void => { (globalThis as Record<string, unknown>)[TIMER_KEY] = t; };
-
-let reconnectAttempts = 0;
-
-const connectWs = (): void => {
-  const existing = getWs();
+const ensureConnected = (): void => {
+  const existing = G[WS_KEY] as WebSocket | undefined;
   if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
-    return; // Already connected or connecting
+    return;
   }
 
   const agentUrl = useSettingsStore.getState().agentUrl;
   const wsUrl = agentUrl.replace("http://", "ws://").replace("https://", "wss://");
-  console.log("[WS] Connecting to:", wsUrl);
 
-  try {
-    const newWs = new WebSocket(wsUrl);
-    setWs(newWs);
+  const ws = new WebSocket(wsUrl);
+  G[WS_KEY] = ws;
 
-    newWs.onopen = () => {
-      console.log("[WS] Connected ✓");
-      reconnectAttempts = 0;
-      useProjectStore.getState().setConnected(true);
-    };
+  ws.onopen = () => {
+    console.log("[WS] Connected ✓ (stable)");
+    useProjectStore.getState().setConnected(true);
+  };
 
-    newWs.onmessage = (event) => {
-      try {
-        useProjectStore.getState().handleWsMessage(JSON.parse(event.data));
-      } catch { /* skip */ }
-    };
+  ws.onmessage = (event) => {
+    try {
+      useProjectStore.getState().handleWsMessage(JSON.parse(event.data));
+    } catch { /* skip */ }
+  };
 
-    newWs.onclose = () => {
-      console.log("[WS] Disconnected");
-      // Only reconnect if THIS ws is still the current one
-      if (getWs() === newWs) {
-        setWs(null);
-        useProjectStore.getState().setConnected(false);
-        scheduleReconnect();
-      }
-    };
-
-    newWs.onerror = () => {
-      // onerror always followed by onclose
-    };
-  } catch {
-    setWs(null);
-    scheduleReconnect();
-  }
-};
-
-const scheduleReconnect = (): void => {
-  if (getTimer()) return;
-  if (reconnectAttempts >= MAX_RECONNECT) return;
-  reconnectAttempts++;
-  setTimer(setTimeout(() => {
-    setTimer(null);
-    connectWs();
-  }, RECONNECT_MS));
-};
-
-// Auto-connect on first module load (only if not already connected)
-if (!getWs()) connectWs();
-
-// ── React hook ──
-
-export const useWebSocket = () => {
-  useEffect(() => {
-    const existing = getWs();
-    if (!existing || existing.readyState === WebSocket.CLOSED) {
-      connectWs();
+  ws.onclose = (e) => {
+    console.log("[WS] Closed code=" + e.code + " clean=" + e.wasClean);
+    // Only reconnect if this is still THE active WS
+    if (G[WS_KEY] === ws) {
+      G[WS_KEY] = undefined;
+      useProjectStore.getState().setConnected(false);
+      // Single reconnect after 3s — no recursive cascade
+      setTimeout(() => ensureConnected(), 3000);
     }
-    // NO cleanup — singleton lives in globalThis
-  }, []);
+  };
+
+  ws.onerror = () => {
+    // onerror is always followed by onclose
+  };
+};
+
+// Connect once on first import (guarded)
+if (typeof window !== "undefined" && !G[INIT_KEY]) {
+  G[INIT_KEY] = true;
+  // Delay to let Zustand stores hydrate from localStorage
+  setTimeout(() => ensureConnected(), 500);
+}
+
+// ── React hook — thin wrapper, NO useEffect connection logic ──
+export const useWebSocket = () => {
+  // Force re-render when connection state changes
+  const isConnected = useProjectStore((s) => s.isConnected);
 
   const send = useCallback((message: Record<string, unknown>) => {
-    const current = getWs();
-    if (current?.readyState !== WebSocket.OPEN) {
-      console.warn("[WS] Not connected");
+    const ws = G[WS_KEY] as WebSocket | undefined;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.warn("[WS] Not connected, cannot send");
       return;
     }
-    current.send(JSON.stringify(message));
+    ws.send(JSON.stringify(message));
   }, []);
 
   const createProject = useCallback((description: string) => {
@@ -117,5 +92,5 @@ export const useWebSocket = () => {
     send({ type: "revert_version", projectName, commitHash });
   }, [send]);
 
-  return { send, createProject, iterate, abortGeneration, revertVersion };
+  return { send, createProject, iterate, abortGeneration, revertVersion, isConnected };
 };
