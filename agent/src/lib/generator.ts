@@ -3,7 +3,7 @@ import { writeFile, readFile } from "../services/file-manager.js";
 import { buildProjectSkeleton } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
-import { BOILERPLATE_TEMPLATES } from "../prompts/templates.js";
+import { BOILERPLATE_TEMPLATES, getRootLayout } from "../prompts/templates.js";
 
 interface GeneratorOptions {
   projectName: string;
@@ -116,11 +116,26 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
   const generatedFiles: string[] = [];
 
+  // Write static boilerplate (config files)
   for (const [templatePath, templateContent] of Object.entries(BOILERPLATE_TEMPLATES)) {
     const alreadyInPlan = plan.files.some((f) => f.path === templatePath);
     if (!alreadyInPlan) {
       writeFile(projectName, templatePath, templateContent);
       generatedFiles.push(templatePath);
+    }
+  }
+
+  // Write dynamic root layout (Stack or Tabs based on navigation type)
+  const navType = plan.navigation?.type ?? "stack";
+  const layoutPath = navType === "tabs" ? "app/(tabs)/_layout.tsx" : "app/_layout.tsx";
+  const hasLayoutInPlan = plan.files.some((f) => f.path === layoutPath || f.path === "app/_layout.tsx");
+  if (!hasLayoutInPlan) {
+    writeFile(projectName, layoutPath, getRootLayout(navType));
+    generatedFiles.push(layoutPath);
+    // For tabs: also write root _layout.tsx that just re-exports
+    if (navType === "tabs") {
+      writeFile(projectName, "app/_layout.tsx", `import "../src/global.css";\nimport { Slot } from "expo-router";\nimport { StatusBar } from "expo-status-bar";\n\nexport default function RootLayout() {\n  return (\n    <>\n      <StatusBar style="dark" />\n      <Slot />\n    </>\n  );\n}\n`);
+      generatedFiles.push("app/_layout.tsx");
     }
   }
 
@@ -181,10 +196,13 @@ Generate the complete code for: ${fileSpec.path}`;
       generatedFiles.push(extracted.filepath);
       onFileComplete?.(extracted.filepath);
     } else {
-      const code = responseBuffer
+      let code = responseBuffer
         .replace(/^```(?:typescript|tsx|ts|jsx|js)?\n?/, "")
         .replace(/\n?```\s*$/, "")
         .trim();
+
+      // ALWAYS run sanitizer (bug fix: fallback was missing sanitization)
+      code = sanitizeGeneratedCode(code);
 
       if (code.length > 10) {
         writeFile(projectName, fileSpec.path, code);

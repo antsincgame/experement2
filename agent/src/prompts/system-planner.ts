@@ -39,24 +39,56 @@ Start with { and end with }
   "description": "One sentence describing the app",
   "files": [
     {
-      "path": "app/_layout.tsx",
-      "type": "layout",
-      "description": "Root layout with Stack navigator",
-      "dependencies": []
+      "path": "app/(tabs)/index.tsx",
+      "type": "screen",
+      "description": "Home screen with main feature",
+      "dependencies": ["src/components/MainComponent.tsx", "src/hooks/useFeature.ts"]
     },
     {
-      "path": "app/index.tsx",
+      "path": "app/(tabs)/settings.tsx",
       "type": "screen",
-      "description": "Home screen with ...",
-      "dependencies": ["src/components/SomeComponent.tsx"]
+      "description": "Settings screen",
+      "dependencies": ["src/stores/settingsStore.ts"]
+    },
+    {
+      "path": "src/components/MainComponent.tsx",
+      "type": "component",
+      "description": "Core UI component",
+      "dependencies": ["src/types/index.ts"]
+    },
+    {
+      "path": "src/hooks/useFeature.ts",
+      "type": "hook",
+      "description": "Business logic hook",
+      "dependencies": ["src/stores/featureStore.ts"]
+    },
+    {
+      "path": "src/stores/featureStore.ts",
+      "type": "store",
+      "description": "Zustand store for state",
+      "dependencies": ["src/types/index.ts"]
+    },
+    {
+      "path": "src/types/index.ts",
+      "type": "type",
+      "description": "TypeScript types",
+      "dependencies": []
     }
   ],
   "extraDependencies": ["zustand", "@expo/vector-icons"],
   "navigation": {
     "type": "tabs",
     "screens": [
-      {"path": "app/(tabs)/index.tsx", "name": "Home", "icon": "home"},
-      {"path": "app/(tabs)/settings.tsx", "name": "Settings", "icon": "settings"}
+      {"name": "Home", "icon": "home-outline"},
+      {"name": "Settings", "icon": "settings-outline"}
     ]
   }
+
+CRITICAL RULES FOR FILES ARRAY:
+- Do NOT include app/_layout.tsx — it's auto-generated based on navigation type
+- For tabs: put screens in app/(tabs)/ directory
+- EVERY file that is imported by another file MUST be in the files array
+- If screen imports @/hooks/useX, then src/hooks/useX.ts MUST be in files[]
+- If hook imports @/stores/X, then src/stores/X.ts MUST be in files[]
+- Missing files = "Unable to resolve module" crash at runtime
 }`;
