@@ -3,6 +3,21 @@ import { writeFile, readFile } from "../services/file-manager.js";
 import { buildProjectSkeleton } from "./context-builder.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import { BOILERPLATE_TEMPLATES } from "../prompts/templates.js";
+/** Post-process: fix common LLM mistakes that cause crashes */
+const sanitizeGeneratedCode = (code) => {
+    let result = code;
+    // Fix: @/src/components → @/components (double src)
+    result = result.replace(/from\s+["']@\/src\//g, 'from "@/');
+    // Fix: import { Tabs } from "expo-router/tabs" → "expo-router"
+    result = result.replace(/from\s+["']expo-router\/tabs["']/g, 'from "expo-router"');
+    // Fix: import { Ionicons } from "@expo/vector-icons" → default import
+    result = result.replace(/import\s*\{\s*Ionicons\s*\}\s*from\s*["']@expo\/vector-icons["']/g, 'import Ionicons from "@expo/vector-icons/Ionicons"');
+    // Fix: import { MaterialIcons } from "@expo/vector-icons" → default import
+    result = result.replace(/import\s*\{\s*MaterialIcons\s*\}\s*from\s*["']@expo\/vector-icons["']/g, 'import MaterialIcons from "@expo/vector-icons/MaterialIcons"');
+    // Fix: import { FontAwesome } from "@expo/vector-icons" → default import
+    result = result.replace(/import\s*\{\s*FontAwesome\s*\}\s*from\s*["']@expo\/vector-icons["']/g, 'import FontAwesome from "@expo/vector-icons/FontAwesome"');
+    return result;
+};
 const extractCodeFromResponse = (response) => {
     const filepathMatch = response.match(/^filepath:\s*(.+)/m);
     if (!filepathMatch)
@@ -19,6 +34,8 @@ const extractCodeFromResponse = (response) => {
     if (code.startsWith("```")) {
         code = code.replace(/^```\w*\s*\n?/, "").trim();
     }
+    // Post-process: fix common LLM mistakes that cause crashes
+    code = sanitizeGeneratedCode(code);
     return { filepath, code };
 };
 export const generateFiles = async (options) => {
