@@ -1,0 +1,1 @@
+{"version":3,"file":"stream-parser.d.ts","sourceRoot":"","sources":["../../src/lib/stream-parser.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,kBAAkB,EAAE,MAAM,qCAAqC,CAAC;AA8B9E,wBAAuB,WAAW,CAChC,MAAM,EAAE,cAAc,CAAC,MAAM,CAAC,GAC7B,cAAc,CAAC,kBAAkB,GAAG;IAAE,IAAI,EAAE,UAAU,CAAC;IAAC,OAAO,EAAE,MAAM,CAAA;CAAE,CAAC,CAoE5E"}

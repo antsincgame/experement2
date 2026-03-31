@@ -1,0 +1,29 @@
+import type { Request, Response } from "express";
+interface ChatMessage {
+    role: "system" | "user" | "assistant";
+    content: string;
+}
+export declare const streamCompletion: (messages: ChatMessage[], options?: {
+    temperature?: number;
+    maxTokens?: number;
+    responseFormat?: {
+        type: "json_object";
+    };
+    model?: string;
+    lmStudioUrl?: string;
+    taskId?: string;
+}) => Promise<AsyncGenerator<string>>;
+export declare const completeNonStreaming: (messages: ChatMessage[], options?: {
+    temperature?: number;
+    maxTokens?: number;
+    responseFormat?: {
+        type: "json_object";
+    };
+    model?: string;
+    lmStudioUrl?: string;
+}) => Promise<string>;
+export declare const abortTask: (taskId: string) => boolean;
+export declare const abortAll: () => number;
+export declare const handleLLMProxyRoute: (req: Request, res: Response) => Promise<void>;
+export {};
+//# sourceMappingURL=llm-proxy.d.ts.map

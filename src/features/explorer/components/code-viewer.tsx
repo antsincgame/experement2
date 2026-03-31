@@ -68,9 +68,18 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   const lang = getLanguage(filepath);
 
-  if (Platform.OS === "web" && SyntaxHighlighter && vscDarkPlus) {
-    const Highlighter = SyntaxHighlighter;
-    const theme = vscDarkPlus;
+  // Safety cap: files > 80 KB or > 1000 lines skip syntax highlighting to avoid OOM
+  const lineCount = content.split("\n").length;
+  const useSyntaxHighlighter =
+    Platform.OS === "web" &&
+    SyntaxHighlighter !== null &&
+    vscDarkPlus !== null &&
+    content.length < 80_000 &&
+    lineCount < 1000;
+
+  if (useSyntaxHighlighter) {
+    const Highlighter = SyntaxHighlighter!;
+    const theme = vscDarkPlus!;
     return (
       <ScrollView className="flex-1" style={{ backgroundColor: "#09090B" }}>
         <Highlighter

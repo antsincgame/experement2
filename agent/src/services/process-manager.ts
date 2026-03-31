@@ -11,6 +11,20 @@ interface ManagedProcess {
 
 const activeProcesses = new Map<string, ManagedProcess>();
 
+// Max concurrent expo processes to prevent OOM
+const MAX_ACTIVE_EXPO = 3;
+
+const evictOldestIfNeeded = (): void => {
+  if (activeProcesses.size < MAX_ACTIVE_EXPO) return;
+
+  // Kill the oldest process (first inserted into the Map)
+  const [oldestName, oldest] = activeProcesses.entries().next().value as [string, ManagedProcess];
+  console.log(`[process-manager] Evicting oldest expo process: ${oldestName} (limit: ${MAX_ACTIVE_EXPO})`);
+  killProcess(oldest.process);
+  oldest.cleanup();
+  activeProcesses.delete(oldestName);
+};
+
 const isWindows = process.platform === "win32";
 
 const killProcess = (cp: ChildProcess): void => {
@@ -41,6 +55,8 @@ export const startExpo = async (
     existing.cleanup();
     activeProcesses.delete(projectName);
   }
+
+  evictOldestIfNeeded();
 
   const port = await findFreePort();
 
@@ -85,6 +101,8 @@ export const startExpoClearCache = async (
     existing.cleanup();
     activeProcesses.delete(projectName);
   }
+
+  evictOldestIfNeeded();
 
   const npxCmd = isWindows ? "npx.cmd" : "npx";
   const child = spawn(

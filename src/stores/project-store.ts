@@ -119,7 +119,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   setPlan: (plan) => set({ plan }),
 
   addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
+    set((state) => {
+      const next = [...state.messages, message];
+      // Cap at 200 messages to prevent unbounded growth
+      return { messages: next.length > 200 ? next.slice(-200) : next };
+    }),
 
   updateLastAssistantMessage: (content) =>
     set((state) => {
@@ -155,9 +159,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
   setActiveFile: (activeFile) => set({ activeFile }),
   setFileContent: (path, content) =>
-    set((state) => ({
-      fileContents: { ...state.fileContents, [path]: content },
-    })),
+    set((state) => {
+      const updated = { ...state.fileContents, [path]: content };
+      const keys = Object.keys(updated);
+      // LRU eviction: keep only the 40 most recently set files
+      if (keys.length > 40) {
+        const evict = keys.slice(0, keys.length - 40);
+        for (const k of evict) delete updated[k];
+      }
+      return { fileContents: updated };
+    }),
 
   addVersion: (version) =>
     set((state) => ({
@@ -177,9 +188,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   setLmStudioStatus: (lmStudioStatus) => set({ lmStudioStatus }),
 
   appendStreamingContent: (chunk) =>
-    set((state) => ({
-      streamingContent: state.streamingContent + chunk,
-    })),
+    set((state) => {
+      const next = state.streamingContent + chunk;
+      // Keep only last 12 000 chars to prevent OOM during long streaming
+      return { streamingContent: next.length > 12_000 ? next.slice(-12_000) : next };
+    }),
   clearStreamingContent: () => set({ streamingContent: "" }),
 
   toggleFileTree: () =>
