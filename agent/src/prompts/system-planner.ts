@@ -22,6 +22,11 @@ Your task: create a detailed JSON plan for the app described by the user.
    - External URLs (picsum.photos, via.placeholder.com) for placeholder images
 10. Keep files under 200 lines each
 11. Every component must have typed props interface
+12. CRITICAL: @/ alias resolves to ./src/. So @/components/X = ./src/components/X
+13. CRITICAL: Every file that is imported by another file MUST be in the plan.
+    If screen imports @/hooks/useCounter, then src/hooks/useCounter.ts MUST be in files[].
+    Missing files = "Unable to resolve module" crash.
+14. Icons: use @expo/vector-icons with DEFAULT import (Ionicons from "@expo/vector-icons/Ionicons")
 
 ## Output Format
 Respond with a single JSON object. No markdown, no explanation, no code fences.

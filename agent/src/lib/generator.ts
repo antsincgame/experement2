@@ -43,6 +43,39 @@ const sanitizeGeneratedCode = (code: string): string => {
     'import FontAwesome from "@expo/vector-icons/FontAwesome"'
   );
 
+  // Fix: import { AntDesign } from "@expo/vector-icons" → default import
+  result = result.replace(
+    /import\s*\{\s*AntDesign\s*\}\s*from\s*["']@expo\/vector-icons["']/g,
+    'import AntDesign from "@expo/vector-icons/AntDesign"'
+  );
+
+  // Fix: import { Home, Settings, ... } from "@expo/vector-icons" → remove (these don't exist)
+  // Replace with Ionicons default import
+  result = result.replace(
+    /import\s*\{[^}]+\}\s*from\s*["']@expo\/vector-icons["']\s*;?/g,
+    'import Ionicons from "@expo/vector-icons/Ionicons";'
+  );
+
+  // Fix: import { Tabs } from "expo-router/tabs" → "expo-router"
+  result = result.replace(/from\s*["']expo-router\/tabs["']/g, 'from "expo-router"');
+
+  // Fix: React.useState/useEffect/useCallback → direct import (if React not imported)
+  if (result.includes("React.use") && !result.includes("import React")) {
+    // Extract all React.useX calls
+    const reactHooks = new Set<string>();
+    const hookMatches = result.matchAll(/React\.(use\w+)/g);
+    for (const m of hookMatches) reactHooks.add(m[1]);
+    if (reactHooks.size > 0) {
+      const hooksList = [...reactHooks].join(", ");
+      // Add direct import at top
+      result = `import { ${hooksList} } from "react";\n` + result;
+      // Replace React.useX with useX
+      for (const hook of reactHooks) {
+        result = result.replace(new RegExp(`React\\.${hook}`, "g"), hook);
+      }
+    }
+  }
+
   return result;
 };
 
