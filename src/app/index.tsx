@@ -217,7 +217,7 @@ export default function AppFactoryScreen() {
                   </View>
                   <View className="flex-row items-center gap-2">
                   {/* Enhance button */}
-                  {enhancerEnabled && welcomeInput.trim() && (
+                  {enhancerEnabled && welcomeInput.trim().length > 0 && (
                     <Pressable
                       onPress={handleEnhance}
                       disabled={enhancing}
