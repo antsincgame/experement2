@@ -7,6 +7,7 @@
 ![Expo](https://img.shields.io/badge/Expo_SDK-55-blue?logo=expo)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)
 ![LM Studio](https://img.shields.io/badge/LM_Studio-local_LLM-green)
+![Tests](https://img.shields.io/badge/tests-100_passed-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -14,29 +15,65 @@
 ## Как это работает
 
 ```
-Ты описываешь приложение → LLM планирует структуру → генерирует код файл за файлом
-→ Metro собирает → Live Preview в iframe → ты дорабатываешь через чат → бесконечно
+Описываешь приложение → LLM планирует → генерирует код → Metro билдит
+→ Build Verification Loop автофиксит ошибки → Live Preview в iframe
+→ дорабатываешь через чат → бесконечные итерации
 ```
 
 ### Архитектура
 
 ```
-┌─────────────────────┐     WebSocket      ┌──────────────────────┐
-│   Frontend (Expo)   │ ◄──────────────►  │  Backend Agent (Node) │
-│   localhost:8081    │                    │  localhost:3100       │
-│                     │                    │                       │
-│  Chat │ Code │ Preview ──iframe──►      │  Preview Proxy        │
-│                     │                    │  File Manager → disk  │
-│                     │                    │  Metro logs → WS      │
-│                     │                    │  LM Studio → :1234    │
-└─────────────────────┘                    └──────────────────────┘
+┌──────────────────────────┐     WebSocket      ┌───────────────────────────┐
+│   Frontend (Expo Web)    │ ◄──────────────►  │   Backend Agent (Node.js)  │
+│   localhost:8081         │                    │   localhost:3100           │
+│                          │                    │                           │
+│  Sidebar │ Chat │ Code │ │                    │  LLM Proxy → LM Studio    │
+│  Preview (iframe)        │ ──────────────►   │  Preview Proxy → Metro     │
+│  Aurora UI + Glassmorphism                    │  File Manager → disk       │
+│                          │                    │  Auto-Fixer → LLM          │
+│                          │                    │  Build Verification Loop   │
+└──────────────────────────┘                    └───────────────────────────┘
+                                                          │
+                                                    ┌─────┴─────┐
+                                                    │ LM Studio │
+                                                    │ :1234     │
+                                                    └───────────┘
 ```
 
-**Frontend** — Expo Web с Aurora UI, трёхпанельный workspace (Chat | Editor | Preview)
+---
 
-**Backend Agent** — Node.js сервер, который пишет файлы на диск, запускает `expo start`, проксирует LLM, парсит ошибки Metro и автоматически их фиксит
+## Ключевые фичи
 
-**LM Studio** — локальный LLM inference (рекомендуется Qwen 3 Coder 30B)
+### 3 слоя защиты от ошибок генерации
+
+| Слой | Тип | Описание |
+|------|-----|----------|
+| **Промпт** | Превентивный | 9 FORBIDDEN patterns + PRE-FLIGHT checklist + CORRECT templates |
+| **Sanitizer** | Автоматический | 9 regex auto-fix: `@/src/`→`@/`, named icons→default, `React.useState`→direct import |
+| **Build Loop** | Реактивный | Metro error → LLM fix → recompile → retry (max 3 попытки) |
+
+### Генерация
+- Промпт → JSON-план → scaffold из pre-warmed cache (~50ms) → генерация файлов со стримингом
+- Dynamic root layout (Stack или Tabs автоматически по плану)
+- Build Verification Loop: ждёт Metro, ловит ошибки, автофиксит через LLM
+
+### Итерация (SEARCH/REPLACE)
+- Чат: "Добавь поиск" → LLM анализирует файлы → точечные SEARCH/REPLACE блоки
+- 10x экономия токенов vs перезапись файлов
+- Metro hot-reload → preview обновляется мгновенно
+
+### UI — Cyberpunk Aurora
+- Aurora градиент (cyan→pink→gold)
+- Glassmorphism панели
+- Sidebar проектов (скроллируемый, 100+ проектов)
+- Per-project чат (история сохраняется при переключении)
+- Sacred geometry (Mandala, FlowerOfLife)
+- Enhance промпт через LLM (кнопка ✦)
+
+### Тестирование
+- **100 юнит-тестов** (Vitest, 304ms)
+- **70+ E2E тестов** через WebSocket (Waves 1-7)
+- Stream parser, schemas, file manager, port finder, preview proxy, log watcher
 
 ---
 
@@ -45,13 +82,12 @@
 ### Требования
 
 - Node.js 20+
-- [LM Studio](https://lmstudio.ai) с загруженной моделью (Qwen 3 Coder 30B рекомендуется)
-- GPU с 16+ GB VRAM (для комфортной работы LLM)
+- [LM Studio](https://lmstudio.ai) с загруженной моделью
+- GPU с 16+ GB VRAM (Qwen 3 Coder 30B рекомендуется)
 
 ### Установка
 
 ```bash
-# Клонировать
 git clone https://github.com/antsincgame/experement2.git
 cd experement2
 
@@ -59,26 +95,22 @@ cd experement2
 npm install
 
 # Backend Agent
-cd agent
-npm install
-cd ..
+cd agent && npm install && npm run build && cd ..
 ```
 
 ### Запуск
 
 ```bash
-# 1. Запусти LM Studio и загрузи модель (Server → Start)
-#    Убедись что сервер слушает на localhost:1234
+# 1. LM Studio → загрузи модель → Start Server (localhost:1234)
 
 # 2. Backend Agent (терминал 1)
-cd agent
-npm run dev
+cd agent && node dist/server.js
 
 # 3. Frontend (терминал 2)
-npm run web
+npx expo start --web
 ```
 
-Открой `http://localhost:8081` — Welcome Screen. Опиши приложение и нажми **Generate**.
+Открой `http://localhost:8081` → опиши приложение → **Generate**.
 
 ---
 
@@ -87,39 +119,13 @@ npm run web
 | Слой | Технология |
 |---|---|
 | Frontend | Expo SDK 55, Expo Router v6, NativeWind v4 |
-| UI | Lucide React, react-resizable-panels, react-syntax-highlighter |
-| State | Zustand v5 |
+| UI | Aurora gradient, Glassmorphism, Lucide React, Sacred Geometry |
+| State | Zustand v4 (per-project chat isolation) |
 | Backend | Node.js, Express, WebSocket (ws) |
-| LLM | LM Studio (OpenAI-compatible API) |
-| AST | ts-morph (скелет проекта) |
-| Validation | Zod v3 |
-
----
-
-## Возможности
-
-### Создание
-1. Опиши приложение на естественном языке
-2. LLM создаёт JSON-план (файлы, зависимости, навигация)
-3. Scaffold из pre-warmed cache (~50ms вместо 60-120s npm install)
-4. Генерация кода файл за файлом со стримингом
-5. `expo start --web` + Live Preview в iframe
-
-### Итерация
-1. Пиши в чат: "Добавь поиск" / "Измени цвет на красный"
-2. Двухшаговая система: LLM анализирует какие файлы читать → генерирует SEARCH/REPLACE блоки
-3. Точечные правки (не перезапись файлов целиком)
-4. Metro hot-reload → превью обновляется мгновенно
-
-### Auto-Fix Loop
-- Metro ловит ошибку → Agent отправляет LLM (обрезанную до 500 символов)
-- LLM генерирует фикс → применяется → Metro перекомпилирует
-- До 3 попыток, потом ошибка показывается в чате
-
-### Версионирование
-- Каждая итерация = git commit
-- Откат к любой версии через timeline
-- `git clean -fd` + `checkout` + `expo start -c` (safe rollback)
+| LLM | LM Studio (OpenAI-compatible API), auto-detect model |
+| Code Gen | SEARCH/REPLACE blocks (Aider-style), AST skeleton (ts-morph) |
+| Validation | Zod v3 schemas |
+| Testing | Vitest (100 unit tests), E2E WebSocket tests |
 
 ---
 
@@ -128,52 +134,78 @@ npm run web
 ```
 ├── agent/                    # Backend Agent (Node.js)
 │   └── src/
-│       ├── server.ts         # Express + WebSocket
-│       ├── lib/              # Pipeline, Planner, Generator, Editor, AutoFixer
-│       ├── services/         # FileManager, ProcessManager, LLM Proxy, Preview Proxy
-│       ├── prompts/          # System prompts для LLM
-│       └── schemas/          # Zod-схемы (AppPlan, EditAction, SearchReplace)
+│       ├── server.ts         # Express + WebSocket + Preview Proxy
+│       ├── lib/
+│       │   ├── pipeline.ts   # Orchestrator: plan→generate→build→verify
+│       │   ├── planner.ts    # LLM → JSON plan
+│       │   ├── generator.ts  # LLM → code files + sanitizer
+│       │   ├── editor.ts     # SEARCH/REPLACE iteration
+│       │   ├── auto-fixer.ts # Metro error → LLM fix
+│       │   ├── stream-parser.ts # Parse SEARCH/REPLACE from LLM stream
+│       │   └── context-builder.ts # AST skeleton (ts-morph)
+│       ├── services/
+│       │   ├── llm-proxy.ts  # LM Studio API (auto-detect model)
+│       │   ├── process-manager.ts # Expo process lifecycle
+│       │   ├── file-manager.ts # Workspace CRUD
+│       │   ├── preview-proxy.ts # Strip X-Frame-Options for iframe
+│       │   ├── template-cache.ts # Pre-warmed Expo template
+│       │   └── log-watcher.ts # Metro error parser
+│       ├── prompts/          # System prompts (generator, planner, editor)
+│       └── schemas/          # Zod schemas (AppPlan, EditAction, SearchReplace)
 │
-├── src/                      # Frontend (Expo)
-│   ├── app/                  # Expo Router (index.tsx — единый экран)
-│   ├── features/             # Chat, Explorer, Preview, Terminal, Settings, History
-│   ├── shared/               # Sacred Geometry, Effects, Hooks
-│   └── stores/               # Zustand (project-store, settings-store)
+├── src/                      # Frontend (Expo Web)
+│   ├── app/index.tsx         # Main screen (Welcome + Workspace)
+│   ├── features/
+│   │   ├── chat/             # Chat panel, message schema, suggestion chips
+│   │   ├── explorer/         # File tree, code viewer, file tabs
+│   │   ├── preview/          # Preview iframe (proxy + auto-refresh)
+│   │   ├── settings/         # Settings drawer (model selector, test connection)
+│   │   ├── terminal/         # Terminal panel (streaming code)
+│   │   └── history/          # Version timeline
+│   ├── shared/
+│   │   ├── hooks/use-websocket.ts # globalThis singleton (HMR-safe)
+│   │   └── components/       # Aurora background, Sacred geometry
+│   └── stores/
+│       ├── project-store.ts  # Per-project state (dual-write pattern)
+│       └── settings-store.ts # Persisted settings (localStorage)
 │
-└── workspace/                # Сгенерированные проекты (на диске)
+└── workspace/                # Generated projects (on disk)
+    └── template_cache/       # Pre-warmed Expo template
 ```
 
 ---
 
-## Горячие клавиши
+## Pipeline генерации
 
-| Комбинация | Действие |
-|---|---|
-| `Ctrl/Cmd + B` | Показать/скрыть файловое дерево |
-| `Ctrl/Cmd + J` | Открыть/закрыть терминал |
-| `Ctrl/Cmd + Enter` | Отправить сообщение в чат |
+```
+1. PLAN      LLM → JSON (files[], dependencies, navigation type)
+2. SCAFFOLD  cp -r template_cache → workspace/project-name (~50ms)
+3. GENERATE  LLM → code per file (streaming, sanitizer post-process)
+4. LAYOUT    Dynamic: Stack or Tabs based on plan.navigation.type
+5. BUILD     expo start --web → Metro bundler
+6. VERIFY    Wait for build result (60s timeout)
+   ├─ success → git commit "v1: verified" → preview_ready ✅
+   └─ error → auto-fix (LLM reads error, generates SEARCH/REPLACE)
+              → recompile → retry (max 3x)
+              → still broken → show error to user
+7. PREVIEW   iframe via proxy (strip X-Frame-Options/CSP)
+8. ITERATE   Chat → SEARCH/REPLACE → Metro hot-reload → repeat
+```
 
 ---
 
 ## Конфигурация
 
-Настройки через gear-иконку в UI:
+Settings через ⚙️ иконку:
 
-- **LM Studio URL** — `http://localhost:1234`
-- **Agent URL** — `http://localhost:3100`
-- **Temperature** — 0.4 (генерация), 0.3 (планирование)
-- **Max Tokens** — 8192
-
----
-
-## Технические решения
-
-- **SEARCH/REPLACE** вместо перезаписи файлов — 10x экономия токенов при итерациях
-- **AST-скелет** через ts-morph — экспорты/импорты/типы без тел функций (~3-5k токенов для 20+ файлов)
-- **Pre-warmed template cache** — `cp -r` за 50ms вместо `npm install` за 60-120s
-- **Preview proxy** — strip X-Frame-Options/CSP для iframe
-- **Metro error parser** — лимит 500 символов (тип + файл + строка + 3-5 строк стека)
-- **Двухшаговая итерация** — LLM сначала решает какие файлы прочитать, потом генерирует точечные правки
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| LM Studio URL | `http://localhost:1234` | LLM inference server |
+| Agent URL | `http://localhost:3100` | Backend agent |
+| Temperature | 0.4 | Генерация кода |
+| Max Tokens | 32768 | Максимум на файл |
+| Prompt Enhancer | ON | Улучшение промпта через LLM |
+| Model | auto-detect | Первая загруженная в LM Studio |
 
 ---
 
@@ -182,21 +214,53 @@ npm run web
 **Qwen 3 Coder 30B** через LM Studio
 
 - Квантизация: Q4_K_M (~18 GB VRAM)
-- Контекст: 32k токенов (комфортно в VRAM)
-- HumanEval: ~92%
+- Контекст: 32k токенов
+- Auto-detect: агент сам находит загруженную модель
 
-Также работает с: DeepSeek Coder V2, Qwen 2.5 Coder 32B, Mistral Codestral 22B
+Также работает с: DeepSeek Coder V2, Qwen 2.5 Coder 32B, Mistral Devstral, GLM-4
+
+---
+
+## Тесты
+
+```bash
+# Unit tests (100 тестов, <1 сек)
+cd agent && npm test
+
+# E2E (генерация 10 проектов через WebSocket)
+node e2e-preview-test.mjs
+```
+
+| Модуль | Тесты |
+|--------|-------|
+| stream-parser | 25 (SEARCH/REPLACE, thinking, code fences, streaming) |
+| app-plan.schema | 17 (validation, sanitize, navigation) |
+| edit-action.schema | 8 (read_files, defaults, strip) |
+| search-replace.schema | 9 (types, required fields) |
+| log-watcher | 14 (Metro errors, truncation, warnings) |
+| file-manager | 14 (CRUD, recursive, path traversal) |
+| port-finder | 6 (free port, bind verification) |
+| preview-proxy | 7 (headers, CORS, 502 fallback) |
 
 ---
 
 ## Roadmap
 
-- [ ] E2E тест: полный цикл создание → итерация → экспорт
-- [ ] Monaco Editor вместо react-syntax-highlighter
+- [x] MVP генерации (plan → generate → preview)
+- [x] Итерация через SEARCH/REPLACE
+- [x] Auto-fix loop (Metro errors)
+- [x] Build Verification Loop
+- [x] Per-project chat (dual-write store)
+- [x] Sidebar проектов + загрузка с диска
+- [x] Prompt Enhancer (✦ кнопка)
+- [x] Model auto-detect (LM Studio API)
+- [x] 100 юнит-тестов
+- [x] 3 слоя защиты генерации (промпт + sanitizer + build loop)
+- [ ] Runtime error collector (iframe → postMessage → agent)
+- [ ] Monaco Editor вместо syntax highlighter
 - [ ] Кроссплатформенные билды (iOS, Android)
-- [ ] Сохранение проектов в IndexedDB
-- [ ] Import существующего проекта
-- [ ] Мульти-модельная поддержка (переключение между LLM)
+- [ ] Export в standalone Expo project
+- [ ] Мульти-модельная поддержка
 
 ---
 
