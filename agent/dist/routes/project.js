@@ -1,6 +1,31 @@
 import { Router } from "express";
-import { getFileTree, readFile, listAllFiles, projectExists, } from "../services/file-manager.js";
+import fs from "fs";
+import path from "path";
+import { getFileTree, readFile, listAllFiles, projectExists, getWorkspaceRoot, } from "../services/file-manager.js";
 export const projectRouter = Router();
+// List all projects in workspace (for sidebar on Welcome screen)
+projectRouter.get("/", (_req, res) => {
+    const wsRoot = getWorkspaceRoot();
+    if (!fs.existsSync(wsRoot)) {
+        res.json({ data: [] });
+        return;
+    }
+    const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
+    const projects = entries
+        .filter((e) => e.isDirectory() && e.name !== "template_cache" && !e.name.startsWith("."))
+        .map((e) => {
+        const pkgPath = path.join(wsRoot, e.name, "package.json");
+        let displayName = e.name;
+        try {
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+            displayName = pkg.displayName ?? pkg.name ?? e.name;
+        }
+        catch { /* no package.json */ }
+        return { name: e.name, displayName, createdAt: fs.statSync(path.join(wsRoot, e.name)).birthtimeMs };
+    })
+        .sort((a, b) => b.createdAt - a.createdAt);
+    res.json({ data: projects });
+});
 projectRouter.get("/:name/files", (req, res) => {
     const { name } = req.params;
     if (!projectExists(name)) {

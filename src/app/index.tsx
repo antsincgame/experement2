@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, Platform, ActivityIndicator } from "r
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus, FolderOpen } from "lucide-react-native";
 
-import { useProjectStore, fetchProjectFiles } from "@/stores/project-store";
+import { useProjectStore, fetchProjectFiles, type AppStatus } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { createUserMessage } from "@/features/chat/schemas/message.schema";
@@ -49,6 +49,7 @@ export default function AppFactoryScreen() {
   const [inputFocused, setInputFocused] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [diskProjects, setDiskProjects] = useState<Array<{ name: string; displayName: string }>>([]);
 
   const enhancerEnabled = useSettingsStore((s) => s.enhancerEnabled);
   const enhancerModel = useSettingsStore((s) => s.enhancerModel);
@@ -81,6 +82,25 @@ export default function AppFactoryScreen() {
     prevStatus.current = status;
   }, [status, projectName]);
 
+  // Load project list from disk on mount
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        const resp = await fetch(`${agentUrl}/api/projects`);
+        if (resp.ok) {
+          const { data } = await resp.json();
+          setDiskProjects(data);
+          // Also add them to the store
+          const addProject = useProjectStore.getState().addProject;
+          for (const p of data) {
+            addProject({ name: p.name, displayName: p.displayName, status: "ready", port: null, createdAt: p.createdAt ?? Date.now() });
+          }
+        }
+      } catch { /* agent offline */ }
+    };
+    loadProjects();
+  }, [agentUrl]);
+
   const isWorkspace = projectName !== null || !["idle", "error"].includes(status);
 
   const handleCreate = useCallback(
@@ -101,11 +121,62 @@ export default function AppFactoryScreen() {
     [addMessage, projectName, handleCreate, iterate]
   );
 
+  // ── Open existing project ──
+  const handleOpenProject = useCallback((name: string) => {
+    const store = useProjectStore.getState();
+    store.setProjectName(name);
+    store.setStatus("ready");
+    store.addProject({ name, displayName: name, status: "ready", port: null, createdAt: Date.now() });
+    fetchProjectFiles(agentUrl, name);
+  }, [agentUrl]);
+
   // ── WELCOME ────────────────────────────────────────────
   if (!isWorkspace) {
+    const allProjects = projectList.length > 0 ? projectList : diskProjects.map((p) => ({ ...p, status: "ready" as AppStatus, port: null, createdAt: Date.now() }));
+
     return (
       <AuroraBackground intensity="vivid">
         <SafeAreaView className="flex-1">
+          <View className="flex-1 flex-row">
+          {/* Project Sidebar on Welcome */}
+          {allProjects.length > 0 && (
+            <View
+              style={{
+                width: 220,
+                backgroundColor: "rgba(255,255,255,0.3)",
+                borderRightWidth: 1,
+                borderRightColor: "rgba(255,255,255,0.5)",
+                ...(Platform.OS === "web" ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
+              } as never}
+            >
+              <View className="px-4 py-3 flex-row items-center gap-2" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.4)" }}>
+                <FolderOpen size={14} color="#7C4DFF" strokeWidth={1.5} />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#4A4A6A", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                  My Projects ({allProjects.length})
+                </Text>
+              </View>
+              <View className="flex-1 py-1">
+                {allProjects.map((p) => (
+                  <Pressable
+                    key={p.name}
+                    onPress={() => handleOpenProject(p.name)}
+                    className="flex-row items-center gap-2.5 px-4 py-2.5 mx-1.5 my-0.5 rounded-xl"
+                    style={{
+                      backgroundColor: "rgba(255,255,255,0.35)",
+                      borderWidth: 1,
+                      borderColor: "rgba(255,255,255,0.5)",
+                    }}
+                  >
+                    <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#00FF88" }} />
+                    <Text style={{ fontSize: 12, color: "#4A4A6A", fontWeight: "500" }} numberOfLines={1}>
+                      {p.displayName}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
           <View className="flex-1 items-center justify-center relative overflow-hidden">
             {/* Flower of Life background */}
             <View className="absolute inset-0 items-center justify-center" style={{ opacity: 0.025 }}>
@@ -276,6 +347,7 @@ export default function AppFactoryScreen() {
             </View>
 
             <SuggestionChips onSelect={setWelcomeInput} />
+          </View>
           </View>
 
           <SettingsDrawer visible={settingsVisible} onClose={() => setSettingsVisible(false)} />

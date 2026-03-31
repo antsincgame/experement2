@@ -2,7 +2,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 export const createPreviewProxy = (targetPort) => createProxyMiddleware({
     target: `http://127.0.0.1:${targetPort}`,
     changeOrigin: true,
-    ws: true,
+    ws: false, // CRITICAL: ws:true hijacks ALL WebSocket connections including agent WS!
     pathRewrite: { "^/preview": "" },
     on: {
         proxyRes(proxyRes) {
