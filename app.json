@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "App Factory",
+    "slug": "app-factory",
+    "version": "1.0.0",
+    "scheme": "appfactory",
+    "userInterfaceStyle": "automatic",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"]
+  }
+}
