@@ -126,6 +126,24 @@ export default function AppFactoryScreen() {
 
   const isWorkspace = projectName !== null || !["idle", "error"].includes(status);
 
+  // ALL hooks must be before any early return (React rules of hooks)
+  const handleCreateNew = useCallback(() => {
+    setStatus("idle");
+    setProjectName(null);
+  }, [setProjectName, setStatus]);
+
+  const handleSelectProject = useCallback((name: string) => {
+    switchProject(name);
+    setStatus("building");
+    void fetchProjectFiles(name);
+    startPreview(name);
+  }, [setStatus, startPreview, switchProject]);
+
+  const handleExport = useCallback(() => {
+    if (!projectName) return;
+    void Linking.openURL(apiClient.getProjectExportUrl(projectName));
+  }, [projectName]);
+
   const handleCreate = useCallback(
     (text: string) => {
       addMessage(createUserMessage(text));
@@ -384,27 +402,6 @@ export default function AppFactoryScreen() {
       </AuroraBackground>
     );
   }
-
-  // Workspace actions
-  const handleCreateNew = useCallback(() => {
-    setStatus("idle");
-    setProjectName(null);
-  }, [setProjectName, setStatus]);
-
-  const handleSelectProject = useCallback((name: string) => {
-    switchProject(name);
-    setStatus("building");
-    void fetchProjectFiles(name);
-    startPreview(name);
-  }, [setStatus, startPreview, switchProject]);
-
-  const handleExport = useCallback(() => {
-    if (!projectName) {
-      return;
-    }
-
-    void Linking.openURL(apiClient.getProjectExportUrl(projectName));
-  }, [projectName]);
 
   return (
     <AuroraBackground intensity="subtle">
