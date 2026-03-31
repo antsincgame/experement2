@@ -51,7 +51,8 @@ interface ProjectChat {
   previewPort: number | null;
 }
 
-const emptyChat = (): ProjectChat => ({
+/** Stable empty reference for reads — prevents infinite re-render */
+const EMPTY_CHAT: Readonly<ProjectChat> = {
   messages: [],
   versions: [],
   fileTree: [],
@@ -61,35 +62,35 @@ const emptyChat = (): ProjectChat => ({
   streamingContent: "",
   previewUrl: null,
   previewPort: null,
-});
+};
+
+const freshChat = (): ProjectChat => ({ ...EMPTY_CHAT, messages: [], versions: [], fileTree: [], openFiles: [], fileContents: {} });
 
 interface ProjectState {
-  // ── Global state ──
+  // ── Top-level (active project) — used by selectors ──
   projectName: string | null;
   projectList: ProjectEntry[];
   status: AppStatus;
   plan: Record<string, unknown> | null;
+  messages: ChatMessage[];
+  fileTree: FileNode[];
+  openFiles: string[];
+  activeFile: string | null;
+  fileContents: Record<string, string>;
+  versions: Version[];
+  currentVersion: number;
+  previewUrl: string | null;
+  previewPort: number | null;
   generationProgress: number;
   currentGeneratingFile: string | null;
   isConnected: boolean;
   lmStudioStatus: "connected" | "disconnected" | "checking";
+  streamingContent: string;
   fileTreeVisible: boolean;
   terminalVisible: boolean;
 
-  // ── Per-project state map ──
+  // ── Per-project persistence map ──
   projectChats: Record<string, ProjectChat>;
-
-  // ── Computed getters (read from active project) ──
-  readonly messages: ChatMessage[];
-  readonly fileTree: FileNode[];
-  readonly openFiles: string[];
-  readonly activeFile: string | null;
-  readonly fileContents: Record<string, string>;
-  readonly versions: Version[];
-  readonly currentVersion: number;
-  readonly streamingContent: string;
-  readonly previewUrl: string | null;
-  readonly previewPort: number | null;
 
   // ── Actions ──
   setProjectName: (name: string | null) => void;
@@ -119,128 +120,102 @@ interface ProjectState {
   handleWsMessage: (msg: Record<string, unknown>) => void;
 }
 
-// ── Helper: get or create chat for a project ──
-const getChat = (chats: Record<string, ProjectChat>, name: string | null): ProjectChat => {
-  if (!name) return emptyChat();
-  return chats[name] ?? emptyChat();
-};
-
-const updateChat = (
+/** Save current top-level state into projectChats for the given project */
+const saveToChats = (
   chats: Record<string, ProjectChat>,
   name: string | null,
-  updater: (chat: ProjectChat) => Partial<ProjectChat>
+  patch: Partial<ProjectChat>
 ): Record<string, ProjectChat> => {
   if (!name) return chats;
-  const current = chats[name] ?? emptyChat();
-  return { ...chats, [name]: { ...current, ...updater(current) } };
+  const existing = chats[name] ?? freshChat();
+  return { ...chats, [name]: { ...existing, ...patch } };
 };
 
 export const useProjectStore = create<ProjectState>()((set, get) => ({
-  // ── Global state ──
+  // ── Top-level state ──
   projectName: null,
   projectList: [],
   status: "idle" as AppStatus,
   plan: null,
+  messages: [] as ChatMessage[],
+  fileTree: [] as FileNode[],
+  openFiles: [] as string[],
+  activeFile: null as string | null,
+  fileContents: {} as Record<string, string>,
+  versions: [] as Version[],
+  currentVersion: 0,
+  previewUrl: null as string | null,
+  previewPort: null as number | null,
   generationProgress: 0,
-  currentGeneratingFile: null,
+  currentGeneratingFile: null as string | null,
   isConnected: false,
   lmStudioStatus: "checking" as "connected" | "disconnected" | "checking",
+  streamingContent: "",
   fileTreeVisible: true,
   terminalVisible: true,
   projectChats: {} as Record<string, ProjectChat>,
 
-  // ── Computed getters ──
-  get messages() { return getChat(get().projectChats, get().projectName).messages; },
-  get fileTree() { return getChat(get().projectChats, get().projectName).fileTree; },
-  get openFiles() { return getChat(get().projectChats, get().projectName).openFiles; },
-  get activeFile() { return getChat(get().projectChats, get().projectName).activeFile; },
-  get fileContents() { return getChat(get().projectChats, get().projectName).fileContents; },
-  get versions() { return getChat(get().projectChats, get().projectName).versions; },
-  get currentVersion() {
-    const v = getChat(get().projectChats, get().projectName).versions;
-    return v.length > 0 ? v[v.length - 1].number : 0;
-  },
-  get streamingContent() { return getChat(get().projectChats, get().projectName).streamingContent; },
-  get previewUrl() { return getChat(get().projectChats, get().projectName).previewUrl; },
-  get previewPort() { return getChat(get().projectChats, get().projectName).previewPort; },
-
-  // ── Actions ──
+  // ── Actions (dual-write: top-level + projectChats) ──
   setProjectName: (projectName) => set({ projectName }),
   setStatus: (status) => set({ status }),
   setPlan: (plan) => set({ plan }),
 
   addMessage: (message) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      const next = [...chat.messages, message];
+    set((s) => {
+      const next = [...s.messages, message];
       const messages = next.length > 200 ? next.slice(-200) : next;
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ messages })) };
+      return { messages, projectChats: saveToChats(s.projectChats, s.projectName, { messages }) };
     }),
 
   updateLastAssistantMessage: (content) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      const msgs = [...chat.messages];
+    set((s) => {
+      const msgs = [...s.messages];
       for (let i = msgs.length - 1; i >= 0; i--) {
         if (msgs[i].role === "assistant") {
           msgs[i] = { ...msgs[i], content, status: "streaming" };
           break;
         }
       }
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ messages: msgs })) };
+      return { messages: msgs, projectChats: saveToChats(s.projectChats, s.projectName, { messages: msgs }) };
     }),
 
   setFileTree: (fileTree) =>
-    set((state) => ({
-      projectChats: updateChat(state.projectChats, state.projectName, () => ({ fileTree })),
-    })),
+    set((s) => ({ fileTree, projectChats: saveToChats(s.projectChats, s.projectName, { fileTree }) })),
 
   openFile: (path) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      const openFiles = chat.openFiles.includes(path) ? chat.openFiles : [...chat.openFiles, path];
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ openFiles, activeFile: path })) };
+    set((s) => {
+      const openFiles = s.openFiles.includes(path) ? s.openFiles : [...s.openFiles, path];
+      return { openFiles, activeFile: path, projectChats: saveToChats(s.projectChats, s.projectName, { openFiles, activeFile: path }) };
     }),
 
   closeFile: (path) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      const openFiles = chat.openFiles.filter((f) => f !== path);
-      const activeFile = chat.activeFile === path ? (openFiles[openFiles.length - 1] ?? null) : chat.activeFile;
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ openFiles, activeFile })) };
+    set((s) => {
+      const openFiles = s.openFiles.filter((f) => f !== path);
+      const activeFile = s.activeFile === path ? (openFiles[openFiles.length - 1] ?? null) : s.activeFile;
+      return { openFiles, activeFile, projectChats: saveToChats(s.projectChats, s.projectName, { openFiles, activeFile }) };
     }),
 
   setActiveFile: (activeFile) =>
-    set((state) => ({
-      projectChats: updateChat(state.projectChats, state.projectName, () => ({ activeFile })),
-    })),
+    set((s) => ({ activeFile, projectChats: saveToChats(s.projectChats, s.projectName, { activeFile }) })),
 
   setFileContent: (path, content) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      const updated = { ...chat.fileContents, [path]: content };
+    set((s) => {
+      const updated = { ...s.fileContents, [path]: content };
       const keys = Object.keys(updated);
-      if (keys.length > 40) {
-        const evict = keys.slice(0, keys.length - 40);
-        for (const k of evict) delete updated[k];
-      }
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ fileContents: updated })) };
+      if (keys.length > 40) { for (const k of keys.slice(0, keys.length - 40)) delete updated[k]; }
+      return { fileContents: updated, projectChats: saveToChats(s.projectChats, s.projectName, { fileContents: updated }) };
     }),
 
   addVersion: (version) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ versions: [...chat.versions, version] })) };
+    set((s) => {
+      const versions = [...s.versions, version];
+      return { versions, currentVersion: version.number, projectChats: saveToChats(s.projectChats, s.projectName, { versions }) };
     }),
 
-  setCurrentVersion: () => {
-    // Version number is computed from versions array length
-  },
+  setCurrentVersion: (currentVersion) => set({ currentVersion }),
 
   setPreview: (previewUrl, previewPort) =>
-    set((state) => ({
-      projectChats: updateChat(state.projectChats, state.projectName, () => ({ previewUrl, previewPort })),
-    })),
+    set((s) => ({ previewUrl, previewPort, projectChats: saveToChats(s.projectChats, s.projectName, { previewUrl, previewPort }) })),
 
   setGenerationProgress: (generationProgress, currentGeneratingFile) =>
     set({ generationProgress, currentGeneratingFile }),
@@ -249,63 +224,92 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   setLmStudioStatus: (lmStudioStatus) => set({ lmStudioStatus }),
 
   appendStreamingContent: (chunk) =>
-    set((state) => {
-      const chat = getChat(state.projectChats, state.projectName);
-      const next = chat.streamingContent + chunk;
+    set((s) => {
+      const next = s.streamingContent + chunk;
       const streamingContent = next.length > 12_000 ? next.slice(-12_000) : next;
-      return { projectChats: updateChat(state.projectChats, state.projectName, () => ({ streamingContent })) };
+      return { streamingContent, projectChats: saveToChats(s.projectChats, s.projectName, { streamingContent }) };
     }),
 
   clearStreamingContent: () =>
-    set((state) => ({
-      projectChats: updateChat(state.projectChats, state.projectName, () => ({ streamingContent: "" })),
-    })),
+    set((s) => ({ streamingContent: "", projectChats: saveToChats(s.projectChats, s.projectName, { streamingContent: "" }) })),
 
-  toggleFileTree: () => set((state) => ({ fileTreeVisible: !state.fileTreeVisible })),
-  toggleTerminal: () => set((state) => ({ terminalVisible: !state.terminalVisible })),
+  toggleFileTree: () => set((s) => ({ fileTreeVisible: !s.fileTreeVisible })),
+  toggleTerminal: () => set((s) => ({ terminalVisible: !s.terminalVisible })),
 
   addProject: (entry) =>
-    set((state) => ({
-      projectList: [...state.projectList.filter((p) => p.name !== entry.name), entry],
-      // Initialize empty chat if new
-      projectChats: state.projectChats[entry.name]
-        ? state.projectChats
-        : { ...state.projectChats, [entry.name]: emptyChat() },
+    set((s) => ({
+      projectList: [...s.projectList.filter((p) => p.name !== entry.name), entry],
+      projectChats: s.projectChats[entry.name] ? s.projectChats : { ...s.projectChats, [entry.name]: freshChat() },
     })),
 
   removeProject: (name) =>
-    set((state) => {
-      const newList = state.projectList.filter((p) => p.name !== name);
-      const isActive = state.projectName === name;
-      const { [name]: _removed, ...restChats } = state.projectChats;
+    set((s) => {
+      const newList = s.projectList.filter((p) => p.name !== name);
+      const isActive = s.projectName === name;
+      const { [name]: _removed, ...restChats } = s.projectChats;
+      if (!isActive) return { projectList: newList, projectChats: restChats };
+      // Switch to first remaining or go idle
+      const next = newList[0];
+      const chat = next ? (restChats[next.name] ?? EMPTY_CHAT) : EMPTY_CHAT;
       return {
         projectList: newList,
         projectChats: restChats,
-        ...(isActive
-          ? { projectName: newList[0]?.name ?? null, status: newList[0]?.status ?? "idle" }
-          : {}),
+        projectName: next?.name ?? null,
+        status: next?.status ?? "idle",
+        messages: chat.messages,
+        fileTree: chat.fileTree,
+        openFiles: chat.openFiles,
+        activeFile: chat.activeFile,
+        fileContents: chat.fileContents,
+        versions: chat.versions,
+        streamingContent: chat.streamingContent,
+        previewUrl: chat.previewUrl,
+        previewPort: chat.previewPort,
       };
     }),
 
+  // ── CORE: switch restores from projectChats ──
   switchProject: (name) =>
-    set(() => ({
-      projectName: name,
-      status: "ready",
-      // Chat preserved in projectChats[name] — NO clearing!
-    })),
+    set((s) => {
+      // Save current project state first
+      const saved = s.projectName
+        ? saveToChats(s.projectChats, s.projectName, {
+            messages: s.messages,
+            fileTree: s.fileTree,
+            openFiles: s.openFiles,
+            activeFile: s.activeFile,
+            fileContents: s.fileContents,
+            versions: s.versions,
+            streamingContent: s.streamingContent,
+            previewUrl: s.previewUrl,
+            previewPort: s.previewPort,
+          })
+        : s.projectChats;
+      // Restore target project
+      const chat = saved[name] ?? EMPTY_CHAT;
+      return {
+        projectName: name,
+        status: "ready",
+        projectChats: saved,
+        messages: chat.messages,
+        fileTree: chat.fileTree,
+        openFiles: chat.openFiles,
+        activeFile: chat.activeFile,
+        fileContents: chat.fileContents,
+        versions: chat.versions,
+        streamingContent: chat.streamingContent,
+        previewUrl: chat.previewUrl,
+        previewPort: chat.previewPort,
+      };
+    }),
 
   reset: () => set({
-    projectName: null,
-    projectList: [],
-    status: "idle" as AppStatus,
-    plan: null,
-    generationProgress: 0,
-    currentGeneratingFile: null,
-    isConnected: false,
+    projectName: null, projectList: [], status: "idle" as AppStatus, plan: null,
+    messages: [], fileTree: [], openFiles: [], activeFile: null, fileContents: {},
+    versions: [], currentVersion: 0, previewUrl: null, previewPort: null,
+    generationProgress: 0, currentGeneratingFile: null, isConnected: false,
     lmStudioStatus: "checking" as "connected" | "disconnected" | "checking",
-    fileTreeVisible: true,
-    terminalVisible: true,
-    projectChats: {},
+    streamingContent: "", fileTreeVisible: true, terminalVisible: true, projectChats: {},
   }),
 
   // ── WebSocket message handler ──
@@ -314,17 +318,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const store = get();
 
     switch (type) {
-      case "connected":
-        set({ isConnected: true });
-        break;
-
-      case "status":
-        set({ status: msg.status as AppStatus });
-        break;
-
-      case "plan_chunk":
-        store.appendStreamingContent(msg.chunk as string);
-        break;
+      case "connected": set({ isConnected: true }); break;
+      case "status": set({ status: msg.status as AppStatus }); break;
+      case "plan_chunk": store.appendStreamingContent(msg.chunk as string); break;
 
       case "plan_complete":
         set({ plan: msg.plan as Record<string, unknown> });
@@ -341,50 +337,31 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         set({ generationProgress: msg.progress as number, currentGeneratingFile: msg.filepath as string });
         break;
 
-      case "code_chunk":
-        store.appendStreamingContent(msg.chunk as string);
-        break;
-
-      case "file_complete":
-        store.addMessage(createSystemMessage(`Файл создан: ${msg.filepath}`, true));
-        break;
+      case "code_chunk": store.appendStreamingContent(msg.chunk as string); break;
+      case "file_complete": store.addMessage(createSystemMessage(`Файл создан: ${msg.filepath}`, true)); break;
 
       case "generation_complete":
         store.clearStreamingContent();
         store.addMessage(createAssistantMessage(`Сгенерировано ${msg.filesCount} файлов ✓`));
         break;
 
-      case "build_event":
-        break;
+      case "build_event": break;
 
-      case "preview_ready": {
+      case "preview_ready":
         store.setPreview(msg.proxyUrl as string, msg.port as number);
         set({ status: "ready" });
         store.addMessage(createAssistantMessage("Preview ready! App is running."));
-        const pName = get().projectName;
-        if (pName) fetchProjectFiles("http://localhost:3100", pName);
-        break;
-      }
-
-      case "thinking":
-        store.addMessage(createAssistantMessage(msg.content as string));
+        { const pName = get().projectName; if (pName) fetchProjectFiles("http://localhost:3100", pName); }
         break;
 
-      case "analysis_complete":
-        store.addMessage(createSystemMessage(`Анализ: чтение ${(msg.files as string[]).join(", ")}`, true));
-        break;
-
-      case "block_applied":
-        store.addMessage(createSystemMessage(`Изменён: ${msg.filepath}`, true));
-        break;
+      case "thinking": store.addMessage(createAssistantMessage(msg.content as string)); break;
+      case "analysis_complete": store.addMessage(createSystemMessage(`Анализ: чтение ${(msg.files as string[]).join(", ")}`, true)); break;
+      case "block_applied": store.addMessage(createSystemMessage(`Изменён: ${msg.filepath}`, true)); break;
 
       case "iteration_complete": {
         const applied = msg.applied as number;
         const failed = msg.failed as number;
-        const text = failed > 0
-          ? `Применено ${applied} изменений, ${failed} ошибок`
-          : `Применено ${applied} изменений ✓`;
-        store.addMessage(createAssistantMessage(text));
+        store.addMessage(createAssistantMessage(failed > 0 ? `Применено ${applied} изменений, ${failed} ошибок` : `Применено ${applied} изменений ✓`));
         break;
       }
 
@@ -392,92 +369,42 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         store.addVersion({ number: msg.version as number, hash: msg.hash as string, description: msg.description as string, timestamp: Date.now() });
         break;
 
-      case "autofix_start":
-        store.addMessage(createSystemMessage(`Автофикс: ${msg.file} — ${(msg.error as string).slice(0, 100)}`, false));
-        break;
-
-      case "autofix_success":
-        store.addMessage(createAssistantMessage(`Ошибка исправлена автоматически (попытка ${msg.attempts}) ✓`));
-        break;
-
-      case "autofix_failed":
-        store.addMessage(createAssistantMessage(`Не удалось исправить после ${msg.attempts} попыток. Опишите проблему подробнее.`));
-        set({ status: "error" });
-        break;
-
-      case "reloading_preview":
-        store.addMessage(createSystemMessage("Откат версии, перезагрузка превью...", false));
-        break;
-
-      case "system_error":
-        store.addMessage(createAssistantMessage(`Ошибка: ${msg.error}`));
-        set({ status: "error" });
-        break;
-
-      case "generation_aborted":
-        store.addMessage(createSystemMessage("Генерация прервана пользователем", false));
-        set({ status: "ready" });
-        break;
+      case "autofix_start": store.addMessage(createSystemMessage(`Автофикс: ${msg.file} — ${(msg.error as string).slice(0, 100)}`, false)); break;
+      case "autofix_success": store.addMessage(createAssistantMessage(`Ошибка исправлена (попытка ${msg.attempts}) ✓`)); break;
+      case "autofix_failed": store.addMessage(createAssistantMessage(`Не удалось исправить после ${msg.attempts} попыток.`)); set({ status: "error" }); break;
+      case "reloading_preview": store.addMessage(createSystemMessage("Откат версии, перезагрузка превью...", false)); break;
+      case "system_error": store.addMessage(createAssistantMessage(`Ошибка: ${msg.error}`)); set({ status: "error" }); break;
+      case "generation_aborted": store.addMessage(createSystemMessage("Генерация прервана пользователем", false)); set({ status: "ready" }); break;
 
       case "project_created": {
         const pName = msg.projectName as string;
         set({ projectName: pName });
-        store.addProject({
-          name: pName,
-          displayName: pName,
-          status: "ready",
-          port: (msg.port as number) ?? null,
-          createdAt: Date.now(),
-        });
+        store.addProject({ name: pName, displayName: pName, status: "ready", port: (msg.port as number) ?? null, createdAt: Date.now() });
         break;
       }
 
-      case "iteration_result":
-        break;
-
-      case "autofix_attempt":
-        store.addMessage(createSystemMessage(`Автофикс: попытка ${msg.attempt}/${msg.maxAttempts}`, true));
-        break;
-
-      case "autofix_block":
-        store.addMessage(createSystemMessage(`Фикс: ${msg.filepath}`, true));
-        break;
-
-      case "lm_studio_status":
-        set({ lmStudioStatus: msg.status as "connected" | "disconnected" | "checking" });
-        break;
+      case "iteration_result": break;
+      case "autofix_attempt": store.addMessage(createSystemMessage(`Автофикс: попытка ${msg.attempt}/${msg.maxAttempts}`, true)); break;
+      case "autofix_block": store.addMessage(createSystemMessage(`Фикс: ${msg.filepath}`, true)); break;
+      case "lm_studio_status": set({ lmStudioStatus: msg.status as "connected" | "disconnected" | "checking" }); break;
     }
   },
 }));
 
 // ── File fetch helper ────────────────────────────────────
-
-export const fetchProjectFiles = async (
-  agentUrl: string,
-  projectName: string
-): Promise<void> => {
+export const fetchProjectFiles = async (agentUrl: string, projectName: string): Promise<void> => {
   const store = useProjectStore.getState();
   try {
     const treeResp = await fetch(`${agentUrl}/api/projects/${projectName}/files`);
-    if (treeResp.ok) {
-      const { data } = await treeResp.json();
-      store.setFileTree(data);
-    }
+    if (treeResp.ok) { const { data } = await treeResp.json(); store.setFileTree(data); }
 
     const listResp = await fetch(`${agentUrl}/api/projects/${projectName}/all-files`);
     if (listResp.ok) {
       const { data: files } = await listResp.json();
       for (const filePath of files as string[]) {
-        const fileResp = await fetch(
-          `${agentUrl}/api/projects/${projectName}/file?path=${encodeURIComponent(filePath)}`
-        );
-        if (fileResp.ok) {
-          const { data: fileData } = await fileResp.json();
-          store.setFileContent(filePath, fileData.content);
-        }
+        const fileResp = await fetch(`${agentUrl}/api/projects/${projectName}/file?path=${encodeURIComponent(filePath)}`);
+        if (fileResp.ok) { const { data: fileData } = await fileResp.json(); store.setFileContent(filePath, fileData.content); }
       }
     }
-  } catch (err) {
-    console.error("[fetchProjectFiles]", err);
-  }
+  } catch (err) { console.error("[fetchProjectFiles]", err); }
 };
