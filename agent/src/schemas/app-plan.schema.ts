@@ -2,18 +2,7 @@ import { z } from "zod";
 
 export const FileInPlanSchema = z.object({
   path: z.string().min(1),
-  type: z.enum([
-    "screen",
-    "component",
-    "hook",
-    "store",
-    "type",
-    "util",
-    "config",
-    "style",
-    "layout",
-    "lib",
-  ]),
+  type: z.string().min(1),
   description: z.string().min(1),
   dependencies: z.array(z.string()).default([]),
 });
@@ -27,7 +16,7 @@ export const NavigationScreenSchema = z.object({
 });
 
 export const AppPlanSchema = z.object({
-  name: z.string().min(1).regex(/^[a-z0-9-]+$/, "slug format only"),
+  name: z.string().min(1).transform((s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-")),
   displayName: z.string().min(1),
   description: z.string().min(1),
   files: z.array(FileInPlanSchema).min(1),
