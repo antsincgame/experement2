@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { View, Text, TextInput, Pressable, Platform } from "react-native";
+import { View, Text, TextInput, Pressable, Platform, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus, FolderOpen } from "lucide-react-native";
 
 import { useProjectStore, fetchProjectFiles } from "@/stores/project-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { createUserMessage } from "@/features/chat/schemas/message.schema";
 
@@ -47,6 +48,30 @@ export default function AppFactoryScreen() {
   const [welcomeInput, setWelcomeInput] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+
+  const enhancerEnabled = useSettingsStore((s) => s.enhancerEnabled);
+  const enhancerModel = useSettingsStore((s) => s.enhancerModel);
+  const agentUrl = useSettingsStore((s) => s.agentUrl);
+  const lmStudioUrl = useSettingsStore((s) => s.lmStudioUrl);
+
+  const handleEnhance = useCallback(async () => {
+    const trimmed = welcomeInput.trim();
+    if (!trimmed) return;
+    setEnhancing(true);
+    try {
+      const resp = await fetch(`${agentUrl}/api/llm/enhance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmed, model: enhancerModel || undefined, lmStudioUrl }),
+      });
+      if (resp.ok) {
+        const { data } = await resp.json();
+        if (data) setWelcomeInput(data);
+      }
+    } catch { /* silent */ }
+    finally { setEnhancing(false); }
+  }, [welcomeInput, agentUrl, enhancerModel, lmStudioUrl]);
 
   const prevStatus = useRef(status);
   useEffect(() => {
@@ -190,6 +215,25 @@ export default function AppFactoryScreen() {
                       Powered by local LLM
                     </Text>
                   </View>
+                  <View className="flex-row items-center gap-2">
+                  {/* Enhance button */}
+                  {enhancerEnabled && welcomeInput.trim() && (
+                    <Pressable
+                      onPress={handleEnhance}
+                      disabled={enhancing}
+                      className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl"
+                      style={{ backgroundColor: "rgba(124, 77, 255, 0.12)", borderWidth: 1, borderColor: "rgba(124,77,255,0.2)" }}
+                    >
+                      {enhancing ? (
+                        <ActivityIndicator size="small" color="#7C4DFF" />
+                      ) : (
+                        <Sparkles size={13} color="#7C4DFF" strokeWidth={1.5} />
+                      )}
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: "#7C4DFF" }}>
+                        {enhancing ? "Improving..." : "Enhance"}
+                      </Text>
+                    </Pressable>
+                  )}
                   <Pressable
                     onPress={() => {
                       if (welcomeInput.trim() && isConnected) handleCreate(welcomeInput.trim());
@@ -222,6 +266,7 @@ export default function AppFactoryScreen() {
                       Generate
                     </Text>
                   </Pressable>
+                  </View>
                 </View>
               </View>
             </View>
