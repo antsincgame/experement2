@@ -84,7 +84,25 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
         <ScrollView className="px-6 py-4 pb-8" contentContainerStyle={{ gap: 16 }}>
           <Field label="LM Studio URL" value={settings.lmStudioUrl} onChange={settings.setLmStudioUrl} />
-          <Field label="Agent URL" value={settings.agentUrl} onChange={settings.setAgentUrl} />
+          <View>
+            <Field label="Agent URL" value={settings.agentUrl} onChange={settings.setAgentUrl} />
+            <Pressable
+              onPress={() => {
+                const wsUrl = settings.agentUrl.replace("http://", "ws://").replace("https://", "wss://");
+                console.log("[Settings] Testing WS connection to:", wsUrl);
+                try {
+                  const ws = new WebSocket(wsUrl);
+                  ws.onopen = () => { console.log("[Settings] WS TEST: SUCCESS"); ws.close(); alert("Agent connected!"); };
+                  ws.onerror = () => { console.log("[Settings] WS TEST: FAILED"); alert("Agent connection FAILED. Check URL."); };
+                  setTimeout(() => ws.close(), 5000);
+                } catch (e) { alert("Error: " + String(e)); }
+              }}
+              className="mt-1.5 px-3 py-1.5 rounded-lg self-start"
+              style={{ backgroundColor: "rgba(0,229,255,0.1)", borderWidth: 1, borderColor: "rgba(0,229,255,0.2)" }}
+            >
+              <Text style={{ fontSize: 10, color: "#00BCD4", fontWeight: "600" }}>Test Connection</Text>
+            </Pressable>
+          </View>
 
           {/* Model Selector */}
           <ModelSelector

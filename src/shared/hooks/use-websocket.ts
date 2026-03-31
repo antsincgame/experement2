@@ -29,12 +29,14 @@ export const useWebSocket = () => {
 
       isConnecting.current = true;
 
+      console.log("[WS] Connecting to:", wsUrl);
+
       try {
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log("[WS] Connected to agent");
+          console.log("[WS] Connected to agent at", wsUrl);
           isConnecting.current = false;
           reconnectAttempts.current = 0;
           useProjectStore.getState().setConnected(true);
@@ -63,7 +65,8 @@ export const useWebSocket = () => {
           }
         };
 
-        ws.onerror = () => {
+        ws.onerror = (e) => {
+          console.error("[WS] Error connecting to", wsUrl, e);
           isConnecting.current = false;
         };
       } catch {
