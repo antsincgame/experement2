@@ -2,6 +2,9 @@ import type { AppPlan } from "../schemas/app-plan.schema.js";
 interface CreateOptions {
     description: string;
     lmStudioUrl?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
     onProjectNameResolved?: (projectName: string) => void;
 }
 interface CreateResult {
@@ -17,6 +20,9 @@ interface IterateOptions {
         content: string;
     }>;
     lmStudioUrl?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
 }
 interface IterateResult {
     appliedBlocks: number;

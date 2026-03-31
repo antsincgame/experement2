@@ -9,15 +9,15 @@ export declare const SearchReplaceBlockSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     type: "search_replace" | "new_file" | "delete";
     filepath: string;
-    replace?: string | undefined;
     search?: string | undefined;
+    replace?: string | undefined;
     content?: string | undefined;
     thinking?: string | undefined;
 }, {
     type: "search_replace" | "new_file" | "delete";
     filepath: string;
-    replace?: string | undefined;
     search?: string | undefined;
+    replace?: string | undefined;
     content?: string | undefined;
     thinking?: string | undefined;
 }>;

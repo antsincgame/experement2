@@ -1,3 +1,4 @@
+// Repairs lax LLM JSON and returns null instead of throwing when recovery still fails.
 /**
  * Extracts and repairs JSON from LLM output that may contain:
  * - Markdown code fences (```json ... ```)
@@ -34,13 +35,14 @@ export const repairJson = (raw: string): string => {
   return text;
 };
 
-export const safeJsonParse = (raw: string): unknown => {
-  // Try direct parse first
+export const safeJsonParse = (raw: string): unknown | null => {
   try {
     return JSON.parse(raw.trim());
   } catch {
-    // Try with repair
-    const repaired = repairJson(raw);
-    return JSON.parse(repaired);
+    try {
+      return JSON.parse(repairJson(raw));
+    } catch {
+      return null;
+    }
   }
 };

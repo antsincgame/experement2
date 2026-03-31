@@ -1,4 +1,5 @@
 const METRO_ERROR_MAX_LENGTH = 500;
+const MAX_STACK_LINES = 5;
 const ERROR_PATTERNS = [
     /SyntaxError:\s*(.+)/,
     /Error:\s*(.+)/,
@@ -16,16 +17,21 @@ const METRO_FILE_PATTERN = /(?:in|from)\s+['"]?([^\s'"]+\.(?:tsx?|jsx?))['"]?/;
 const UNABLE_RESOLVE_PATTERN = /Unable to resolve module\s+["']?([^"'\s]+)["']?.*from\s+["']?([^"'\s:]+)["']?/;
 const isErrorLine = (line) => ERROR_PATTERNS.some((pattern) => pattern.test(line));
 const isNoiseLine = (line) => {
-    const lower = line.toLowerCase();
+    const trimmed = line.trim();
+    const lower = trimmed.toLowerCase();
     return (lower.includes("warning") ||
         lower.includes("deprecat") ||
         lower.includes("experimentalwarning") ||
-        lower.includes("info") ||
-        line.trim().startsWith("at node:") ||
-        line.trim().startsWith("at Object.") ||
-        line.includes("node_modules") ||
-        line.trim() === "");
+        (lower.startsWith("info") && !lower.includes("error")) ||
+        trimmed.startsWith("at node:") ||
+        trimmed.startsWith("at Object.") ||
+        trimmed.startsWith("at Module.") ||
+        trimmed.startsWith("at require") ||
+        trimmed.startsWith("at async") ||
+        (line.includes("node_modules") && !line.includes("Unable to resolve")) ||
+        trimmed === "");
 };
+const isUserFileLine = (line) => /src\//.test(line) && !line.includes("node_modules");
 const truncateError = (errorText) => {
     if (errorText.length <= METRO_ERROR_MAX_LENGTH)
         return errorText;
@@ -80,17 +86,24 @@ export const parseMetroError = (output) => {
         if (metroFileMatch && file === "unknown") {
             file = metroFileMatch[1];
         }
-        if (!isNoiseLine(l) && stackLines.length < 5) {
-            stackLines.push(l.trim());
+        if (!isNoiseLine(l)) {
+            if (isUserFileLine(l)) {
+                stackLines.unshift(l.trim()); // user files first
+            }
+            else if (stackLines.length < MAX_STACK_LINES) {
+                stackLines.push(l.trim());
+            }
         }
     }
-    const raw = `${errorType}\n  File: ${file}:${line}\n  ${stackLines.join("\n  ")}`;
+    // Deduplicate and limit
+    const uniqueStack = [...new Set(stackLines)].slice(0, MAX_STACK_LINES);
+    const raw = `${errorType}\n  File: ${file}:${line}\n  ${uniqueStack.join("\n  ")}`;
     return {
         type: errorType,
         category: categorizeError(errorType),
         file,
         line,
-        stack: stackLines.join("\n"),
+        stack: uniqueStack.join("\n"),
         raw: truncateError(raw),
     };
 };

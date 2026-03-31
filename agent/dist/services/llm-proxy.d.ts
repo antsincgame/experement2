@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+export declare const clearModelCache: (baseUrl?: string) => void;
 interface ChatMessage {
     role: "system" | "user" | "assistant";
     content: string;

@@ -1,7 +1,16 @@
-﻿import express from "express";
+﻿// Orchestrates HTTP, WebSocket, and preview runtime state via a shared event bus to avoid circular imports.
+import express from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 
+import {
+  broadcast,
+  handlePreviewRequest,
+  registerClient,
+  sendToClient,
+  setPreviewPort,
+  unregisterClient,
+} from "./lib/event-bus.js";
 import { formatZodError } from "./lib/request-validation.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { projectRouter } from "./routes/project.js";
@@ -18,7 +27,7 @@ import {
   projectExists,
   readFile,
 } from "./services/file-manager.js";
-import { abortAll } from "./services/llm-proxy.js";
+import { abortAll, clearModelCache } from "./services/llm-proxy.js";
 import { parseMetroError } from "./services/log-watcher.js";
 import {
   attachOperationToQueueKey,
@@ -26,7 +35,6 @@ import {
   getProjectOperationQueueKey,
   WORKSPACE_OPERATION_QUEUE_KEY,
 } from "./services/project-operation-lock.js";
-import { createPreviewProxy } from "./services/preview-proxy.js";
 import { killAll, startExpo, getActivePort } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 
@@ -97,59 +105,9 @@ app.get("/api/projects/:name/export", async (req, res) => {
   archive.finalize();
 });
 
-// Preview proxy вЂ” dynamically routes to active Expo port
-let activePreviewPort: number | null = null;
-let cachedProxy: ReturnType<typeof createPreviewProxy> | null = null;
-let cachedProxyPort: number | null = null;
-
-app.use("/preview", (req, res, next) => {
-  if (!activePreviewPort) {
-    res.status(503).send("No preview available yet. Metro is not running.");
-    return;
-  }
-  // Reuse proxy if port hasn't changed
-  if (!cachedProxy || cachedProxyPort !== activePreviewPort) {
-    cachedProxy = createPreviewProxy(activePreviewPort);
-    cachedProxyPort = activePreviewPort;
-  }
-  cachedProxy(req, res, next);
-});
-
-export const setPreviewPort = (port: number | null) => {
-  if (port !== activePreviewPort) {
-    cachedProxy = null;
-    cachedProxyPort = null;
-  }
-  activePreviewPort = port;
-  console.log(`[Preview] Port set to: ${port}`);
-};
+app.use("/preview", handlePreviewRequest);
 
 // в”Ђв”Ђ WebSocket в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-
-interface WsClient {
-  ws: WebSocket;
-  id: string;
-}
-
-const clients = new Map<string, WsClient>();
-
-const broadcast = (message: Record<string, unknown>): void => {
-  const data = JSON.stringify(message);
-  for (const client of clients.values()) {
-    if (client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(data);
-    }
-  }
-};
-
-const sendToClient = (clientId: string, message: Record<string, unknown>): void => {
-  const client = clients.get(clientId);
-  if (!client || client.ws.readyState !== WebSocket.OPEN) {
-    return;
-  }
-
-  client.ws.send(JSON.stringify(message));
-};
 
 const sendSystemErrorToClient = (
   clientId: string,
@@ -186,7 +144,7 @@ const runQueuedOperation = <T>(
 
 wss.on("connection", (ws: WebSocket) => {
   const clientId = crypto.randomUUID();
-  clients.set(clientId, { ws, id: clientId });
+  registerClient(clientId, ws);
   console.log(`[WS] Client ${clientId.slice(0, 8)} connected`);
 
   ws.on("message", (data: Buffer) => {
@@ -214,7 +172,7 @@ wss.on("connection", (ws: WebSocket) => {
   });
 
   ws.on("close", () => {
-    clients.delete(clientId);
+    unregisterClient(clientId);
     console.log(`[WS] Client ${clientId.slice(0, 8)} disconnected`);
   });
 
@@ -402,8 +360,6 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
   }
 };
 
-export { broadcast, wss };
-
 // в”Ђв”Ђ LM Studio Health Check в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 const checkLmStudio = async (): Promise<void> => {
@@ -412,9 +368,11 @@ const checkLmStudio = async (): Promise<void> => {
     if (resp.ok) {
       broadcast({ type: "lm_studio_status", status: "connected" });
     } else {
+      clearModelCache(DEFAULT_LM_STUDIO_URL);
       broadcast({ type: "lm_studio_status", status: "disconnected" });
     }
   } catch {
+    clearModelCache(DEFAULT_LM_STUDIO_URL);
     broadcast({ type: "lm_studio_status", status: "disconnected" });
   }
 };

@@ -1,11 +1,40 @@
 import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
+const SUCCESS_MODEL_CACHE_TTL_MS = 5 * 60_000;
+const FAILED_MODEL_CACHE_TTL_MS = 30_000;
 const cachedModelIds = new Map();
 const modelFetchPromises = new Map();
+const getCachedModelId = (baseUrl) => {
+    const entry = cachedModelIds.get(baseUrl);
+    if (!entry) {
+        return undefined;
+    }
+    if (entry.expiresAt <= Date.now()) {
+        cachedModelIds.delete(baseUrl);
+        return undefined;
+    }
+    return entry.modelId;
+};
+const setCachedModelId = (baseUrl, modelId, ttlMs) => {
+    cachedModelIds.set(baseUrl, {
+        modelId,
+        expiresAt: Date.now() + ttlMs,
+    });
+};
+export const clearModelCache = (baseUrl) => {
+    if (baseUrl) {
+        cachedModelIds.delete(baseUrl);
+        modelFetchPromises.delete(baseUrl);
+        return;
+    }
+    cachedModelIds.clear();
+    modelFetchPromises.clear();
+};
 const getDefaultModel = async (baseUrl) => {
-    if (cachedModelIds.has(baseUrl)) {
-        return cachedModelIds.get(baseUrl) ?? null;
+    const cachedModelId = getCachedModelId(baseUrl);
+    if (cachedModelId !== undefined) {
+        return cachedModelId;
     }
     const existingPromise = modelFetchPromises.get(baseUrl);
     if (existingPromise) {
@@ -15,19 +44,19 @@ const getDefaultModel = async (baseUrl) => {
         try {
             const resp = await fetch(`${baseUrl}/v1/models`);
             if (!resp.ok) {
-                cachedModelIds.set(baseUrl, null);
+                setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);
                 return null;
             }
             const data = await resp.json();
             const models = data.data ?? [];
             const preferred = models.find((model) => model.id.includes("qwen3-coder"));
             const resolvedModel = preferred?.id ?? models[0]?.id ?? null;
-            cachedModelIds.set(baseUrl, resolvedModel);
+            setCachedModelId(baseUrl, resolvedModel, resolvedModel ? SUCCESS_MODEL_CACHE_TTL_MS : FAILED_MODEL_CACHE_TTL_MS);
             console.log(`[LLM] Auto-detected model for ${baseUrl}: ${resolvedModel}`);
             return resolvedModel;
         }
         catch {
-            cachedModelIds.set(baseUrl, null);
+            setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);
             return null;
         }
         finally {

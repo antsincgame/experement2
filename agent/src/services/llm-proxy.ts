@@ -1,16 +1,61 @@
-﻿// Validates LLM proxy requests and caches model discovery per LM Studio base URL.
+﻿// Validates LLM proxy requests and caches model discovery with failure invalidation per LM Studio URL.
 import type { Request, Response } from "express";
 import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
-const cachedModelIds = new Map<string, string | null>();
+interface CachedModelEntry {
+  modelId: string | null;
+  expiresAt: number;
+}
+
+const SUCCESS_MODEL_CACHE_TTL_MS = 5 * 60_000;
+const FAILED_MODEL_CACHE_TTL_MS = 30_000;
+
+const cachedModelIds = new Map<string, CachedModelEntry>();
 const modelFetchPromises = new Map<string, Promise<string | null>>();
 
+const getCachedModelId = (baseUrl: string): string | null | undefined => {
+  const entry = cachedModelIds.get(baseUrl);
+  if (!entry) {
+    return undefined;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    cachedModelIds.delete(baseUrl);
+    return undefined;
+  }
+
+  return entry.modelId;
+};
+
+const setCachedModelId = (
+  baseUrl: string,
+  modelId: string | null,
+  ttlMs: number
+): void => {
+  cachedModelIds.set(baseUrl, {
+    modelId,
+    expiresAt: Date.now() + ttlMs,
+  });
+};
+
+export const clearModelCache = (baseUrl?: string): void => {
+  if (baseUrl) {
+    cachedModelIds.delete(baseUrl);
+    modelFetchPromises.delete(baseUrl);
+    return;
+  }
+
+  cachedModelIds.clear();
+  modelFetchPromises.clear();
+};
+
 const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
-  if (cachedModelIds.has(baseUrl)) {
-    return cachedModelIds.get(baseUrl) ?? null;
+  const cachedModelId = getCachedModelId(baseUrl);
+  if (cachedModelId !== undefined) {
+    return cachedModelId;
   }
 
   const existingPromise = modelFetchPromises.get(baseUrl);
@@ -22,7 +67,7 @@ const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
     try {
       const resp = await fetch(`${baseUrl}/v1/models`);
       if (!resp.ok) {
-        cachedModelIds.set(baseUrl, null);
+        setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);
         return null;
       }
 
@@ -32,11 +77,15 @@ const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
         model.id.includes("qwen3-coder")
       );
       const resolvedModel = preferred?.id ?? models[0]?.id ?? null;
-      cachedModelIds.set(baseUrl, resolvedModel);
+      setCachedModelId(
+        baseUrl,
+        resolvedModel,
+        resolvedModel ? SUCCESS_MODEL_CACHE_TTL_MS : FAILED_MODEL_CACHE_TTL_MS
+      );
       console.log(`[LLM] Auto-detected model for ${baseUrl}: ${resolvedModel}`);
       return resolvedModel;
     } catch {
-      cachedModelIds.set(baseUrl, null);
+      setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);
       return null;
     } finally {
       modelFetchPromises.delete(baseUrl);

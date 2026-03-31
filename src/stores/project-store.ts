@@ -1,4 +1,5 @@
-﻿import { create } from "zustand";
+﻿// Keeps per-project UI state synchronized across scaffold/generation and active workspace switching.
+import { create } from "zustand";
 import { apiClient } from "@/shared/lib/api-client";
 import type { ChatMessage } from "@/features/chat/schemas/message.schema";
 import {
@@ -386,7 +387,21 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         break;
 
       case "scaffold_complete":
-        set({ projectName: msg.projectName as string });
+        {
+          const projectName = msg.projectName as string;
+          const existingProject = store.projectList.find(
+            (project) => project.name === projectName
+          );
+
+          set({ projectName });
+          store.addProject({
+            name: projectName,
+            displayName: existingProject?.displayName ?? projectName,
+            status: existingProject?.status ?? store.status ?? "generating",
+            port: existingProject?.port ?? null,
+            createdAt: existingProject?.createdAt ?? Date.now(),
+          });
+        }
         store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
         break;
 
@@ -517,13 +532,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
       case "project_created": {
         const pName = msg.projectName as string;
+        const existingProject = store.projectList.find(
+          (project) => project.name === pName
+        );
         set({ projectName: pName });
         store.addProject({
           name: pName,
-          displayName: pName,
+          displayName: existingProject?.displayName ?? pName,
           status: "ready",
-          port: (msg.port as number) ?? null,
-          createdAt: Date.now(),
+          port: (msg.port as number) ?? existingProject?.port ?? null,
+          createdAt: existingProject?.createdAt ?? Date.now(),
         });
         break;
       }

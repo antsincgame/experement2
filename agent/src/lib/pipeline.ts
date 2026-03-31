@@ -1,7 +1,7 @@
-// Verifies generated projects with deterministic validation gates before previewing or versioning them.
+// Verifies generated projects with deterministic validation gates and event-bus updates before previewing.
 import { spawnSync } from "child_process";
 import fs from "fs";
-import { broadcast, setPreviewPort } from "../server.js";
+import { broadcast, setPreviewPort } from "./event-bus.js";
 import { createProjectFromCache } from "../services/template-cache.js";
 import {
   startExpo,
@@ -109,6 +109,40 @@ const gitInit = (projectPath: string): void => {
 
 const summarizeOutput = (output: string): string =>
   output.trim().split("\n").slice(-12).join("\n").trim();
+
+const waitForBuildOutcome = async (
+  timeoutMs: number,
+  hasOutcome: () => boolean
+): Promise<void> => {
+  await new Promise<void>((resolve) => {
+    let settled = false;
+
+    const finish = (
+      intervalId: ReturnType<typeof setInterval>,
+      timeoutId: ReturnType<typeof setTimeout>
+    ): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+      resolve();
+    };
+
+    const intervalId = setInterval(() => {
+      if (hasOutcome()) {
+        finish(intervalId, timeoutId);
+      }
+    }, 500);
+    const timeoutId = setTimeout(() => finish(intervalId, timeoutId), timeoutMs);
+
+    if (hasOutcome()) {
+      finish(intervalId, timeoutId);
+    }
+  });
+};
 
 const runProjectQualityGates = async (
   projectPath: string,
@@ -269,15 +303,10 @@ export const createProject = async (
   });
 
   // Wait for first build result (success or error)
-  await new Promise<void>((resolve) => {
-    const check = setInterval(() => {
-      if (buildSuccess || buildError) {
-        clearInterval(check);
-        resolve();
-      }
-    }, 500);
-    setTimeout(() => { clearInterval(check); resolve(); }, BUILD_TIMEOUT);
-  });
+  await waitForBuildOutcome(
+    BUILD_TIMEOUT,
+    () => buildSuccess || Boolean(buildError)
+  );
 
   if (!buildSuccess && !buildError) {
     buildError = `Metro build timed out after ${BUILD_TIMEOUT}ms`;
@@ -311,12 +340,7 @@ export const createProject = async (
     // Wait for Metro to recompile after fix
     buildSuccess = false;
     buildError = null;
-    await new Promise<void>((resolve) => {
-      const check = setInterval(() => {
-        if (buildSuccess || buildError) { clearInterval(check); resolve(); }
-      }, 500);
-      setTimeout(() => { clearInterval(check); resolve(); }, 30000);
-    });
+    await waitForBuildOutcome(30000, () => buildSuccess || Boolean(buildError));
   }
 
   if (buildSuccess) {

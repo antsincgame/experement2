@@ -4,6 +4,7 @@ interface PlannerOptions {
     temperature?: number;
     maxTokens?: number;
     lmStudioUrl?: string;
+    model?: string;
     onChunk?: (chunk: string) => void;
 }
 export declare const planApp: (options: PlannerOptions) => Promise<AppPlan>;

@@ -1,4 +1,4 @@
-// Runs preview and deterministic build gates so generated projects are verified before versioning.
+// Runs preview and deterministic build gates while leaving top-level shutdown orchestration to server.ts.
 import fs from "fs";
 import path from "path";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
@@ -315,13 +315,3 @@ export const killAll = (): void => {
     activeProcesses.delete(name);
   }
 };
-
-process.on("SIGINT", () => {
-  killAll();
-  process.exit(0);
-});
-
-process.on("SIGTERM", () => {
-  killAll();
-  process.exit(0);
-});

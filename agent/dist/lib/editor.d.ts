@@ -9,6 +9,9 @@ interface EditorOptions {
     userRequest: string;
     chatHistory: ChatMessage[];
     lmStudioUrl?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
     onThinking?: (text: string) => void;
     onBlock?: (block: SearchReplaceBlock) => void;
     onAnalysis?: (action: EditAction) => void;

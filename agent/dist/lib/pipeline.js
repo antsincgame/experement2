@@ -1,7 +1,7 @@
-// Verifies generated projects with deterministic validation gates before previewing or versioning them.
+// Verifies generated projects with deterministic validation gates and event-bus updates before previewing.
 import { spawnSync } from "child_process";
 import fs from "fs";
-import { broadcast, setPreviewPort } from "../server.js";
+import { broadcast, setPreviewPort } from "./event-bus.js";
 import { createProjectFromCache } from "../services/template-cache.js";
 import { startExpo, startExpoClearCache, killExpo, getActivePort, runNativeSmoke, runTypecheck, runWebExport, } from "../services/process-manager.js";
 import { getProjectPath } from "../services/file-manager.js";
@@ -52,6 +52,29 @@ const gitInit = (projectPath) => {
     }
 };
 const summarizeOutput = (output) => output.trim().split("\n").slice(-12).join("\n").trim();
+const waitForBuildOutcome = async (timeoutMs, hasOutcome) => {
+    await new Promise((resolve) => {
+        let settled = false;
+        const finish = (intervalId, timeoutId) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            clearInterval(intervalId);
+            clearTimeout(timeoutId);
+            resolve();
+        };
+        const intervalId = setInterval(() => {
+            if (hasOutcome()) {
+                finish(intervalId, timeoutId);
+            }
+        }, 500);
+        const timeoutId = setTimeout(() => finish(intervalId, timeoutId), timeoutMs);
+        if (hasOutcome()) {
+            finish(intervalId, timeoutId);
+        }
+    });
+};
 const runProjectQualityGates = async (projectPath, navigationType) => {
     const errors = [];
     const staticIssues = validateGeneratedProject(projectPath, navigationType ?? undefined);
@@ -84,12 +107,15 @@ const runProjectQualityGates = async (projectPath, navigationType) => {
     return { success: true, errors };
 };
 export const createProject = async (options) => {
-    const { description, lmStudioUrl, onProjectNameResolved } = options;
+    const { description, lmStudioUrl, model, temperature, maxTokens, onProjectNameResolved } = options;
     // ── Step 1: Plan ──────────────────────────────────────
     broadcast({ type: "status", status: "planning" });
     const plan = await planApp({
         description,
         lmStudioUrl,
+        model,
+        temperature,
+        maxTokens,
         onChunk: (chunk) => broadcast({ type: "plan_chunk", chunk }),
     });
     // Deduplicate project name
@@ -112,6 +138,9 @@ export const createProject = async (options) => {
         projectPath,
         plan,
         lmStudioUrl,
+        model,
+        temperature,
+        maxTokens,
         onFileStart: (filepath, index, total) => broadcast({
             type: "file_generating",
             filepath,
@@ -150,15 +179,7 @@ export const createProject = async (options) => {
         }
     });
     // Wait for first build result (success or error)
-    await new Promise((resolve) => {
-        const check = setInterval(() => {
-            if (buildSuccess || buildError) {
-                clearInterval(check);
-                resolve();
-            }
-        }, 500);
-        setTimeout(() => { clearInterval(check); resolve(); }, BUILD_TIMEOUT);
-    });
+    await waitForBuildOutcome(BUILD_TIMEOUT, () => buildSuccess || Boolean(buildError));
     if (!buildSuccess && !buildError) {
         buildError = `Metro build timed out after ${BUILD_TIMEOUT}ms`;
     }
@@ -186,15 +207,7 @@ export const createProject = async (options) => {
         // Wait for Metro to recompile after fix
         buildSuccess = false;
         buildError = null;
-        await new Promise((resolve) => {
-            const check = setInterval(() => {
-                if (buildSuccess || buildError) {
-                    clearInterval(check);
-                    resolve();
-                }
-            }, 500);
-            setTimeout(() => { clearInterval(check); resolve(); }, 30000);
-        });
+        await waitForBuildOutcome(30000, () => buildSuccess || Boolean(buildError));
     }
     if (buildSuccess) {
         const postFixGateResult = await runProjectQualityGates(projectPath, plan.navigation?.type);
@@ -222,7 +235,7 @@ export const createProject = async (options) => {
     return { projectName: projectSlug, port: expoPort, plan };
 };
 export const iterateProject = async (options) => {
-    const { projectName, userRequest, chatHistory, lmStudioUrl } = options;
+    const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens } = options;
     const projectPath = getProjectPath(projectName);
     broadcast({ type: "status", status: "analyzing" });
     const result = await editProject({
@@ -230,6 +243,9 @@ export const iterateProject = async (options) => {
         userRequest,
         chatHistory,
         lmStudioUrl,
+        model,
+        temperature,
+        maxTokens,
         onThinking: (text) => broadcast({ type: "thinking", content: text }),
         onAnalysis: (action) => broadcast({
             type: "analysis_complete",

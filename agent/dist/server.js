@@ -1,6 +1,8 @@
+// Orchestrates HTTP, WebSocket, and preview runtime state via a shared event bus to avoid circular imports.
 import express from "express";
 import { createServer } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer } from "ws";
+import { broadcast, handlePreviewRequest, registerClient, sendToClient, setPreviewPort, unregisterClient, } from "./lib/event-bus.js";
 import { formatZodError } from "./lib/request-validation.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { projectRouter } from "./routes/project.js";
@@ -8,11 +10,10 @@ import { llmRouter } from "./routes/llm.js";
 import { processRouter } from "./routes/process.js";
 import { ProjectParamsSchema, WsMessageSchema, } from "./schemas/runtime-input.schema.js";
 import { getProjectPath, listAllFiles, projectExists, readFile, } from "./services/file-manager.js";
-import { abortAll } from "./services/llm-proxy.js";
+import { abortAll, clearModelCache } from "./services/llm-proxy.js";
 import { parseMetroError } from "./services/log-watcher.js";
 import { attachOperationToQueueKey, enqueueProjectOperation, getProjectOperationQueueKey, WORKSPACE_OPERATION_QUEUE_KEY, } from "./services/project-operation-lock.js";
-import { createPreviewProxy } from "./services/preview-proxy.js";
-import { killAll, startExpo } from "./services/process-manager.js";
+import { killAll, startExpo, getActivePort } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 const PORT = Number(process.env.AGENT_PORT ?? 3100);
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
@@ -72,46 +73,8 @@ app.get("/api/projects/:name/export", async (req, res) => {
     });
     archive.finalize();
 });
-// Preview proxy вЂ” dynamically routes to active Expo port
-let activePreviewPort = null;
-let cachedProxy = null;
-let cachedProxyPort = null;
-app.use("/preview", (req, res, next) => {
-    if (!activePreviewPort) {
-        res.status(503).send("No preview available yet. Metro is not running.");
-        return;
-    }
-    // Reuse proxy if port hasn't changed
-    if (!cachedProxy || cachedProxyPort !== activePreviewPort) {
-        cachedProxy = createPreviewProxy(activePreviewPort);
-        cachedProxyPort = activePreviewPort;
-    }
-    cachedProxy(req, res, next);
-});
-export const setPreviewPort = (port) => {
-    if (port !== activePreviewPort) {
-        cachedProxy = null;
-        cachedProxyPort = null;
-    }
-    activePreviewPort = port;
-    console.log(`[Preview] Port set to: ${port}`);
-};
-const clients = new Map();
-const broadcast = (message) => {
-    const data = JSON.stringify(message);
-    for (const client of clients.values()) {
-        if (client.ws.readyState === WebSocket.OPEN) {
-            client.ws.send(data);
-        }
-    }
-};
-const sendToClient = (clientId, message) => {
-    const client = clients.get(clientId);
-    if (!client || client.ws.readyState !== WebSocket.OPEN) {
-        return;
-    }
-    client.ws.send(JSON.stringify(message));
-};
+app.use("/preview", handlePreviewRequest);
+// в”Ђв”Ђ WebSocket в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 const sendSystemErrorToClient = (clientId, error, step) => {
     sendToClient(clientId, {
         type: "system_error",
@@ -130,7 +93,7 @@ const runQueuedOperation = (clientId, queueKey, operationName, step, task, onSuc
 };
 wss.on("connection", (ws) => {
     const clientId = crypto.randomUUID();
-    clients.set(clientId, { ws, id: clientId });
+    registerClient(clientId, ws);
     console.log(`[WS] Client ${clientId.slice(0, 8)} connected`);
     ws.on("message", (data) => {
         let rawMessage;
@@ -150,7 +113,7 @@ wss.on("connection", (ws) => {
         handleWsMessage(clientId, parsedMessage.data);
     });
     ws.on("close", () => {
-        clients.delete(clientId);
+        unregisterClient(clientId);
         console.log(`[WS] Client ${clientId.slice(0, 8)} disconnected`);
     });
     ws.send(JSON.stringify({ type: "connected", clientId, timestamp: Date.now() }));
@@ -169,6 +132,9 @@ const handleWsMessage = (clientId, message) => {
                 createOperation = createProject({
                     description: message.description,
                     lmStudioUrl: message.lmStudioUrl,
+                    model: message.model,
+                    temperature: message.temperature,
+                    maxTokens: message.maxTokens,
                     onProjectNameResolved: (projectName) => {
                         if (createOperation) {
                             attachOperationToQueueKey(getProjectOperationQueueKey(projectName), `create_project:${projectName}`, createOperation);
@@ -188,12 +154,24 @@ const handleWsMessage = (clientId, message) => {
                 userRequest: message.userRequest,
                 chatHistory: message.chatHistory,
                 lmStudioUrl: message.lmStudioUrl,
+                model: message.model,
+                temperature: message.temperature,
+                maxTokens: message.maxTokens,
             }), (result) => {
                 broadcast({ type: "iteration_result", ...result });
             });
             return;
-        case "start_preview":
+        case "start_preview": {
             console.log("[WS] Start preview:", message.projectName);
+            // Fast path: if project is already running, just switch the proxy
+            const existingPort = getActivePort(message.projectName);
+            if (existingPort) {
+                console.log(`[WS] Project ${message.projectName} already running on port ${existingPort}, switching proxy`);
+                setPreviewPort(existingPort);
+                broadcast({ type: "preview_ready", port: existingPort, proxyUrl: "/preview/" });
+                broadcast({ type: "status", status: "ready" });
+                return;
+            }
             runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `start_preview:${message.projectName}`, "start_preview", async () => {
                 if (!projectExists(message.projectName)) {
                     throw new Error(`Project not found: ${message.projectName}`);
@@ -265,13 +243,13 @@ const handleWsMessage = (clientId, message) => {
                 broadcast({ type: "status", status: "ready" });
             });
             return;
+        }
         case "revert_version":
             console.log("[WS] Revert:", message.projectName, message.commitHash);
             runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `revert_version:${message.projectName}`, "revert", () => revertVersion(message.projectName, message.commitHash, message.lmStudioUrl));
             return;
     }
 };
-export { broadcast, wss };
 // в”Ђв”Ђ LM Studio Health Check в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 const checkLmStudio = async () => {
     try {
@@ -280,10 +258,12 @@ const checkLmStudio = async () => {
             broadcast({ type: "lm_studio_status", status: "connected" });
         }
         else {
+            clearModelCache(DEFAULT_LM_STUDIO_URL);
             broadcast({ type: "lm_studio_status", status: "disconnected" });
         }
     }
     catch {
+        clearModelCache(DEFAULT_LM_STUDIO_URL);
         broadcast({ type: "lm_studio_status", status: "disconnected" });
     }
 };

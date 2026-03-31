@@ -1,0 +1,1 @@
+{"version":3,"file":"search-replace.d.ts","sourceRoot":"","sources":["../../src/lib/search-replace.ts"],"names":[],"mappings":"AACA,MAAM,WAAW,oBAAoB;IACnC,MAAM,EAAE,MAAM,GAAG,IAAI,CAAC;IACtB,KAAK,EAAE,MAAM,GAAG,IAAI,CAAC;CACtB;AAuGD,eAAO,MAAM,kBAAkB,GAC7B,SAAS,MAAM,EACf,QAAQ,MAAM,EACd,SAAS,MAAM,KACd,oBA0CF,CAAC"}

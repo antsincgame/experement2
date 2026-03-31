@@ -1,9 +1,11 @@
+// Applies Metro-driven autofix blocks with the same safe matching rules used by the main editor.
 import { streamCompletion } from "../services/llm-proxy.js";
 import { readFile, writeFile, getProjectPath } from "../services/file-manager.js";
 import { buildProjectSkeleton } from "./context-builder.js";
 import { parseStream } from "./stream-parser.js";
 import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
 import { SYSTEM_AUTOFIX } from "../prompts/system-editor.js";
+import { applySearchReplace } from "./search-replace.js";
 
 export interface MetroError {
   type: string;
@@ -36,25 +38,17 @@ const applyBlock = (
   }
 
   const content = readFile(projectName, block.filepath);
-  if (!content) return false;
-
-  if (content.includes(block.search)) {
-    const count = content.split(block.search).length - 1;
-    if (count !== 1) return false;
-
-    writeFile(projectName, block.filepath, content.replace(block.search, block.replace));
-    return true;
+  if (!content) {
+    return false;
   }
 
-  const normalizedContent = content.replace(/\s+/g, " ");
-  const normalizedSearch = block.search.replace(/\s+/g, " ");
-
-  if (normalizedContent.includes(normalizedSearch)) {
-    writeFile(projectName, block.filepath, content.replace(block.search, block.replace));
-    return true;
+  const { result } = applySearchReplace(content, block.search, block.replace);
+  if (!result || result === content) {
+    return false;
   }
 
-  return false;
+  writeFile(projectName, block.filepath, result);
+  return true;
 };
 
 export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> => {

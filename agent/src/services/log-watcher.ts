@@ -1,7 +1,8 @@
-// Classifies Metro output so autofix can react differently to dependency, syntax, and runtime failures.
+// Classifies Metro output with bounded error payloads so autofix gets concise, stable diagnostics.
 import type { ChildProcess } from "child_process";
 
-const METRO_ERROR_MAX_LENGTH = 1200;
+const METRO_ERROR_MAX_LENGTH = 500;
+const MAX_STACK_LINES = 5;
 
 export type BuildStatus = "building" | "success" | "error" | "idle";
 export type BuildIssueCategory =
@@ -130,14 +131,14 @@ export const parseMetroError = (output: string): ParsedError | null => {
     if (!isNoiseLine(l)) {
       if (isUserFileLine(l)) {
         stackLines.unshift(l.trim()); // user files first
-      } else if (stackLines.length < 8) {
+      } else if (stackLines.length < MAX_STACK_LINES) {
         stackLines.push(l.trim());
       }
     }
   }
 
   // Deduplicate and limit
-  const uniqueStack = [...new Set(stackLines)].slice(0, 8);
+  const uniqueStack = [...new Set(stackLines)].slice(0, MAX_STACK_LINES);
   const raw = `${errorType}\n  File: ${file}:${line}\n  ${uniqueStack.join("\n  ")}`;
 
   return {

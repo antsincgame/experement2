@@ -1,4 +1,4 @@
-﻿// Defines strict Zod schemas for every HTTP and WebSocket payload the agent accepts.
+﻿// Defines strict Zod schemas for every HTTP and WebSocket payload, including model/runtime overrides.
 import path from "path";
 import { z } from "zod";
 
@@ -112,6 +112,9 @@ export const WsCreateProjectSchema = z.object({
   type: z.literal("create_project"),
   description: trimmedString("description", 20_000),
   lmStudioUrl: OptionalHttpUrlSchema,
+  model: OptionalModelSchema,
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().positive().max(131_072).optional(),
 });
 
 export const WsIterateSchema = z.object({
@@ -122,12 +125,16 @@ export const WsIterateSchema = z.object({
     .max(200, "chatHistory is too long")
     .default([]),
   lmStudioUrl: OptionalHttpUrlSchema,
+  model: OptionalModelSchema,
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().int().positive().max(131_072).optional(),
 });
 
 export const WsStartPreviewSchema = z.object({
   type: z.literal("start_preview"),
   projectName: ProjectNameSchema,
   lmStudioUrl: OptionalHttpUrlSchema,
+  model: OptionalModelSchema,
 });
 
 export const WsRevertVersionSchema = z.object({
@@ -135,6 +142,7 @@ export const WsRevertVersionSchema = z.object({
   projectName: ProjectNameSchema,
   commitHash: CommitHashSchema,
   lmStudioUrl: OptionalHttpUrlSchema,
+  model: OptionalModelSchema,
 });
 
 export const WsMessageSchema = z.discriminatedUnion("type", [

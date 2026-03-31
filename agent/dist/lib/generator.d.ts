@@ -4,6 +4,9 @@ interface GeneratorOptions {
     projectPath: string;
     plan: AppPlan;
     lmStudioUrl?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
     onFileStart?: (filepath: string, index: number, total: number) => void;
     onChunk?: (chunk: string) => void;
     onFileComplete?: (filepath: string) => void;

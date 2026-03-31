@@ -1,3 +1,4 @@
+// Plans and applies LLM-driven file edits with shared search/replace semantics and explicit JSON validation.
 import { streamCompletion } from "../services/llm-proxy.js";
 import {
   readFile,
@@ -15,6 +16,7 @@ import {
 } from "../prompts/system-editor.js";
 import { npmInstall } from "../services/process-manager.js";
 import { safeJsonParse } from "./json-repair.js";
+import { applySearchReplace } from "./search-replace.js";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -40,115 +42,6 @@ interface EditorResult {
   failedBlocks: number;
   errors: string[];
 }
-
-const normalizeLine = (line: string): string => line.replace(/\s+$/g, "").replace(/\t/g, "  ");
-
-const fuzzyLineMatch = (contentLine: string, searchLine: string): boolean => {
-  if (contentLine.trim() === searchLine.trim()) return true;
-  if (normalizeLine(contentLine) === normalizeLine(searchLine)) return true;
-  return false;
-};
-
-const applySearchReplace = (
-  content: string,
-  search: string,
-  replace: string
-): { result: string | null; error: string | null } => {
-  // Exact match
-  if (content.includes(search)) {
-    const count = content.split(search).length - 1;
-    if (count > 1) {
-      return {
-        result: null,
-        error: `Search block matches ${count} locations. Provide more context lines.`,
-      };
-    }
-    return { result: content.replace(search, replace), error: null };
-  }
-
-  const contentLines = content.split("\n");
-  const searchLines = search.split("\n").filter((l) => l.trim() !== "" || search.includes("\n\n"));
-
-  // Skip empty-only search blocks
-  if (searchLines.length === 0) {
-    return { result: null, error: "Empty search block." };
-  }
-
-  // Fuzzy line-by-line matching (handles whitespace differences)
-  for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
-    let matched = true;
-    let contentIdx = i;
-    let searchIdx = 0;
-
-    while (searchIdx < searchLines.length && contentIdx < contentLines.length) {
-      const searchLine = searchLines[searchIdx];
-
-      // Skip blank lines in search that don't match
-      if (searchLine.trim() === "" && contentLines[contentIdx].trim() !== "") {
-        searchIdx++;
-        continue;
-      }
-
-      if (fuzzyLineMatch(contentLines[contentIdx], searchLine)) {
-        searchIdx++;
-        contentIdx++;
-      } else {
-        matched = false;
-        break;
-      }
-    }
-
-    if (matched && searchIdx === searchLines.length) {
-      const matchLength = contentIdx - i;
-      // Detect indentation of matched block to preserve it
-      const originalIndent = contentLines[i].match(/^(\s*)/)?.[1] ?? "";
-      const searchIndent = searchLines[0].match(/^(\s*)/)?.[1] ?? "";
-
-      let adjustedReplace = replace;
-      if (originalIndent !== searchIndent) {
-        const replaceLines = replace.split("\n");
-        adjustedReplace = replaceLines.map((rl) => {
-          if (rl.startsWith(searchIndent)) {
-            return originalIndent + rl.slice(searchIndent.length);
-          }
-          return rl;
-        }).join("\n");
-      }
-
-      const before = contentLines.slice(0, i);
-      const after = contentLines.slice(i + matchLength);
-      return {
-        result: [...before, adjustedReplace, ...after].join("\n"),
-        error: null,
-      };
-    }
-  }
-
-  // Last resort: normalized full-text match
-  const normalizedContent = content.replace(/^\s+/gm, "").replace(/\s+$/gm, "");
-  const normalizedSearch = search.replace(/^\s+/gm, "").replace(/\s+$/gm, "");
-
-  if (normalizedContent.includes(normalizedSearch)) {
-    const normalSearchLines = normalizedSearch.split("\n");
-    for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
-      const slice = contentLines.slice(i, i + searchLines.length);
-      const normalSlice = slice.map((l) => l.trim()).join("\n");
-      if (normalSlice === normalSearchLines.join("\n")) {
-        const before = contentLines.slice(0, i);
-        const after = contentLines.slice(i + searchLines.length);
-        return {
-          result: [...before, replace, ...after].join("\n"),
-          error: null,
-        };
-      }
-    }
-  }
-
-  return {
-    result: null,
-    error: `Search block not found in file. Content may have changed.`,
-  };
-};
 
 export const editProject = async (
   options: EditorOptions
@@ -195,6 +88,9 @@ export const editProject = async (
   let action: EditAction;
   try {
     const parsed = safeJsonParse(actionJson);
+    if (parsed === null) {
+      throw new Error("Editor analysis returned unrecoverable JSON");
+    }
     action = EditActionSchema.parse(parsed);
   } catch (err) {
     throw new Error(

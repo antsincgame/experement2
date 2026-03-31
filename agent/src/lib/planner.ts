@@ -1,4 +1,4 @@
-// Adds contract-aware plan validation so unsupported or incomplete app plans fail before generation starts.
+// Adds contract-aware plan validation so invalid or unrecoverable planner JSON fails before generation starts.
 import { streamCompletion } from "../services/llm-proxy.js";
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
@@ -41,6 +41,9 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   let parsed: unknown;
   try {
     parsed = safeJsonParse(trimmed);
+    if (parsed === null) {
+      throw new Error("Planner returned unrecoverable JSON");
+    }
   } catch (err) {
     throw new Error(
       `Planner returned invalid JSON: ${err instanceof Error ? err.message : "parse error"}\n${trimmed.slice(0, 300)}`

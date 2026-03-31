@@ -110,7 +110,7 @@ const extractCodeFromResponse = (response) => {
     return { filepath, code };
 };
 export const generateFiles = async (options) => {
-    const { projectName, projectPath, plan, lmStudioUrl, onFileStart, onChunk, onFileComplete, } = options;
+    const { projectName, projectPath, plan, lmStudioUrl, model, temperature, maxTokens, onFileStart, onChunk, onFileComplete, } = options;
     const planIssues = validateAppPlan(plan);
     if (planIssues.length > 0) {
         throw new Error(`Plan is not internally consistent: ${planIssues
@@ -162,9 +162,10 @@ Generate the complete code for: ${fileSpec.path}`;
         ];
         let responseBuffer = "";
         const generator = await streamCompletion(messages, {
-            temperature: 0.4,
-            maxTokens: 32768,
+            temperature: temperature ?? 0.4,
+            maxTokens: maxTokens ?? 32768,
             lmStudioUrl,
+            model,
         });
         for await (const chunk of generator) {
             responseBuffer += chunk;

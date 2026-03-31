@@ -8,8 +8,8 @@ export const FileInPlanSchema = z.object({
     dependencies: z.array(z.string()).default([]),
 });
 export const NavigationScreenSchema = z.object({
-    path: z.string().optional().default(""),
-    name: z.string(),
+    path: z.string().min(1),
+    name: z.string().min(1),
     icon: z.string().optional(),
 });
 export const AppPlanSchema = z.object({
