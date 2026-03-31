@@ -13,7 +13,7 @@ import { parseMetroError } from "../services/log-watcher.js";
 import { planApp } from "./planner.js";
 import { generateFiles } from "./generator.js";
 import { editProject } from "./editor.js";
-import { autoFix, type MetroError } from "./auto-fixer.js";
+import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 
 interface CreateOptions {
@@ -129,50 +129,91 @@ export const createProject = async (
   // ── Step 4: Git init ──────────────────────────────────
   gitInit(projectPath);
 
-  // ── Step 5: Start Metro ───────────────────────────────
+  // ── Step 5: Build Verification Loop ───────────────────
   broadcast({ type: "status", status: "building" });
 
-  let buildResolved = false;
+  let buildSuccess = false;
+  let buildError: string | null = null;
+  let autoFixAttempts = 0;
+  const MAX_BUILD_AUTOFIX = 3;
+  const BUILD_TIMEOUT = 60000; // 60s for first build (Metro is slow)
 
-  // Start Expo first (awaited — registers port in activeProcesses)
   const { port: expoPort } = await startExpo(projectSlug, projectPath, (event) => {
     broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
 
-    if (event.type === "build_success" && !buildResolved) {
-      buildResolved = true;
+    if (event.type === "build_success") {
+      buildSuccess = true;
+      buildError = null;
     }
 
     if (event.type === "build_error" && event.error) {
-      const parsed = parseMetroError(event.error);
-      if (parsed) {
-        handleAutoFix(projectSlug, {
-          type: parsed.type,
-          file: parsed.file,
-          line: parsed.line,
-          raw: parsed.raw,
-        }, lmStudioUrl);
-      }
+      buildError = event.error;
     }
   });
 
-  // Wait for build_success or timeout (30s)
-  if (!buildResolved) {
-    await new Promise<void>((resolve) => {
-      const check = setInterval(() => {
-        if (buildResolved) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 500);
-      setTimeout(() => {
+  // Wait for first build result (success or error)
+  await new Promise<void>((resolve) => {
+    const check = setInterval(() => {
+      if (buildSuccess || buildError) {
         clearInterval(check);
         resolve();
-      }, 30000);
+      }
+    }, 500);
+    setTimeout(() => { clearInterval(check); resolve(); }, BUILD_TIMEOUT);
+  });
+
+  // Auto-fix loop: if build failed, try to fix with LLM
+  while (buildError && autoFixAttempts < MAX_BUILD_AUTOFIX) {
+    autoFixAttempts++;
+    const parsed = parseMetroError(buildError);
+    if (!parsed) break;
+
+    broadcast({ type: "autofix_start", file: parsed.file, error: parsed.raw });
+
+    const fixResult = await autoFix({
+      projectName: projectSlug,
+      error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
+      lmStudioUrl,
+      maxAttempts: 1,
+      onAttempt: () =>
+        broadcast({ type: "autofix_attempt", attempt: autoFixAttempts, maxAttempts: MAX_BUILD_AUTOFIX }),
+      onFix: (block) =>
+        broadcast({ type: "autofix_block", filepath: block.filepath }),
     });
+
+    if (fixResult.success) {
+      broadcast({ type: "autofix_success", attempts: autoFixAttempts });
+    } else {
+      broadcast({ type: "autofix_failed", attempts: autoFixAttempts, error: fixResult.lastError });
+    }
+
+    // Wait for Metro to recompile after fix
+    buildSuccess = false;
+    buildError = null;
+    await new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (buildSuccess || buildError) { clearInterval(check); resolve(); }
+      }, 500);
+      setTimeout(() => { clearInterval(check); resolve(); }, 30000);
+    });
+  }
+
+  if (buildSuccess) {
+    broadcast({ type: "status", status: "ready" });
+  } else {
+    broadcast({ type: "status", status: buildError ? "error" : "ready" });
   }
 
   setPreviewPort(expoPort || null);
   broadcast({ type: "preview_ready", port: expoPort, proxyUrl: "/preview/" });
+
+  // Git commit the successful state
+  if (buildSuccess) {
+    const hash = gitCommit(projectPath, "v1: initial generation (build verified)");
+    if (hash) {
+      broadcast({ type: "version_created", version: 1, hash, description: description.slice(0, 60) });
+    }
+  }
 
   return { projectName: projectSlug, port: expoPort, plan };
 };
@@ -271,38 +312,7 @@ export const revertVersion = async (
   }
 };
 
-const handleAutoFix = async (
-  projectName: string,
-  error: MetroError,
-  lmStudioUrl?: string
-): Promise<void> => {
-  broadcast({
-    type: "autofix_start",
-    file: error.file,
-    error: error.raw,
-  });
-
-  const result = await autoFix({
-    projectName,
-    error,
-    lmStudioUrl,
-    maxAttempts: 3,
-    onAttempt: (attempt, max) =>
-      broadcast({ type: "autofix_attempt", attempt, maxAttempts: max }),
-    onFix: (block) =>
-      broadcast({ type: "autofix_block", filepath: block.filepath }),
-  });
-
-  if (result.success) {
-    broadcast({ type: "autofix_success", attempts: result.attempts });
-  } else {
-    broadcast({
-      type: "autofix_failed",
-      attempts: result.attempts,
-      error: result.lastError,
-    });
-  }
-};
+// handleAutoFix removed — replaced by inline Build Verification Loop in createProject
 
 const getVersionNumber = (projectPath: string): number => {
   try {
