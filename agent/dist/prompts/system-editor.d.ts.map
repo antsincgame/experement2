@@ -1,1 +1,1 @@
-{"version":3,"file":"system-editor.d.ts","sourceRoot":"","sources":["../../src/prompts/system-editor.ts"],"names":[],"mappings":"AAAA,eAAO,MAAM,qBAAqB,orCA+BhC,CAAC;AAEH,eAAO,MAAM,sBAAsB,qiEA6DK,CAAC;AAEzC,eAAO,MAAM,cAAc,2pBAqBX,CAAC"}
+{"version":3,"file":"system-editor.d.ts","sourceRoot":"","sources":["../../src/prompts/system-editor.ts"],"names":[],"mappings":"AAGA,eAAO,MAAM,qBAAqB,orCA+BhC,CAAC;AAEH,eAAO,MAAM,sBAAsB,QA8DK,CAAC;AAEzC,eAAO,MAAM,cAAc,QAsBX,CAAC"}

@@ -1,34 +1,41 @@
+﻿// Uses the shared API client for preview URLs so external opens respect the current agent URL.
 import { useState, useCallback, useEffect, useRef } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Linking } from "react-native";
 import { Globe, RotateCw, ExternalLink, Loader } from "lucide-react-native";
+import { apiClient } from "@/shared/lib/api-client";
 import { useProjectStore } from "@/stores/project-store";
-import { useSettingsStore } from "@/stores/settings-store";
 
 const PreviewPanel = () => {
-  const previewPort = useProjectStore((s) => s.previewPort);
-  const status = useProjectStore((s) => s.status);
-  const agentUrl = useSettingsStore((s) => s.agentUrl);
+  const previewPort = useProjectStore((state) => state.previewPort);
+  const status = useProjectStore((state) => state.status);
   const [refreshKey, setRefreshKey] = useState(0);
   const prevPort = useRef(previewPort);
 
-  // Auto-refresh iframe when previewPort changes (new preview ready)
   useEffect(() => {
     if (previewPort && previewPort !== prevPort.current) {
-      // Delay to let Metro finish serving
-      const t = setTimeout(() => setRefreshKey((k) => k + 1), 2000);
+      const timeout = setTimeout(() => setRefreshKey((key) => key + 1), 2000);
       prevPort.current = previewPort;
-      return () => clearTimeout(t);
+      return () => clearTimeout(timeout);
     }
   }, [previewPort]);
 
-  const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
-  const proxyUrl = `${agentUrl}/preview/`;
-  const directUrl = previewPort ? `http://localhost:${previewPort}` : null;
+  const isLoading = [
+    "planning",
+    "scaffolding",
+    "generating",
+    "building",
+    "analyzing",
+    "validating",
+  ].includes(status);
+  const proxyUrl = apiClient.getPreviewProxyUrl();
 
-  const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const handleRefresh = useCallback(() => {
+    setRefreshKey((key) => key + 1);
+  }, []);
+
   const handleOpenExternal = useCallback(() => {
-    if (directUrl) window.open(directUrl, "_blank");
-  }, [directUrl]);
+    void Linking.openURL(proxyUrl);
+  }, [proxyUrl]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>
@@ -52,10 +59,14 @@ const PreviewPanel = () => {
           </Pressable>
           <View
             className="flex-1 h-6 rounded-md px-2.5 flex-row items-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" }}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.6)",
+              borderWidth: 1,
+              borderColor: "rgba(0,0,0,0.06)",
+            }}
           >
             <Text className="text-ink-light text-[10px] font-mono">
-              localhost:{previewPort}
+              port:{previewPort}
             </Text>
           </View>
           <Pressable onPress={handleOpenExternal}>
@@ -66,7 +77,8 @@ const PreviewPanel = () => {
 
       {isLoading && !previewPort ? (
         <View className="flex-1 items-center justify-center">
-          <View className="w-16 h-16 rounded-full items-center justify-center"
+          <View
+            className="w-16 h-16 rounded-full items-center justify-center"
             style={{
               backgroundColor: "rgba(0, 229, 255, 0.08)",
               borderWidth: 2,
@@ -76,11 +88,15 @@ const PreviewPanel = () => {
             <Loader size={24} color="#00E5FF" strokeWidth={1.5} />
           </View>
           <Text className="text-neon-cyan text-xs mt-4 uppercase tracking-widest font-semibold">
-            {status === "planning" ? "Planning..." :
-             status === "scaffolding" ? "Scaffolding..." :
-             status === "generating" ? "Generating..." :
-             status === "building" ? "Building..." :
-             "Processing..."}
+            {status === "planning"
+              ? "Planning..."
+              : status === "scaffolding"
+                ? "Scaffolding..."
+                : status === "generating"
+                  ? "Generating..."
+                  : status === "building"
+                    ? "Building..."
+                    : "Processing..."}
           </Text>
         </View>
       ) : previewPort ? (

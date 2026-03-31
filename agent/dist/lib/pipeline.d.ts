@@ -2,6 +2,7 @@ import type { AppPlan } from "../schemas/app-plan.schema.js";
 interface CreateOptions {
     description: string;
     lmStudioUrl?: string;
+    onProjectNameResolved?: (projectName: string) => void;
 }
 interface CreateResult {
     projectName: string;

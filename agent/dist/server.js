@@ -1,21 +1,26 @@
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { formatZodError } from "./lib/request-validation.js";
+import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { projectRouter } from "./routes/project.js";
 import { llmRouter } from "./routes/llm.js";
 import { processRouter } from "./routes/process.js";
-import { initTemplateCache } from "./services/template-cache.js";
-import { killAll } from "./services/process-manager.js";
+import { ProjectParamsSchema, WsMessageSchema, } from "./schemas/runtime-input.schema.js";
+import { getProjectPath, listAllFiles, projectExists, readFile, } from "./services/file-manager.js";
 import { abortAll } from "./services/llm-proxy.js";
-import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
-import { createPreviewProxy } from "./services/preview-proxy.js";
-import { startExpo } from "./services/process-manager.js";
-import { getProjectPath, projectExists } from "./services/file-manager.js";
 import { parseMetroError } from "./services/log-watcher.js";
-const PORT = 3100;
+import { attachOperationToQueueKey, enqueueProjectOperation, getProjectOperationQueueKey, WORKSPACE_OPERATION_QUEUE_KEY, } from "./services/project-operation-lock.js";
+import { createPreviewProxy } from "./services/preview-proxy.js";
+import { killAll, startExpo } from "./services/process-manager.js";
+import { initTemplateCache } from "./services/template-cache.js";
+const PORT = Number(process.env.AGENT_PORT ?? 3100);
+const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
+let lmStudioInterval = null;
+let isShuttingDown = false;
 app.use(express.json({ limit: "10mb" }));
 app.use((_req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
@@ -31,35 +36,43 @@ app.use("/api/llm", llmRouter);
 app.use("/api/process", processRouter);
 // ZIP export endpoint
 app.get("/api/projects/:name/export", async (req, res) => {
-    const { name } = req.params;
-    const { getProjectPath, projectExists: projExists } = await import("./services/file-manager.js");
-    if (!projExists(name)) {
-        res.status(404).json({ error: "Project not found" });
+    const params = ProjectParamsSchema.safeParse(req.params);
+    if (!params.success) {
+        res.status(400).json({
+            error: formatZodError(params.error),
+            code: "INVALID_INPUT",
+        });
+        return;
+    }
+    const { name } = params.data;
+    if (!projectExists(name)) {
+        res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
         return;
     }
     const archiver = await import("archiver").catch(() => null);
     if (!archiver) {
-        // Fallback: list files for client-side ZIP
-        const { listAllFiles, readFile } = await import("./services/file-manager.js");
         const files = listAllFiles(name);
         const contents = {};
-        for (const f of files) {
-            const c = readFile(name, f);
-            if (c)
-                contents[f] = c;
+        for (const filePath of files) {
+            const content = readFile(name, filePath);
+            if (content !== null) {
+                contents[filePath] = content;
+            }
         }
         res.json({ data: contents });
         return;
     }
-    const projPath = getProjectPath(name);
+    const projectPath = getProjectPath(name);
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${name}.zip"`);
     const archive = archiver.default("zip", { zlib: { level: 6 } });
     archive.pipe(res);
-    archive.directory(projPath, name, { ignore: ["node_modules/**", ".expo/**", ".git/**"] });
+    archive.directory(projectPath, name, {
+        ignore: ["node_modules/**", ".expo/**", ".git/**"],
+    });
     archive.finalize();
 });
-// Preview proxy — dynamically routes to active Expo port
+// Preview proxy вЂ” dynamically routes to active Expo port
 let activePreviewPort = null;
 let cachedProxy = null;
 let cachedProxyPort = null;
@@ -92,19 +105,49 @@ const broadcast = (message) => {
         }
     }
 };
+const sendToClient = (clientId, message) => {
+    const client = clients.get(clientId);
+    if (!client || client.ws.readyState !== WebSocket.OPEN) {
+        return;
+    }
+    client.ws.send(JSON.stringify(message));
+};
+const sendSystemErrorToClient = (clientId, error, step) => {
+    sendToClient(clientId, {
+        type: "system_error",
+        error,
+        step,
+    });
+};
+const runQueuedOperation = (clientId, queueKey, operationName, step, task, onSuccess) => {
+    enqueueProjectOperation(queueKey, operationName, task)
+        .then((result) => {
+        onSuccess?.(result);
+    })
+        .catch((error) => {
+        sendSystemErrorToClient(clientId, error instanceof Error ? error.message : "Unknown error", step);
+    });
+};
 wss.on("connection", (ws) => {
     const clientId = crypto.randomUUID();
     clients.set(clientId, { ws, id: clientId });
     console.log(`[WS] Client ${clientId.slice(0, 8)} connected`);
     ws.on("message", (data) => {
+        let rawMessage;
         try {
-            const message = JSON.parse(data.toString());
-            console.log(`[WS] ← ${message.type}`);
-            handleWsMessage(clientId, message);
+            rawMessage = JSON.parse(data.toString());
         }
         catch {
-            console.error("[WS] Invalid message format");
+            sendSystemErrorToClient(clientId, "Invalid JSON message", "validation");
+            return;
         }
+        const parsedMessage = WsMessageSchema.safeParse(rawMessage);
+        if (!parsedMessage.success) {
+            sendSystemErrorToClient(clientId, formatZodError(parsedMessage.error), "validation");
+            return;
+        }
+        console.log(`[WS] <- ${parsedMessage.data.type}`);
+        handleWsMessage(clientId, parsedMessage.data);
     });
     ws.on("close", () => {
         clients.delete(clientId);
@@ -112,101 +155,127 @@ wss.on("connection", (ws) => {
     });
     ws.send(JSON.stringify({ type: "connected", clientId, timestamp: Date.now() }));
 });
-const handleWsMessage = (_clientId, message) => {
+const handleWsMessage = (clientId, message) => {
     switch (message.type) {
         case "abort_generation":
             console.log("[WS] Abort requested");
             abortAll();
             broadcast({ type: "generation_aborted" });
-            break;
-        case "create_project":
+            return;
+        case "create_project": {
             console.log("[WS] Create project:", message.description);
-            createProject({
-                description: message.description,
-                lmStudioUrl: message.lmStudioUrl,
-            })
-                .then((result) => broadcast({ type: "project_created", ...result }))
-                .catch((err) => broadcast({
-                type: "system_error",
-                error: err instanceof Error ? err.message : "Unknown error",
-                step: "create_project",
-            }));
-            break;
+            let createOperation = null;
+            runQueuedOperation(clientId, WORKSPACE_OPERATION_QUEUE_KEY, "create_project", "create_project", () => {
+                createOperation = createProject({
+                    description: message.description,
+                    lmStudioUrl: message.lmStudioUrl,
+                    onProjectNameResolved: (projectName) => {
+                        if (createOperation) {
+                            attachOperationToQueueKey(getProjectOperationQueueKey(projectName), `create_project:${projectName}`, createOperation);
+                        }
+                    },
+                });
+                return createOperation;
+            }, (result) => {
+                broadcast({ type: "project_created", ...result });
+            });
+            return;
+        }
         case "iterate":
             console.log("[WS] Iterate:", message.projectName);
-            iterateProject({
+            runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `iterate:${message.projectName}`, "iterate", () => iterateProject({
                 projectName: message.projectName,
                 userRequest: message.userRequest,
-                chatHistory: message.chatHistory ?? [],
+                chatHistory: message.chatHistory,
                 lmStudioUrl: message.lmStudioUrl,
-            })
-                .then((result) => broadcast({ type: "iteration_result", ...result }))
-                .catch((err) => broadcast({
-                type: "system_error",
-                error: err instanceof Error ? err.message : "Unknown error",
-                step: "iterate",
-            }));
-            break;
-        case "start_preview": {
-            const projName = message.projectName;
-            console.log("[WS] Start preview:", projName);
-            const projPath = getProjectPath(projName);
-            if (!projectExists(projName)) {
-                broadcast({ type: "system_error", error: `Project not found: ${projName}` });
-                break;
-            }
-            broadcast({ type: "status", status: "building" });
-            const lmUrl = message.lmStudioUrl || undefined;
-            startExpo(projName, projPath, (event) => {
-                broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
-                // Auto-fix Metro errors
-                if (event.type === "build_error" && event.error) {
-                    const parsed = parseMetroError(event.error);
-                    if (parsed) {
-                        import("./lib/auto-fixer.js").then(({ autoFix }) => {
-                            broadcast({ type: "autofix_start", file: parsed.file, error: parsed.raw });
-                            autoFix({
-                                projectName: projName,
-                                error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
-                                lmStudioUrl: lmUrl,
-                                maxAttempts: 3,
-                                onAttempt: (attempt, max) => broadcast({ type: "autofix_attempt", attempt, maxAttempts: max }),
-                                onFix: (block) => broadcast({ type: "autofix_block", filepath: block.filepath }),
-                            }).then((result) => {
-                                if (result.success)
-                                    broadcast({ type: "autofix_success", attempts: result.attempts });
-                                else
-                                    broadcast({ type: "autofix_failed", attempts: result.attempts, error: result.lastError });
-                            });
-                        });
-                    }
+            }), (result) => {
+                broadcast({ type: "iteration_result", ...result });
+            });
+            return;
+        case "start_preview":
+            console.log("[WS] Start preview:", message.projectName);
+            runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `start_preview:${message.projectName}`, "start_preview", async () => {
+                if (!projectExists(message.projectName)) {
+                    throw new Error(`Project not found: ${message.projectName}`);
                 }
-            }).then(({ port }) => {
+                const projectPath = getProjectPath(message.projectName);
+                broadcast({ type: "status", status: "building" });
+                const { port } = await startExpo(message.projectName, projectPath, (event) => {
+                    broadcast({
+                        type: "build_event",
+                        eventType: event.type,
+                        message: event.message,
+                        error: event.error,
+                    });
+                    if (event.type === "build_error" && event.error) {
+                        const parsed = parseMetroError(event.error);
+                        if (parsed) {
+                            import("./lib/auto-fixer.js")
+                                .then(({ autoFix }) => autoFix({
+                                projectName: message.projectName,
+                                error: {
+                                    type: parsed.type,
+                                    file: parsed.file,
+                                    line: parsed.line,
+                                    raw: parsed.raw,
+                                },
+                                lmStudioUrl: message.lmStudioUrl,
+                                maxAttempts: 3,
+                                onAttempt: (attempt, max) => broadcast({
+                                    type: "autofix_attempt",
+                                    attempt,
+                                    maxAttempts: max,
+                                }),
+                                onFix: (block) => broadcast({
+                                    type: "autofix_block",
+                                    filepath: block.filepath,
+                                }),
+                            }))
+                                .then((result) => {
+                                if (!result) {
+                                    return;
+                                }
+                                if (result.success) {
+                                    broadcast({
+                                        type: "autofix_success",
+                                        attempts: result.attempts,
+                                    });
+                                    return;
+                                }
+                                broadcast({
+                                    type: "autofix_failed",
+                                    attempts: result.attempts,
+                                    error: result.lastError,
+                                });
+                            })
+                                .catch((error) => {
+                                broadcast({
+                                    type: "system_error",
+                                    error: error instanceof Error
+                                        ? error.message
+                                        : "Failed to run autofix",
+                                    step: "autofix",
+                                });
+                            });
+                        }
+                    }
+                });
                 setPreviewPort(port);
                 broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
                 broadcast({ type: "status", status: "ready" });
-            }).catch((err) => {
-                broadcast({ type: "system_error", error: err instanceof Error ? err.message : "Failed to start preview" });
             });
-            break;
-        }
+            return;
         case "revert_version":
             console.log("[WS] Revert:", message.projectName, message.commitHash);
-            revertVersion(message.projectName, message.commitHash, message.lmStudioUrl).catch((err) => broadcast({
-                type: "system_error",
-                error: err instanceof Error ? err.message : "Unknown error",
-                step: "revert",
-            }));
-            break;
-        default:
-            console.log(`[WS] Unknown message type: ${message.type}`);
+            runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `revert_version:${message.projectName}`, "revert", () => revertVersion(message.projectName, message.commitHash, message.lmStudioUrl));
+            return;
     }
 };
 export { broadcast, wss };
-// ── LM Studio Health Check ───────────────────────────────
+// в”Ђв”Ђ LM Studio Health Check в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 const checkLmStudio = async () => {
     try {
-        const resp = await fetch("http://localhost:1234/v1/models");
+        const resp = await fetch(`${DEFAULT_LM_STUDIO_URL}/v1/models`);
         if (resp.ok) {
             broadcast({ type: "lm_studio_status", status: "connected" });
         }
@@ -218,20 +287,41 @@ const checkLmStudio = async () => {
         broadcast({ type: "lm_studio_status", status: "disconnected" });
     }
 };
-// ── Startup ──────────────────────────────────────────────
+// в”Ђв”Ђ Startup в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+const clearLmStudioInterval = () => {
+    if (!lmStudioInterval) {
+        return;
+    }
+    clearInterval(lmStudioInterval);
+    lmStudioInterval = null;
+};
+const shutdown = () => {
+    if (isShuttingDown) {
+        return;
+    }
+    isShuttingDown = true;
+    console.log("[Agent] Shutting down...");
+    clearLmStudioInterval();
+    abortAll();
+    killAll();
+    wss.close();
+    server.close(() => {
+        process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 1000).unref();
+};
 server.listen(PORT, async () => {
-    console.log(`[Agent] ⚡ Server: http://localhost:${PORT}`);
-    console.log(`[Agent] ⚡ WebSocket: ws://localhost:${PORT}`);
+    console.log(`[Agent] Server: http://localhost:${PORT}`);
+    console.log(`[Agent] WebSocket: ws://localhost:${PORT}`);
     initTemplateCache().catch((err) => {
         console.error("[Agent] Template cache init failed:", err);
     });
-    checkLmStudio();
-    setInterval(checkLmStudio, 15000);
+    await checkLmStudio();
+    clearLmStudioInterval();
+    lmStudioInterval = setInterval(() => {
+        void checkLmStudio();
+    }, 15000);
 });
-process.on("SIGINT", () => {
-    console.log("[Agent] Shutting down...");
-    killAll();
-    server.close();
-    process.exit(0);
-});
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 //# sourceMappingURL=server.js.map

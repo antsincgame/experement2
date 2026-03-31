@@ -1,6 +1,15 @@
+﻿// Uses the shared API client and a stable keydown listener to avoid per-keystroke subscriptions.
 import { useState, useCallback, useRef, useEffect } from "react";
-import { View, TextInput, Pressable, Text, Platform, ActivityIndicator } from "react-native";
+import {
+  View,
+  TextInput,
+  Pressable,
+  Text,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
 import { SendHorizontal, Square, Sparkles } from "lucide-react-native";
+import { apiClient } from "@/shared/lib/api-client";
 import { useSettingsStore } from "@/stores/settings-store";
 
 interface ChatInputProps {
@@ -18,60 +27,72 @@ const ChatInput = ({
 }: ChatInputProps) => {
   const [text, setText] = useState("");
   const [enhancing, setEnhancing] = useState(false);
-  const inputRef = useRef<TextInput>(null);
-  const enhancerEnabled = useSettingsStore((s) => s.enhancerEnabled);
-  const enhancerModel = useSettingsStore((s) => s.enhancerModel);
-  const agentUrl = useSettingsStore((s) => s.agentUrl);
-  const lmStudioUrl = useSettingsStore((s) => s.lmStudioUrl);
+  const handleSendRef = useRef<() => void>(() => undefined);
+  const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
+  const enhancerModel = useSettingsStore((state) => state.enhancerModel);
+  const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
 
   const handleSend = useCallback(() => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      return;
+    }
+
     onSend(trimmed);
     setText("");
-  }, [text, onSend]);
+  }, [onSend, text]);
+
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
 
   const handleEnhance = useCallback(async () => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      return;
+    }
+
     setEnhancing(true);
     try {
-      const resp = await fetch(`${agentUrl}/api/llm/enhance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: trimmed,
-          model: enhancerModel || undefined,
-          lmStudioUrl,
-        }),
+      const improvedPrompt = await apiClient.enhancePrompt({
+        prompt: trimmed,
+        model: enhancerModel || undefined,
+        lmStudioUrl,
       });
-      if (resp.ok) {
-        const { data } = await resp.json();
-        if (data) setText(data);
+
+      if (improvedPrompt) {
+        setText(improvedPrompt);
       }
-    } catch {
-      // silently fail
+    } catch (error) {
+      console.error("[ChatInput] Failed to enhance prompt", error);
     } finally {
       setEnhancing(false);
     }
-  }, [text, agentUrl, enhancerModel, lmStudioUrl]);
+  }, [enhancerModel, lmStudioUrl, text]);
 
   useEffect(() => {
-    if (Platform.OS !== "web") return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        handleSend();
+    if (Platform.OS !== "web") {
+      return;
+    }
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        handleSendRef.current();
       }
     };
+
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleSend]);
+  }, []);
 
   const hasText = text.trim().length > 0;
 
   return (
-    <View className="px-3 py-3" style={{ borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" }}>
+    <View
+      className="px-3 py-3"
+      style={{ borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" }}
+    >
       <View
         className="flex-row items-end rounded-xl overflow-hidden"
         style={{
@@ -81,7 +102,6 @@ const ChatInput = ({
         }}
       >
         <TextInput
-          ref={inputRef}
           value={text}
           onChangeText={setText}
           placeholder={placeholder}

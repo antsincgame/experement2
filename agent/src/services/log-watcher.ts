@@ -1,11 +1,19 @@
+// Classifies Metro output so autofix can react differently to dependency, syntax, and runtime failures.
 import type { ChildProcess } from "child_process";
 
 const METRO_ERROR_MAX_LENGTH = 500;
 
 export type BuildStatus = "building" | "success" | "error" | "idle";
+export type BuildIssueCategory =
+  | "dependency"
+  | "syntax"
+  | "runtime"
+  | "bundle"
+  | "unknown";
 
 export interface ParsedError {
   type: string;
+  category: BuildIssueCategory;
   file: string;
   line: string;
   stack: string;
@@ -49,6 +57,31 @@ const isNoiseLine = (line: string): boolean => {
 const truncateError = (errorText: string): string => {
   if (errorText.length <= METRO_ERROR_MAX_LENGTH) return errorText;
   return errorText.slice(0, METRO_ERROR_MAX_LENGTH - 3) + "...";
+};
+
+const categorizeError = (errorType: string): BuildIssueCategory => {
+  const normalized = errorType.toLowerCase();
+  if (
+    normalized.includes("unable to resolve module") ||
+    normalized.includes("cannot find module") ||
+    normalized.includes("module not found")
+  ) {
+    return "dependency";
+  }
+
+  if (normalized.includes("syntaxerror") || normalized.includes("unexpected token")) {
+    return "syntax";
+  }
+
+  if (normalized.includes("typeerror")) {
+    return "runtime";
+  }
+
+  if (normalized.includes("bundle") || normalized.includes("failed to compile")) {
+    return "bundle";
+  }
+
+  return "unknown";
 };
 
 export const parseMetroError = (output: string): ParsedError | null => {
@@ -96,6 +129,7 @@ export const parseMetroError = (output: string): ParsedError | null => {
 
   return {
     type: errorType,
+    category: categorizeError(errorType),
     file,
     line,
     stack: stackLines.join("\n"),

@@ -1,4 +1,5 @@
-import { execSync } from "child_process";
+// Verifies generated projects with deterministic validation gates before previewing or versioning them.
+import { spawnSync } from "child_process";
 import fs from "fs";
 import { broadcast, setPreviewPort } from "../server.js";
 import { createProjectFromCache } from "../services/template-cache.js";
@@ -7,6 +8,9 @@ import {
   startExpoClearCache,
   killExpo,
   getActivePort,
+  runNativeSmoke,
+  runTypecheck,
+  runWebExport,
 } from "../services/process-manager.js";
 import { getProjectPath } from "../services/file-manager.js";
 import { parseMetroError } from "../services/log-watcher.js";
@@ -15,10 +19,13 @@ import { generateFiles } from "./generator.js";
 import { editProject } from "./editor.js";
 import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
+import { validateGeneratedProject } from "./project-validator.js";
+import type { SupportedNavigationType } from "./generation-contract.js";
 
 interface CreateOptions {
   description: string;
   lmStudioUrl?: string;
+  onProjectNameResolved?: (projectName: string) => void;
 }
 
 interface CreateResult {
@@ -40,18 +47,45 @@ interface IterateResult {
   errors: string[];
 }
 
+interface GateResult {
+  success: boolean;
+  errors: string[];
+}
+
+const GIT_HASH_PATTERN = /^[a-f0-9]{4,64}$/i;
+
+const runGitCommand = (
+  projectPath: string,
+  args: string[],
+  options: { allowFailure?: boolean } = {}
+): string => {
+  const result = spawnSync("git", args, {
+    cwd: projectPath,
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if ((result.status ?? 1) !== 0 && !options.allowFailure) {
+    const output = [result.stdout, result.stderr]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    throw new Error(output || `git ${args.join(" ")} failed`);
+  }
+
+  return result.stdout?.trim() ?? "";
+};
+
 const gitCommit = (projectPath: string, message: string): string | null => {
   try {
-    execSync("git add -A", { cwd: projectPath, stdio: "ignore" });
-    execSync(`git commit -m "${message}" --allow-empty`, {
-      cwd: projectPath,
-      stdio: "ignore",
-    });
-    const hash = execSync("git rev-parse --short HEAD", {
-      cwd: projectPath,
-      encoding: "utf-8",
-    }).trim();
-    return hash;
+    runGitCommand(projectPath, ["add", "-A"]);
+    runGitCommand(projectPath, ["commit", "-m", message, "--allow-empty"]);
+    return runGitCommand(projectPath, ["rev-parse", "--short", "HEAD"]);
   } catch {
     return null;
   }
@@ -59,21 +93,77 @@ const gitCommit = (projectPath: string, message: string): string | null => {
 
 const gitInit = (projectPath: string): void => {
   try {
-    execSync("git init", { cwd: projectPath, stdio: "ignore" });
-    execSync("git add -A", { cwd: projectPath, stdio: "ignore" });
-    execSync('git commit -m "v1: initial generation"', {
-      cwd: projectPath,
-      stdio: "ignore",
-    });
+    runGitCommand(projectPath, ["init"]);
+    runGitCommand(projectPath, ["add", "-A"]);
+    runGitCommand(projectPath, ["commit", "-m", "v1: initial generation"]);
   } catch (err) {
     console.error("[Pipeline] git init failed:", err);
   }
 };
 
+const summarizeOutput = (output: string): string =>
+  output.trim().split("\n").slice(-12).join("\n").trim();
+
+const runProjectQualityGates = async (
+  projectPath: string,
+  navigationType?: SupportedNavigationType
+): Promise<GateResult> => {
+  const errors: string[] = [];
+  const staticIssues = validateGeneratedProject(
+    projectPath,
+    navigationType ?? undefined
+  );
+
+  if (staticIssues.length > 0) {
+    errors.push(
+      `Static validation failed: ${staticIssues
+        .map((issue) => `${issue.filePath ?? "project"}: ${issue.message}`)
+        .join("; ")}`
+    );
+    return { success: false, errors };
+  }
+
+  const typecheckResult = await runTypecheck(projectPath);
+  if (!typecheckResult.success) {
+    errors.push(
+      `Typecheck failed:\n${summarizeOutput(typecheckResult.combinedOutput)}`
+    );
+    return { success: false, errors };
+  }
+
+  const webExportResult = await runWebExport(projectPath);
+  if (!webExportResult.success) {
+    errors.push(
+      `Web export failed:\n${summarizeOutput(webExportResult.combinedOutput)}`
+    );
+    return { success: false, errors };
+  }
+
+  const androidSmokeResult = await runNativeSmoke(projectPath, "android");
+  if (!androidSmokeResult.success) {
+    errors.push(
+      `Android smoke gate failed:\n${summarizeOutput(
+        androidSmokeResult.combinedOutput
+      )}`
+    );
+    return { success: false, errors };
+  }
+
+  const iosSmokeResult = await runNativeSmoke(projectPath, "ios");
+  if (!iosSmokeResult.success) {
+    errors.push(
+      `iOS smoke gate failed:\n${summarizeOutput(iosSmokeResult.combinedOutput)}`
+    );
+    return { success: false, errors };
+  }
+
+  return { success: true, errors };
+};
+
 export const createProject = async (
   options: CreateOptions
 ): Promise<CreateResult> => {
-  const { description, lmStudioUrl } = options;
+  const { description, lmStudioUrl, onProjectNameResolved } = options;
 
   // ── Step 1: Plan ──────────────────────────────────────
   broadcast({ type: "status", status: "planning" });
@@ -91,6 +181,8 @@ export const createProject = async (
     suffix++;
     projectSlug = `${plan.name}-${suffix}`;
   }
+
+  onProjectNameResolved?.(projectSlug);
 
   broadcast({ type: "plan_complete", plan: { ...plan, name: projectSlug } });
 
@@ -129,7 +221,20 @@ export const createProject = async (
   // ── Step 4: Git init ──────────────────────────────────
   gitInit(projectPath);
 
-  // ── Step 5: Build Verification Loop ───────────────────
+  // ── Step 5: Deterministic Validation Gates ────────────
+  broadcast({ type: "status", status: "validating" });
+  const gateResult = await runProjectQualityGates(
+    projectPath,
+    plan.navigation?.type
+  );
+  if (!gateResult.success) {
+    const message = gateResult.errors.join("\n\n");
+    broadcast({ type: "system_error", error: message });
+    broadcast({ type: "status", status: "error" });
+    return { projectName: projectSlug, port: 0, plan };
+  }
+
+  // ── Step 6: Build Verification Loop ───────────────────
   broadcast({ type: "status", status: "building" });
 
   let buildSuccess = false;
@@ -161,6 +266,10 @@ export const createProject = async (
     }, 500);
     setTimeout(() => { clearInterval(check); resolve(); }, BUILD_TIMEOUT);
   });
+
+  if (!buildSuccess && !buildError) {
+    buildError = `Metro build timed out after ${BUILD_TIMEOUT}ms`;
+  }
 
   // Auto-fix loop: if build failed, try to fix with LLM
   while (buildError && autoFixAttempts < MAX_BUILD_AUTOFIX) {
@@ -196,6 +305,18 @@ export const createProject = async (
       }, 500);
       setTimeout(() => { clearInterval(check); resolve(); }, 30000);
     });
+  }
+
+  if (buildSuccess) {
+    const postFixGateResult = await runProjectQualityGates(
+      projectPath,
+      plan.navigation?.type
+    );
+    if (!postFixGateResult.success) {
+      buildSuccess = false;
+      buildError = postFixGateResult.errors.join("\n\n");
+      broadcast({ type: "system_error", error: buildError });
+    }
   }
 
   if (buildSuccess) {
@@ -245,6 +366,22 @@ export const iterateProject = async (
   if (result.appliedBlocks > 0) {
     broadcast({ type: "status", status: "validating" });
 
+    const gateResult = await runProjectQualityGates(projectPath);
+    if (!gateResult.success) {
+      broadcast({
+        type: "iteration_complete",
+        applied: result.appliedBlocks,
+        failed: result.failedBlocks,
+        errors: [...result.errors, ...gateResult.errors],
+      });
+
+      return {
+        appliedBlocks: result.appliedBlocks,
+        failedBlocks: result.failedBlocks,
+        errors: [...result.errors, ...gateResult.errors],
+      };
+    }
+
     const versionNumber = getVersionNumber(projectPath);
     const commitHash = gitCommit(
       projectPath,
@@ -287,12 +424,17 @@ export const revertVersion = async (
 
   killExpo(projectName);
 
-  try {
-    execSync("git clean -fd", { cwd: projectPath, stdio: "ignore" });
-    execSync(`git checkout ${commitHash} -- .`, {
-      cwd: projectPath,
-      stdio: "ignore",
+  if (!GIT_HASH_PATTERN.test(commitHash)) {
+    broadcast({
+      type: "system_error",
+      error: `Invalid commit hash: ${commitHash}`,
     });
+    return;
+  }
+
+  try {
+    runGitCommand(projectPath, ["clean", "-fd"]);
+    runGitCommand(projectPath, ["checkout", commitHash, "--", "."]);
   } catch (err) {
     broadcast({
       type: "system_error",
@@ -316,11 +458,10 @@ export const revertVersion = async (
 
 const getVersionNumber = (projectPath: string): number => {
   try {
-    const log = execSync("git log --oneline", {
-      cwd: projectPath,
-      encoding: "utf-8",
+    const log = runGitCommand(projectPath, ["log", "--oneline"], {
+      allowFailure: true,
     });
-    return log.trim().split("\n").length + 1;
+    return log ? log.split("\n").length + 1 : 1;
   } catch {
     return 1;
   }

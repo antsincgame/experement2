@@ -1,4 +1,7 @@
-import { spawn, type ChildProcess, execSync } from "child_process";
+// Runs preview and deterministic build gates so generated projects are verified before versioning.
+import fs from "fs";
+import path from "path";
+import { spawn, spawnSync, type ChildProcess } from "child_process";
 import { findFreePort } from "../lib/port-finder.js";
 import { watchProcess, type LogCallback } from "./log-watcher.js";
 
@@ -7,6 +10,14 @@ interface ManagedProcess {
   port: number;
   projectName: string;
   cleanup: () => void;
+}
+
+export interface CommandResult {
+  success: boolean;
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  combinedOutput: string;
 }
 
 const activeProcesses = new Map<string, ManagedProcess>();
@@ -27,20 +38,32 @@ const evictOldestIfNeeded = (): void => {
 
 const isWindows = process.platform === "win32";
 
+const runWindowsTaskkill = (pid: number): void => {
+  const result = spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+    stdio: "ignore",
+    windowsHide: true,
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+};
+
 const killProcess = (cp: ChildProcess): void => {
   if (!cp.pid) return;
 
   try {
     if (isWindows) {
-      execSync(`taskkill /pid ${cp.pid} /T /F`, { stdio: "ignore" });
-    } else {
-      cp.kill("SIGTERM");
-      setTimeout(() => {
-        if (!cp.killed) cp.kill("SIGKILL");
-      }, 5000);
+      runWindowsTaskkill(cp.pid);
+      return;
     }
+
+    cp.kill("SIGTERM");
+    setTimeout(() => {
+      if (!cp.killed) cp.kill("SIGKILL");
+    }, 5000);
   } catch {
-    // процесс мог уже завершиться
+    // The process may have already exited before cleanup completed.
   }
 };
 
@@ -178,6 +201,103 @@ export const npmInstall = async (
 
     child.on("error", reject);
   });
+};
+
+export const runProjectCommand = async (
+  projectPath: string,
+  command: string,
+  args: string[],
+  timeoutMs = 120000
+): Promise<CommandResult> => {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: projectPath,
+      env: { ...process.env, CI: "1", BROWSER: "none" },
+      shell: isWindows,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+
+    const finish = (exitCode: number | null, timedOut = false): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+
+      resolve({
+        success: !timedOut && exitCode === 0,
+        exitCode,
+        stdout,
+        stderr,
+        combinedOutput: [stdout, stderr].filter(Boolean).join("\n").trim(),
+      });
+    };
+
+    child.stdout?.on("data", (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    child.stderr?.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    child.on("exit", (code) => finish(code));
+    child.on("error", (error) => {
+      stderr += error.message;
+      finish(1);
+    });
+
+    const timeout = setTimeout(() => {
+      killProcess(child);
+      stderr += `\nCommand timed out after ${timeoutMs}ms`;
+      finish(124, true);
+    }, timeoutMs);
+  });
+};
+
+export const runTypecheck = async (
+  projectPath: string
+): Promise<CommandResult> => {
+  const npxCmd = isWindows ? "npx.cmd" : "npx";
+  return runProjectCommand(projectPath, npxCmd, ["tsc", "--noEmit"], 120000);
+};
+
+export const runWebExport = async (
+  projectPath: string
+): Promise<CommandResult> => {
+  const npxCmd = isWindows ? "npx.cmd" : "npx";
+  return runProjectCommand(
+    projectPath,
+    npxCmd,
+    ["expo", "export", "--platform", "web"],
+    180000
+  );
+};
+
+export const runNativeSmoke = async (
+  projectPath: string,
+  platform: "android" | "ios"
+): Promise<CommandResult> => {
+  const npxCmd = isWindows ? "npx.cmd" : "npx";
+  const nativeDir = path.join(projectPath, platform);
+
+  try {
+    return await runProjectCommand(
+      projectPath,
+      npxCmd,
+      ["expo", "prebuild", "--platform", platform, "--no-install", "--non-interactive"],
+      180000
+    );
+  } finally {
+    fs.rmSync(nativeDir, { recursive: true, force: true });
+  }
 };
 
 export const getActivePort = (projectName: string): number | null => {

@@ -1,3 +1,4 @@
+// Keeps preview proxy tests aligned with the safe ws:false behavior that avoids hijacking the agent socket.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RequestHandler } from "http-proxy-middleware";
 
@@ -34,13 +35,13 @@ describe("preview-proxy", () => {
     );
   });
 
-  it("enables websocket support", async () => {
+  it("keeps websocket proxying disabled to protect the agent socket", async () => {
     const { createProxyMiddleware } = await import("http-proxy-middleware");
     createPreviewProxy(3000);
 
     expect(createProxyMiddleware).toHaveBeenCalledWith(
       expect.objectContaining({
-        ws: true,
+        ws: false,
       })
     );
   });

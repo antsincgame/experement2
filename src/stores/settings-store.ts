@@ -1,5 +1,10 @@
+﻿// Persists configurable frontend endpoints and generation settings with env-backed defaults.
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import {
+  AGENT_HTTP_URL,
+  LM_STUDIO_DEFAULT_URL,
+} from "@/shared/lib/constants";
 
 interface SettingsState {
   lmStudioUrl: string;
@@ -24,12 +29,12 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      lmStudioUrl: "http://localhost:1234",
+      lmStudioUrl: LM_STUDIO_DEFAULT_URL,
       model: "",
       temperature: 0.4,
       maxTokens: 32768,
       maxContextTokens: 65536,
-      agentUrl: "http://localhost:3100",
+      agentUrl: AGENT_HTTP_URL,
       enhancerModel: "",
       enhancerEnabled: true,
 

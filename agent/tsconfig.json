@@ -1,3 +1,4 @@
+// Fixed duplicate exclude keys so TypeScript and Vitest can load the agent config reliably.
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -19,6 +20,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }

@@ -1,4 +1,7 @@
-import { spawn, execSync } from "child_process";
+// Runs preview and deterministic build gates so generated projects are verified before versioning.
+import fs from "fs";
+import path from "path";
+import { spawn, spawnSync } from "child_process";
 import { findFreePort } from "../lib/port-finder.js";
 import { watchProcess } from "./log-watcher.js";
 const activeProcesses = new Map();
@@ -15,23 +18,31 @@ const evictOldestIfNeeded = () => {
     activeProcesses.delete(oldestName);
 };
 const isWindows = process.platform === "win32";
+const runWindowsTaskkill = (pid) => {
+    const result = spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+    });
+    if (result.error) {
+        throw result.error;
+    }
+};
 const killProcess = (cp) => {
     if (!cp.pid)
         return;
     try {
         if (isWindows) {
-            execSync(`taskkill /pid ${cp.pid} /T /F`, { stdio: "ignore" });
+            runWindowsTaskkill(cp.pid);
+            return;
         }
-        else {
-            cp.kill("SIGTERM");
-            setTimeout(() => {
-                if (!cp.killed)
-                    cp.kill("SIGKILL");
-            }, 5000);
-        }
+        cp.kill("SIGTERM");
+        setTimeout(() => {
+            if (!cp.killed)
+                cp.kill("SIGKILL");
+        }, 5000);
     }
     catch {
-        // процесс мог уже завершиться
+        // The process may have already exited before cleanup completed.
     }
 };
 export const startExpo = async (projectName, projectPath, onLog) => {
@@ -132,6 +143,69 @@ export const npmInstall = async (projectPath, packages) => {
         });
         child.on("error", reject);
     });
+};
+export const runProjectCommand = async (projectPath, command, args, timeoutMs = 120000) => {
+    return new Promise((resolve) => {
+        const child = spawn(command, args, {
+            cwd: projectPath,
+            env: { ...process.env, CI: "1", BROWSER: "none" },
+            shell: isWindows,
+            stdio: ["ignore", "pipe", "pipe"],
+        });
+        let stdout = "";
+        let stderr = "";
+        let settled = false;
+        const finish = (exitCode, timedOut = false) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+            resolve({
+                success: !timedOut && exitCode === 0,
+                exitCode,
+                stdout,
+                stderr,
+                combinedOutput: [stdout, stderr].filter(Boolean).join("\n").trim(),
+            });
+        };
+        child.stdout?.on("data", (data) => {
+            stdout += data.toString();
+        });
+        child.stderr?.on("data", (data) => {
+            stderr += data.toString();
+        });
+        child.on("exit", (code) => finish(code));
+        child.on("error", (error) => {
+            stderr += error.message;
+            finish(1);
+        });
+        const timeout = setTimeout(() => {
+            killProcess(child);
+            stderr += `\nCommand timed out after ${timeoutMs}ms`;
+            finish(124, true);
+        }, timeoutMs);
+    });
+};
+export const runTypecheck = async (projectPath) => {
+    const npxCmd = isWindows ? "npx.cmd" : "npx";
+    return runProjectCommand(projectPath, npxCmd, ["tsc", "--noEmit"], 120000);
+};
+export const runWebExport = async (projectPath) => {
+    const npxCmd = isWindows ? "npx.cmd" : "npx";
+    return runProjectCommand(projectPath, npxCmd, ["expo", "export", "--platform", "web"], 180000);
+};
+export const runNativeSmoke = async (projectPath, platform) => {
+    const npxCmd = isWindows ? "npx.cmd" : "npx";
+    const nativeDir = path.join(projectPath, platform);
+    try {
+        return await runProjectCommand(projectPath, npxCmd, ["expo", "prebuild", "--platform", platform, "--no-install", "--non-interactive"], 180000);
+    }
+    finally {
+        fs.rmSync(nativeDir, { recursive: true, force: true });
+    }
 };
 export const getActivePort = (projectName) => {
     const managed = activeProcesses.get(projectName);

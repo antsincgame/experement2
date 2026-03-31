@@ -1,0 +1,227 @@
+﻿// Centralizes agent and LM Studio requests so URL building stays consistent across Web, Android, and iOS.
+import {
+  AGENT_HTTP_URL,
+  LM_STUDIO_DEFAULT_URL,
+} from "@/shared/lib/constants";
+import { useSettingsStore } from "@/stores/settings-store";
+
+export interface ProjectListItem {
+  name: string;
+  displayName: string;
+  createdAt: number;
+}
+
+export interface ProjectFilePayload {
+  path: string;
+  content: string;
+}
+
+export interface LmModel {
+  id: string;
+  object: string;
+}
+
+type QueryValue = string | number | boolean | undefined;
+
+interface RequestOptions extends Omit<RequestInit, "body"> {
+  body?: unknown;
+  query?: Record<string, QueryValue>;
+}
+
+interface DataEnvelope<T> {
+  data: T;
+}
+
+const appendQuery = (
+  url: URL,
+  query?: Record<string, QueryValue>
+): void => {
+  if (!query) {
+    return;
+  }
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined) {
+      continue;
+    }
+    url.searchParams.set(key, String(value));
+  }
+};
+
+export const normalizeBaseUrl = (
+  value: string,
+  fallback = AGENT_HTTP_URL
+): string => {
+  const trimmed = value.trim();
+  return (trimmed || fallback).replace(/\/+$/, "");
+};
+
+export const toWebSocketUrl = (value: string): string =>
+  normalizeBaseUrl(value)
+    .replace(/^http:\/\//, "ws://")
+    .replace(/^https:\/\//, "wss://");
+
+class ApiClient {
+  private buildUrl(
+    baseUrl: string,
+    pathname: string,
+    query?: Record<string, QueryValue>
+  ): string {
+    const url = new URL(pathname, `${baseUrl}/`);
+    appendQuery(url, query);
+    return url.toString();
+  }
+
+  private async buildError(response: Response): Promise<Error> {
+    const message = (await response.text()).trim();
+    return new Error(message || `${response.status} ${response.statusText}`);
+  }
+
+  private async fetchJson<T>(
+    url: string,
+    options: RequestOptions = {}
+  ): Promise<T> {
+    const { body, headers, ...init } = options;
+    const finalHeaders = new Headers(headers);
+
+    if (body !== undefined && !finalHeaders.has("Content-Type")) {
+      finalHeaders.set("Content-Type", "application/json");
+    }
+
+    const response = await fetch(url, {
+      ...init,
+      headers: finalHeaders,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw await this.buildError(response);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  async getData<T>(
+    pathname: string,
+    query?: Record<string, QueryValue>
+  ): Promise<T> {
+    const url = this.buildUrl(this.getAgentUrl(), pathname, query);
+    const response = await this.fetchJson<DataEnvelope<T>>(url);
+    return response.data;
+  }
+
+  async postData<T>(pathname: string, body: unknown): Promise<T> {
+    const url = this.buildUrl(this.getAgentUrl(), pathname);
+    const response = await this.fetchJson<DataEnvelope<T>>(url, {
+      method: "POST",
+      body,
+    });
+    return response.data;
+  }
+
+  getAgentUrl(): string {
+    return normalizeBaseUrl(useSettingsStore.getState().agentUrl, AGENT_HTTP_URL);
+  }
+
+  getLmStudioUrl(): string {
+    return normalizeBaseUrl(
+      useSettingsStore.getState().lmStudioUrl,
+      LM_STUDIO_DEFAULT_URL
+    );
+  }
+
+  getWebSocketUrl(): string {
+    return toWebSocketUrl(this.getAgentUrl());
+  }
+
+  getPreviewProxyUrl(): string {
+    return this.buildUrl(this.getAgentUrl(), "/preview/");
+  }
+
+  getProjectExportUrl(projectName: string): string {
+    return this.buildUrl(
+      this.getAgentUrl(),
+      `/api/projects/${encodeURIComponent(projectName)}/export`
+    );
+  }
+
+  listProjects(): Promise<ProjectListItem[]> {
+    return this.getData<ProjectListItem[]>("/api/projects");
+  }
+
+  enhancePrompt(payload: {
+    prompt: string;
+    model?: string;
+    lmStudioUrl?: string;
+  }): Promise<string> {
+    return this.postData<string>("/api/llm/enhance", payload);
+  }
+
+  getProjectTree<T>(projectName: string): Promise<T> {
+    return this.getData<T>(
+      `/api/projects/${encodeURIComponent(projectName)}/files`
+    );
+  }
+
+  listProjectFiles(projectName: string): Promise<string[]> {
+    return this.getData<string[]>(
+      `/api/projects/${encodeURIComponent(projectName)}/all-files`
+    );
+  }
+
+  getProjectFile(projectName: string, filePath: string): Promise<ProjectFilePayload> {
+    return this.getData<ProjectFilePayload>(
+      `/api/projects/${encodeURIComponent(projectName)}/file`,
+      { path: filePath }
+    );
+  }
+
+  async listLmStudioModels(): Promise<LmModel[]> {
+    const response = await this.fetchJson<{ data?: LmModel[] }>(
+      this.buildUrl(this.getLmStudioUrl(), "/v1/models")
+    );
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
+  async testAgentConnection(timeoutMs = 5000): Promise<void> {
+    if (typeof WebSocket === "undefined") {
+      throw new Error("WebSocket is not available in this environment");
+    }
+
+    const wsUrl = this.getWebSocketUrl();
+
+    await new Promise<void>((resolve, reject) => {
+      const socket = new WebSocket(wsUrl);
+      const timeout = setTimeout(() => {
+        cleanup();
+        socket.close();
+        reject(new Error(`Connection timed out: ${wsUrl}`));
+      }, timeoutMs);
+
+      const cleanup = (): void => {
+        clearTimeout(timeout);
+        socket.onopen = null;
+        socket.onerror = null;
+        socket.onclose = null;
+      };
+
+      socket.onopen = () => {
+        cleanup();
+        socket.close();
+        resolve();
+      };
+
+      socket.onerror = () => {
+        cleanup();
+        reject(new Error(`Failed to connect to ${wsUrl}`));
+      };
+
+      socket.onclose = (event) => {
+        cleanup();
+        reject(new Error(`Connection closed before opening (${event.code})`));
+      };
+    });
+  }
+}
+
+export const apiClient = new ApiClient();

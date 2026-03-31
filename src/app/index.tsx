@@ -1,23 +1,36 @@
-import { useState, useCallback, useRef, useEffect } from "react";
-import { View, Text, TextInput, Pressable, Platform, ActivityIndicator, ScrollView } from "react-native";
+﻿import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Platform,
+  ActivityIndicator,
+  ScrollView,
+  Linking,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Settings, Zap, Sparkles, Wifi, WifiOff, Download, X, Plus, FolderOpen } from "lucide-react-native";
+import {
+  Settings,
+  Zap,
+  Sparkles,
+  Wifi,
+  WifiOff,
+  Download,
+  FolderOpen,
+} from "lucide-react-native";
 
+import { apiClient, type ProjectListItem } from "@/shared/lib/api-client";
 import { useProjectStore, fetchProjectFiles, type AppStatus } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { createUserMessage } from "@/features/chat/schemas/message.schema";
 
 import AuroraBackground from "@/shared/components/effects/aurora-background";
-import ChatPanel from "@/features/chat/components/chat-panel";
 import SuggestionChips from "@/features/chat/components/suggestion-chips";
-import FileTree from "@/features/explorer/components/file-tree";
-import CodeViewer from "@/features/explorer/components/code-viewer";
-import FileTabBar from "@/features/explorer/components/file-tab-bar";
-import PreviewPanel from "@/features/preview/components/preview-panel";
-import TerminalPanel from "@/features/terminal/components/terminal-panel";
 import SettingsDrawer from "@/features/settings/components/settings-drawer";
 import VersionTimeline from "@/features/history/components/version-timeline";
+import WorkspaceLayout from "@/features/workspace/components/workspace-layout";
 import FlowerOfLife from "@/shared/components/sacred-geometry/flower-of-life";
 import Mandala from "@/shared/components/sacred-geometry/mandala";
 import LotusToast from "@/shared/components/effects/lotus-toast";
@@ -25,7 +38,7 @@ import LotusToast from "@/shared/components/effects/lotus-toast";
 // react-resizable-panels disabled: uses import.meta which breaks Hermes bundler
 
 export default function AppFactoryScreen() {
-  const { createProject, iterate, abortGeneration, revertVersion } = useWebSocket();
+  const { createProject, iterate, abortGeneration, revertVersion, startPreview } = useWebSocket();
 
   const projectName = useProjectStore((s) => s.projectName);
   const status = useProjectStore((s) => s.status);
@@ -37,10 +50,12 @@ export default function AppFactoryScreen() {
   const terminalVisible = useProjectStore((s) => s.terminalVisible);
   const projectList = useProjectStore((s) => s.projectList);
   const addMessage = useProjectStore((s) => s.addMessage);
+  const addProject = useProjectStore((s) => s.addProject);
   const openFile = useProjectStore((s) => s.openFile);
   const closeFile = useProjectStore((s) => s.closeFile);
   const setActiveFile = useProjectStore((s) => s.setActiveFile);
   const setStatus = useProjectStore((s) => s.setStatus);
+  const setProjectName = useProjectStore((s) => s.setProjectName);
   const switchProject = useProjectStore((s) => s.switchProject);
   const removeProject = useProjectStore((s) => s.removeProject);
 
@@ -49,7 +64,7 @@ export default function AppFactoryScreen() {
   const [inputFocused, setInputFocused] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
-  const [diskProjects, setDiskProjects] = useState<Array<{ name: string; displayName: string }>>([]);
+  const [diskProjects, setDiskProjects] = useState<ProjectListItem[]>([]);
 
   const enhancerEnabled = useSettingsStore((s) => s.enhancerEnabled);
   const enhancerModel = useSettingsStore((s) => s.enhancerModel);
@@ -59,20 +74,23 @@ export default function AppFactoryScreen() {
   const handleEnhance = useCallback(async () => {
     const trimmed = welcomeInput.trim();
     if (!trimmed) return;
+
     setEnhancing(true);
     try {
-      const resp = await fetch(`${agentUrl}/api/llm/enhance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed, model: enhancerModel || undefined, lmStudioUrl }),
+      const improvedPrompt = await apiClient.enhancePrompt({
+        prompt: trimmed,
+        model: enhancerModel || undefined,
+        lmStudioUrl,
       });
-      if (resp.ok) {
-        const { data } = await resp.json();
-        if (data) setWelcomeInput(data);
+      if (improvedPrompt) {
+        setWelcomeInput(improvedPrompt);
       }
-    } catch { /* silent */ }
-    finally { setEnhancing(false); }
-  }, [welcomeInput, agentUrl, enhancerModel, lmStudioUrl]);
+    } catch (error) {
+      console.error("[AppFactoryScreen] Failed to enhance prompt", error);
+    } finally {
+      setEnhancing(false);
+    }
+  }, [welcomeInput, enhancerModel, lmStudioUrl]);
 
   const prevStatus = useRef(status);
   useEffect(() => {
@@ -86,19 +104,24 @@ export default function AppFactoryScreen() {
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        const resp = await fetch(`${agentUrl}/api/projects`);
-        if (resp.ok) {
-          const { data } = await resp.json();
-          setDiskProjects(data);
-          // Also add them to the store
-          const addProject = useProjectStore.getState().addProject;
-          for (const p of data) {
-            addProject({ name: p.name, displayName: p.displayName, status: "ready", port: null, createdAt: p.createdAt ?? Date.now() });
-          }
+        const projects = await apiClient.listProjects();
+        setDiskProjects(projects);
+        const store = useProjectStore.getState();
+        for (const project of projects) {
+          store.addProject({
+            name: project.name,
+            displayName: project.displayName,
+            status: "ready",
+            port: null,
+            createdAt: project.createdAt ?? Date.now(),
+          });
         }
-      } catch { /* agent offline */ }
+      } catch (error) {
+        console.error("[AppFactoryScreen] Failed to load projects", error);
+      }
     };
-    loadProjects();
+
+    void loadProjects();
   }, [agentUrl]);
 
   const isWorkspace = projectName !== null || !["idle", "error"].includes(status);
@@ -121,23 +144,24 @@ export default function AppFactoryScreen() {
     [addMessage, projectName, handleCreate, iterate]
   );
 
-  // ── Open existing project ──
+  // Open existing project
   const handleOpenProject = useCallback((name: string) => {
-    const store = useProjectStore.getState();
-    store.setProjectName(name);
-    store.setStatus("building");
-    store.addProject({ name, displayName: name, status: "building", port: null, createdAt: Date.now() });
-    fetchProjectFiles(agentUrl, name);
-    // Start preview server for existing project
-    const ws = (window as Record<string, unknown>).__af_ws__ as WebSocket | undefined;
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "start_preview", projectName: name }));
-    }
-  }, [agentUrl]);
+    const existingProject = diskProjects.find((project) => project.name === name);
+    addProject({
+      name,
+      displayName: existingProject?.displayName ?? name,
+      status: "building",
+      port: null,
+      createdAt: existingProject?.createdAt ?? Date.now(),
+    });
+    switchProject(name);
+    setStatus("building");
+    void fetchProjectFiles(name);
+    startPreview(name);
+  }, [addProject, diskProjects, setStatus, startPreview, switchProject]);
 
-  // ── WELCOME ────────────────────────────────────────────
   if (!isWorkspace) {
-    const allProjects = projectList.length > 0 ? projectList : diskProjects.map((p) => ({ ...p, status: "ready" as AppStatus, port: null, createdAt: Date.now() }));
+    const allProjects = projectList.length > 0 ? projectList : diskProjects.map((p) => ({ ...p, status: "ready" as AppStatus, port: null, createdAt: p.createdAt ?? Date.now() }));
 
     return (
       <AuroraBackground intensity="vivid">
@@ -361,132 +385,26 @@ export default function AppFactoryScreen() {
     );
   }
 
-  // ── PROJECT SIDEBAR ──────────────────────────────────────
-  const projectSidebar = () => (
-    <View
-      style={{
-        width: 180,
-        backgroundColor: "rgba(255,255,255,0.45)",
-        borderRightWidth: 1,
-        borderRightColor: "rgba(0,0,0,0.06)",
-        ...(Platform.OS === "web" ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
-      } as never}
-    >
-      {/* Sidebar Header */}
-      <View className="px-3 py-2.5 flex-row items-center justify-between"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" }}
-      >
-        <View className="flex-row items-center gap-1.5">
-          <FolderOpen size={12} color="#7C4DFF" strokeWidth={1.5} />
-          <Text style={{ fontSize: 10, fontWeight: "700", color: "#4A4A6A", letterSpacing: 1, textTransform: "uppercase" }}>
-            Projects
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => {
-            setStatus("idle");
-            useProjectStore.setState({ projectName: null });
-          }}
-          className="w-5 h-5 rounded items-center justify-center"
-          style={{ backgroundColor: "rgba(0,229,255,0.1)" }}
-        >
-          <Plus size={11} color="#00E5FF" strokeWidth={2} />
-        </Pressable>
-      </View>
+  // Workspace actions
+  const handleCreateNew = useCallback(() => {
+    setStatus("idle");
+    setProjectName(null);
+  }, [setProjectName, setStatus]);
 
-      {/* Project List */}
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 4 }}>
-        {projectList.map((p) => {
-          const isActive = p.name === projectName;
-          return (
-            <Pressable
-              key={p.name}
-              onPress={() => {
-                switchProject(p.name);
-                fetchProjectFiles("http://localhost:3100", p.name);
-                // Start preview for this project
-                const ws = (window as Record<string, unknown>).__af_ws__ as WebSocket | undefined;
-                if (ws?.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify({ type: "start_preview", projectName: p.name }));
-                }
-              }}
-              className="flex-row items-center px-3 py-2 mx-1 rounded-lg"
-              style={{
-                backgroundColor: isActive ? "rgba(0,229,255,0.1)" : "transparent",
-                borderWidth: isActive ? 1 : 0,
-                borderColor: "rgba(0,229,255,0.25)",
-              }}
-            >
-              <View className="flex-row items-center gap-2 flex-1" style={{ minWidth: 0 }}>
-                <View
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: p.status === "ready" ? "#00FF88" : p.status === "error" ? "#FF3366" : "#FFD700",
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontWeight: isActive ? "600" : "400",
-                    color: isActive ? "#00BCD4" : "#4A4A6A",
-                  }}
-                  numberOfLines={1}
-                >
-                  {p.displayName}
-                </Text>
-              </View>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  removeProject(p.name);
-                }}
-                className="w-4 h-4 items-center justify-center rounded opacity-30"
-                style={{ marginLeft: 4 }}
-              >
-                <X size={9} color="#4A4A6A" strokeWidth={1.5} />
-              </Pressable>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
+  const handleSelectProject = useCallback((name: string) => {
+    switchProject(name);
+    setStatus("building");
+    void fetchProjectFiles(name);
+    startPreview(name);
+  }, [setStatus, startPreview, switchProject]);
 
-  // ── WORKSPACE ──────────────────────────────────────────
-  const workspace = () => (
-      <View className="flex-1 flex-row">
-        {/* Project Sidebar */}
-        {projectList.length > 0 && projectSidebar()}
+  const handleExport = useCallback(() => {
+    if (!projectName) {
+      return;
+    }
 
-        {/* Chat Panel */}
-        <View style={{ width: "25%" }}>
-          <ChatPanel onSend={handleChatSend} onAbort={abortGeneration} />
-        </View>
-        <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
-
-        {/* Code Area */}
-        <View className="flex-1">
-          <View className="flex-1 flex-row">
-            {fileTreeVisible && (
-              <View style={{ width: 200, backgroundColor: "rgba(255,255,255,0.5)" }}>
-                <FileTree nodes={fileTree} activeFile={activeFile} onFilePress={openFile} />
-              </View>
-            )}
-            <View className="flex-1">
-              <FileTabBar openFiles={openFiles} activeFile={activeFile} onSelect={setActiveFile} onClose={closeFile} />
-              <CodeViewer filepath={activeFile} />
-            </View>
-          </View>
-          {terminalVisible && <TerminalPanel />}
-        </View>
-        <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
-
-        {/* Preview */}
-        <View style={{ width: "25%" }}>
-          <PreviewPanel />
-        </View>
-      </View>
-  );
+    void Linking.openURL(apiClient.getProjectExportUrl(projectName));
+  }, [projectName]);
 
   return (
     <AuroraBackground intensity="subtle">
@@ -524,11 +442,7 @@ export default function AppFactoryScreen() {
           <View className="flex-row items-center gap-2">
             {projectName && (
               <Pressable
-                onPress={() => {
-                  if (projectName) {
-                    window.open(`http://localhost:3100/api/projects/${projectName}/export`, "_blank");
-                  }
-                }}
+                onPress={handleExport}
                 className="w-8 h-8 rounded-lg items-center justify-center"
                 style={{ backgroundColor: "rgba(0,229,255,0.1)", borderWidth: 1, borderColor: "rgba(0,229,255,0.2)" }}
               >
@@ -545,7 +459,23 @@ export default function AppFactoryScreen() {
           </View>
         </View>
 
-        {workspace()}
+        <WorkspaceLayout
+          activeFile={activeFile}
+          fileTree={fileTree}
+          fileTreeVisible={fileTreeVisible}
+          openFiles={openFiles}
+          projectList={projectList}
+          projectName={projectName}
+          terminalVisible={terminalVisible}
+          onAbort={abortGeneration}
+          onCloseFile={closeFile}
+          onCreateProject={handleCreateNew}
+          onOpenFile={openFile}
+          onRemoveProject={removeProject}
+          onSelectFile={setActiveFile}
+          onSelectProject={handleSelectProject}
+          onSendChat={handleChatSend}
+        />
 
         <VersionTimeline onRevert={revertVersion} />
         <SettingsDrawer visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
@@ -554,3 +484,5 @@ export default function AppFactoryScreen() {
     </AuroraBackground>
   );
 }
+
+

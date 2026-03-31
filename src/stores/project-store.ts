@@ -1,4 +1,5 @@
-import { create } from "zustand";
+﻿import { create } from "zustand";
+import { apiClient } from "@/shared/lib/api-client";
 import type { ChatMessage } from "@/features/chat/schemas/message.schema";
 import {
   createAssistantMessage,
@@ -51,7 +52,7 @@ interface ProjectChat {
   previewPort: number | null;
 }
 
-/** Stable empty reference for reads — prevents infinite re-render */
+/** Stable empty reference for reads вЂ” prevents infinite re-render */
 const EMPTY_CHAT: Readonly<ProjectChat> = {
   messages: [],
   versions: [],
@@ -67,7 +68,7 @@ const EMPTY_CHAT: Readonly<ProjectChat> = {
 const freshChat = (): ProjectChat => ({ ...EMPTY_CHAT, messages: [], versions: [], fileTree: [], openFiles: [], fileContents: {} });
 
 interface ProjectState {
-  // ── Top-level (active project) — used by selectors ──
+  // Top-level (active project) used by selectors
   projectName: string | null;
   projectList: ProjectEntry[];
   status: AppStatus;
@@ -88,11 +89,9 @@ interface ProjectState {
   streamingContent: string;
   fileTreeVisible: boolean;
   terminalVisible: boolean;
-
-  // ── Per-project persistence map ──
+  // Per-project persistence map
   projectChats: Record<string, ProjectChat>;
-
-  // ── Actions ──
+  // Actions
   setProjectName: (name: string | null) => void;
   setStatus: (status: AppStatus) => void;
   setPlan: (plan: Record<string, unknown>) => void;
@@ -131,8 +130,51 @@ const saveToChats = (
   return { ...chats, [name]: { ...existing, ...patch } };
 };
 
+const limitFileContents = (
+  fileContents: Record<string, string>
+): Record<string, string> => {
+  const entries = Object.entries(fileContents);
+  if (entries.length <= 40) {
+    return fileContents;
+  }
+
+  return Object.fromEntries(entries.slice(entries.length - 40));
+};
+
+const applyProjectFileSnapshot = (
+  state: ProjectState,
+  projectName: string,
+  fileTree: FileNode[],
+  fileContents: Record<string, string>
+): Partial<ProjectState> => {
+  const existingChat = state.projectChats[projectName] ?? freshChat();
+  const nextFileContents = limitFileContents({
+    ...existingChat.fileContents,
+    ...fileContents,
+  });
+
+  const projectChats = {
+    ...state.projectChats,
+    [projectName]: {
+      ...existingChat,
+      fileTree,
+      fileContents: nextFileContents,
+    },
+  };
+
+  if (state.projectName !== projectName) {
+    return { projectChats };
+  }
+
+  return {
+    projectChats,
+    fileTree,
+    fileContents: nextFileContents,
+  };
+};
+
 export const useProjectStore = create<ProjectState>()((set, get) => ({
-  // ── Top-level state ──
+  // Top-level state
   projectName: null,
   projectList: [],
   status: "idle" as AppStatus,
@@ -154,10 +196,19 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   fileTreeVisible: true,
   terminalVisible: true,
   projectChats: {} as Record<string, ProjectChat>,
-
-  // ── Actions (dual-write: top-level + projectChats) ──
+  // Actions
   setProjectName: (projectName) => set({ projectName }),
-  setStatus: (status) => set({ status }),
+  setStatus: (status) =>
+    set((state) => ({
+      status,
+      projectList: state.projectName
+        ? state.projectList.map((project) => (
+            project.name === state.projectName
+              ? { ...project, status }
+              : project
+          ))
+        : state.projectList,
+    })),
   setPlan: (plan) => set({ plan }),
 
   addMessage: (message) =>
@@ -267,8 +318,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         previewPort: chat.previewPort,
       };
     }),
-
-  // ── CORE: switch restores from projectChats ──
+  // Core: switch restores from projectChats
   switchProject: (name) =>
     set((s) => {
       // Save current project state first
@@ -289,7 +339,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const chat = saved[name] ?? EMPTY_CHAT;
       return {
         projectName: name,
-        status: "ready",
+        status: s.projectList.find((project) => project.name === name)?.status ?? "ready",
         projectChats: saved,
         messages: chat.messages,
         fileTree: chat.fileTree,
@@ -311,100 +361,170 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     lmStudioStatus: "checking" as "connected" | "disconnected" | "checking",
     streamingContent: "", fileTreeVisible: true, terminalVisible: true, projectChats: {},
   }),
-
-  // ── WebSocket message handler ──
+  // WebSocket message handler
   handleWsMessage: (msg) => {
     const type = msg.type as string;
     const store = get();
 
     switch (type) {
-      case "connected": set({ isConnected: true }); break;
-      case "status": set({ status: msg.status as AppStatus }); break;
-      case "plan_chunk": store.appendStreamingContent(msg.chunk as string); break;
+      case "connected":
+        set({ isConnected: true });
+        break;
+      case "status":
+        store.setStatus(msg.status as AppStatus);
+        break;
+      case "plan_chunk":
+        store.appendStreamingContent(msg.chunk as string);
+        break;
 
       case "plan_complete":
         set({ plan: msg.plan as Record<string, unknown> });
         store.clearStreamingContent();
-        store.addMessage(createSystemMessage("План приложения создан ✓", false));
+        store.addMessage(createSystemMessage("Plan created [ok]", false));
         break;
 
       case "scaffold_complete":
         set({ projectName: msg.projectName as string });
-        store.addMessage(createSystemMessage("Проект создан из кэша ✓", true));
+        store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
         break;
 
       case "file_generating":
-        set({ generationProgress: msg.progress as number, currentGeneratingFile: msg.filepath as string });
+        set({
+          generationProgress: msg.progress as number,
+          currentGeneratingFile: msg.filepath as string,
+        });
         break;
 
-      case "code_chunk": store.appendStreamingContent(msg.chunk as string); break;
-      case "file_complete": store.addMessage(createSystemMessage(`Файл создан: ${msg.filepath}`, true)); break;
+      case "code_chunk":
+        store.appendStreamingContent(msg.chunk as string);
+        break;
+      case "file_complete":
+        store.addMessage(createSystemMessage(`File created: ${msg.filepath}`, true));
+        break;
 
       case "generation_complete":
         store.clearStreamingContent();
-        store.addMessage(createAssistantMessage(`Сгенерировано ${msg.filesCount} файлов ✓`));
+        store.addMessage(createAssistantMessage(`Generated ${msg.filesCount} files [ok]`));
         break;
 
-      case "build_event": break;
+      case "build_event":
+        break;
 
       case "preview_ready":
         store.setPreview(msg.proxyUrl as string, msg.port as number);
-        set({ status: "ready" });
+        store.setStatus("ready");
         store.addMessage(createAssistantMessage("Preview ready! App is running."));
-        { const pName = get().projectName; if (pName) fetchProjectFiles("http://localhost:3100", pName); }
+        {
+          const pName = get().projectName;
+          if (pName) {
+            void fetchProjectFiles(pName);
+          }
+        }
         break;
 
-      case "thinking": store.addMessage(createAssistantMessage(msg.content as string)); break;
-      case "analysis_complete": store.addMessage(createSystemMessage(`Анализ: чтение ${(msg.files as string[]).join(", ")}`, true)); break;
-      case "block_applied": store.addMessage(createSystemMessage(`Изменён: ${msg.filepath}`, true)); break;
+      case "thinking":
+        store.addMessage(createAssistantMessage(msg.content as string));
+        break;
+      case "analysis_complete":
+        store.addMessage(createSystemMessage(`Analysis: reading ${(msg.files as string[]).join(", ")}`, true));
+        break;
+      case "block_applied":
+        store.addMessage(createSystemMessage(`Modified: ${msg.filepath}`, true));
+        break;
 
       case "iteration_complete": {
         const applied = msg.applied as number;
         const failed = msg.failed as number;
-        store.addMessage(createAssistantMessage(failed > 0 ? `Применено ${applied} изменений, ${failed} ошибок` : `Применено ${applied} изменений ✓`));
+        store.addMessage(createAssistantMessage(
+          failed > 0
+            ? `Applied ${applied} changes, ${failed} errors`
+            : `Applied ${applied} changes [ok]`
+        ));
         break;
       }
 
       case "version_created":
-        store.addVersion({ number: msg.version as number, hash: msg.hash as string, description: msg.description as string, timestamp: Date.now() });
+        store.addVersion({
+          number: msg.version as number,
+          hash: msg.hash as string,
+          description: msg.description as string,
+          timestamp: Date.now(),
+        });
         break;
 
-      case "autofix_start": store.addMessage(createSystemMessage(`Автофикс: ${msg.file} — ${(msg.error as string).slice(0, 100)}`, false)); break;
-      case "autofix_success": store.addMessage(createAssistantMessage(`Ошибка исправлена (попытка ${msg.attempts}) ✓`)); break;
-      case "autofix_failed": store.addMessage(createAssistantMessage(`Не удалось исправить после ${msg.attempts} попыток.`)); set({ status: "error" }); break;
-      case "reloading_preview": store.addMessage(createSystemMessage("Откат версии, перезагрузка превью...", false)); break;
-      case "system_error": store.addMessage(createAssistantMessage(`Ошибка: ${msg.error}`)); set({ status: "error" }); break;
-      case "generation_aborted": store.addMessage(createSystemMessage("Генерация прервана пользователем", false)); set({ status: "ready" }); break;
+      case "autofix_start":
+        store.addMessage(createSystemMessage(`Autofix: ${msg.file} - ${(msg.error as string).slice(0, 100)}`, false));
+        break;
+      case "autofix_success":
+        store.addMessage(createAssistantMessage(`Error fixed (attempt ${msg.attempts}) [ok]`));
+        break;
+      case "autofix_failed":
+        store.addMessage(createAssistantMessage(`Could not fix after ${msg.attempts} attempts.`));
+        store.setStatus("error");
+        break;
+      case "reloading_preview":
+        store.addMessage(createSystemMessage("Reverting version, reloading preview...", false));
+        break;
+      case "system_error":
+        store.addMessage(createAssistantMessage(`Error: ${msg.error}`));
+        store.setStatus("error");
+        break;
+      case "generation_aborted":
+        store.addMessage(createSystemMessage("Generation aborted by user", false));
+        store.setStatus("ready");
+        break;
 
       case "project_created": {
         const pName = msg.projectName as string;
         set({ projectName: pName });
-        store.addProject({ name: pName, displayName: pName, status: "ready", port: (msg.port as number) ?? null, createdAt: Date.now() });
+        store.addProject({
+          name: pName,
+          displayName: pName,
+          status: "ready",
+          port: (msg.port as number) ?? null,
+          createdAt: Date.now(),
+        });
         break;
       }
 
-      case "iteration_result": break;
-      case "autofix_attempt": store.addMessage(createSystemMessage(`Автофикс: попытка ${msg.attempt}/${msg.maxAttempts}`, true)); break;
-      case "autofix_block": store.addMessage(createSystemMessage(`Фикс: ${msg.filepath}`, true)); break;
-      case "lm_studio_status": set({ lmStudioStatus: msg.status as "connected" | "disconnected" | "checking" }); break;
+      case "iteration_result":
+        break;
+      case "autofix_attempt":
+        store.addMessage(createSystemMessage(`Autofix: attempt ${msg.attempt}/${msg.maxAttempts}`, true));
+        break;
+      case "autofix_block":
+        store.addMessage(createSystemMessage(`Fix: ${msg.filepath}`, true));
+        break;
+      case "lm_studio_status":
+        set({ lmStudioStatus: msg.status as "connected" | "disconnected" | "checking" });
+        break;
     }
   },
 }));
-
-// ── File fetch helper ────────────────────────────────────
-export const fetchProjectFiles = async (agentUrl: string, projectName: string): Promise<void> => {
-  const store = useProjectStore.getState();
+  // File fetch helper
+export const fetchProjectFiles = async (projectName: string): Promise<void> => {
   try {
-    const treeResp = await fetch(`${agentUrl}/api/projects/${projectName}/files`);
-    if (treeResp.ok) { const { data } = await treeResp.json(); store.setFileTree(data); }
+    const [fileTree, files] = await Promise.all([
+      apiClient.getProjectTree<FileNode[]>(projectName),
+      apiClient.listProjectFiles(projectName),
+    ]);
 
-    const listResp = await fetch(`${agentUrl}/api/projects/${projectName}/all-files`);
-    if (listResp.ok) {
-      const { data: files } = await listResp.json();
-      for (const filePath of files as string[]) {
-        const fileResp = await fetch(`${agentUrl}/api/projects/${projectName}/file?path=${encodeURIComponent(filePath)}`);
-        if (fileResp.ok) { const { data: fileData } = await fileResp.json(); store.setFileContent(filePath, fileData.content); }
+    const fileContents: Record<string, string> = {};
+    for (const filePath of files) {
+      try {
+        const fileData = await apiClient.getProjectFile(projectName, filePath);
+        fileContents[filePath] = fileData.content;
+      } catch (error) {
+        console.error(`[fetchProjectFiles] Failed to load ${filePath}`, error);
       }
     }
-  } catch (err) { console.error("[fetchProjectFiles]", err); }
+
+    useProjectStore.setState((state) =>
+      applyProjectFileSnapshot(state, projectName, fileTree, fileContents)
+    );
+  } catch (error) {
+    console.error(`[fetchProjectFiles] Failed to load ${projectName}`, error);
+  }
 };
+
+

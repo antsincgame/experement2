@@ -5,13 +5,13 @@ export declare const FileInPlanSchema: z.ZodObject<{
     description: z.ZodString;
     dependencies: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
 }, "strip", z.ZodTypeAny, {
-    path: string;
     type: string;
+    path: string;
     description: string;
     dependencies: string[];
 }, {
-    path: string;
     type: string;
+    path: string;
     description: string;
     dependencies?: string[] | undefined;
 }>;
@@ -39,19 +39,19 @@ export declare const AppPlanSchema: z.ZodObject<{
         description: z.ZodString;
         dependencies: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     }, "strip", z.ZodTypeAny, {
-        path: string;
         type: string;
+        path: string;
         description: string;
         dependencies: string[];
     }, {
-        path: string;
         type: string;
+        path: string;
         description: string;
         dependencies?: string[] | undefined;
     }>, "many">;
     extraDependencies: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     navigation: z.ZodOptional<z.ZodObject<{
-        type: z.ZodDefault<z.ZodEnum<["stack", "tabs", "drawer"]>>;
+        type: z.ZodDefault<z.ZodEnum<["stack", "tabs"]>>;
         screens: z.ZodDefault<z.ZodArray<z.ZodObject<{
             path: z.ZodString;
             name: z.ZodString;
@@ -66,14 +66,14 @@ export declare const AppPlanSchema: z.ZodObject<{
             icon?: string | undefined;
         }>, "many">>;
     }, "strip", z.ZodTypeAny, {
-        type: "stack" | "tabs" | "drawer";
+        type: "stack" | "tabs";
         screens: {
             name: string;
             path: string;
             icon?: string | undefined;
         }[];
     }, {
-        type?: "stack" | "tabs" | "drawer" | undefined;
+        type?: "stack" | "tabs" | undefined;
         screens?: {
             name: string;
             path: string;
@@ -82,17 +82,17 @@ export declare const AppPlanSchema: z.ZodObject<{
     }>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
+    description: string;
+    displayName: string;
     files: {
-        path: string;
         type: string;
+        path: string;
         description: string;
         dependencies: string[];
     }[];
-    description: string;
-    displayName: string;
     extraDependencies: string[];
     navigation?: {
-        type: "stack" | "tabs" | "drawer";
+        type: "stack" | "tabs";
         screens: {
             name: string;
             path: string;
@@ -101,17 +101,17 @@ export declare const AppPlanSchema: z.ZodObject<{
     } | undefined;
 }, {
     name: string;
+    description: string;
+    displayName: string;
     files: {
-        path: string;
         type: string;
+        path: string;
         description: string;
         dependencies?: string[] | undefined;
     }[];
-    description: string;
-    displayName: string;
     extraDependencies?: string[] | undefined;
     navigation?: {
-        type?: "stack" | "tabs" | "drawer" | undefined;
+        type?: "stack" | "tabs" | undefined;
         screens?: {
             name: string;
             path: string;

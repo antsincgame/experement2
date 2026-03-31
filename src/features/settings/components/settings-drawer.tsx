@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, TextInput, Pressable, Modal, Platform, ScrollView } from "react-native";
 import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown } from "lucide-react-native";
+import { apiClient, type LmModel } from "@/shared/lib/api-client";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useProjectStore } from "@/stores/project-store";
 
 interface SettingsDrawerProps {
   visible: boolean;
   onClose: () => void;
-}
-
-interface LmModel {
-  id: string;
-  object: string;
 }
 
 const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
@@ -27,13 +23,13 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const fetchModels = useCallback(async () => {
     setModelsLoading(true);
     try {
-      const resp = await fetch(`${settings.lmStudioUrl}/v1/models`);
-      if (resp.ok) {
-        const data = await resp.json();
-        setModels(data.data ?? []);
-      }
-    } catch { /* LM Studio offline */ }
-    finally { setModelsLoading(false); }
+      setModels(await apiClient.listLmStudioModels());
+    } catch (error) {
+      console.error("[SettingsDrawer] Failed to load models", error);
+      setModels([]);
+    } finally {
+      setModelsLoading(false);
+    }
   }, [settings.lmStudioUrl]);
 
   useEffect(() => {
@@ -88,14 +84,14 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             <Field label="Agent URL" value={settings.agentUrl} onChange={settings.setAgentUrl} />
             <Pressable
               onPress={() => {
-                const wsUrl = settings.agentUrl.replace("http://", "ws://").replace("https://", "wss://");
-                console.log("[Settings] Testing WS connection to:", wsUrl);
-                try {
-                  const ws = new WebSocket(wsUrl);
-                  ws.onopen = () => { console.log("[Settings] WS TEST: SUCCESS"); ws.close(); alert("Agent connected!"); };
-                  ws.onerror = () => { console.log("[Settings] WS TEST: FAILED"); alert("Agent connection FAILED. Check URL."); };
-                  setTimeout(() => ws.close(), 5000);
-                } catch (e) { alert("Error: " + String(e)); }
+                apiClient.testAgentConnection()
+                  .then(() => {
+                    alert("Agent connected!");
+                  })
+                  .catch((error) => {
+                    console.error("[SettingsDrawer] Agent connection test failed", error);
+                    alert(`Agent connection FAILED. ${error instanceof Error ? error.message : String(error)}`);
+                  });
               }}
               className="mt-1.5 px-3 py-1.5 rounded-lg self-start"
               style={{ backgroundColor: "rgba(0,229,255,0.1)", borderWidth: 1, borderColor: "rgba(0,229,255,0.2)" }}

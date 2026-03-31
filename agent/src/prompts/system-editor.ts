@@ -1,3 +1,6 @@
+// Reuses the shared generation contract so edit and autofix prompts follow the same import and icon rules.
+import { ICON_CONTRACT, PATH_ALIAS } from "../lib/generation-contract.js";
+
 export const SYSTEM_EDITOR_ANALYZE = `You are an expert code analyzer for React Native (Expo) projects.
 
 Your task: analyze the user's change request and decide which existing files need to be read.
@@ -44,9 +47,10 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 6. Use NativeWind className for all styling.
 7. TypeScript strict — no \`any\`.
 8. FORBIDDEN: local binary assets. Use @expo/vector-icons or external URLs.
-9. Icons: \`import Ionicons from "@expo/vector-icons/Ionicons"\` (default import ONLY).
-   NEVER: \`import { Home } from "@expo/vector-icons"\` — named exports don't exist!
+9. Icons: \`import ${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}"\` (default import ONLY).
+   NEVER: \`import { Home } from "${ICON_CONTRACT.packageName}"\` — named exports don't exist!
    className does NOT work on icons — use style prop. Wrap in Pressable for onPress.
+10. ${PATH_ALIAS.importPrefix} resolves to ${PATH_ALIAS.resolvedPrefix}; never generate ${PATH_ALIAS.importPrefix}src/... imports.
 
 ## Response Format
 
@@ -104,6 +108,7 @@ Your task: fix a Metro bundler error using minimal SEARCH/REPLACE blocks.
 3. SEARCH block MUST be unique and include context.
 4. Minimal changes only — fix the error, nothing else.
 5. Do NOT wrap in markdown code fences.
+6. Keep imports aligned with ${ICON_CONTRACT.defaultImportPath} and never emit ${PATH_ALIAS.importPrefix}src/... paths.
 
 ## Response Format
 <thinking>

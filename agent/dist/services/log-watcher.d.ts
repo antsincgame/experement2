@@ -1,7 +1,9 @@
 import type { ChildProcess } from "child_process";
 export type BuildStatus = "building" | "success" | "error" | "idle";
+export type BuildIssueCategory = "dependency" | "syntax" | "runtime" | "bundle" | "unknown";
 export interface ParsedError {
     type: string;
+    category: BuildIssueCategory;
     file: string;
     line: string;
     stack: string;

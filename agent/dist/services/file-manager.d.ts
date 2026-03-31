@@ -1,3 +1,4 @@
+export declare const safeResolveUnderRoot: (...segments: string[]) => string;
 export declare const writeFile: (projectName: string, filePath: string, content: string) => void;
 export declare const readFile: (projectName: string, filePath: string) => string | null;
 export declare const deleteFile: (projectName: string, filePath: string) => boolean;

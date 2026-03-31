@@ -1,5 +1,9 @@
+// Validates LLM route payloads so malformed prompts and URLs are rejected before proxying.
 import { Router } from "express";
+import { parseOrRespond } from "../lib/request-validation.js";
+import { LlmEnhanceBodySchema } from "../schemas/runtime-input.schema.js";
 import { handleLLMProxyRoute, completeNonStreaming } from "../services/llm-proxy.js";
+const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 export const llmRouter = Router();
 llmRouter.post("/complete", (req, res) => {
     handleLLMProxyRoute(req, res).catch((err) => {
@@ -10,9 +14,8 @@ llmRouter.post("/complete", (req, res) => {
     });
 });
 llmRouter.post("/enhance", async (req, res) => {
-    const { prompt, model, lmStudioUrl } = req.body;
-    if (!prompt) {
-        res.status(400).json({ error: "prompt required" });
+    const payload = parseOrRespond(LlmEnhanceBodySchema, req.body, res);
+    if (!payload) {
         return;
     }
     try {
@@ -30,12 +33,12 @@ Rules:
 - Write in the same language as the input
 - 3-5 sentences max`,
             },
-            { role: "user", content: prompt },
+            { role: "user", content: payload.prompt },
         ], {
             temperature: 0.7,
             maxTokens: 1024,
-            model: model || undefined,
-            lmStudioUrl: lmStudioUrl || undefined,
+            model: payload.model,
+            lmStudioUrl: payload.lmStudioUrl,
         });
         res.json({ data: enhanced });
     }
@@ -46,12 +49,12 @@ Rules:
 });
 llmRouter.get("/health", async (_req, res) => {
     try {
-        const response = await fetch("http://localhost:1234/v1/models");
+        const response = await fetch(`${DEFAULT_LM_STUDIO_URL}/v1/models`);
         if (response.ok) {
             const data = await response.json();
             res.json({
                 status: "connected",
-                models: data.data?.map((m) => m.id) ?? [],
+                models: data.data?.map((model) => model.id) ?? [],
             });
         }
         else {

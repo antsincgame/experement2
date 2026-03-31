@@ -1,96 +1,246 @@
-import { useEffect, useCallback, useState } from "react";
+﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL.
+import { useCallback } from "react";
+import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-// ── Singleton WebSocket stored on window object ──
-// The ONLY way to survive Metro HMR + React StrictMode + lazy bundles.
-// Key insight: direct `new WebSocket()` in browser works fine (tested).
-// The bug was reconnect logic creating competing connections.
+interface WsRuntime {
+  currentUrl?: string;
+  initialized?: boolean;
+  reconnectTimer?: ReturnType<typeof setTimeout>;
+  socket?: WebSocket;
+}
 
-const G = typeof window !== "undefined" ? (window as Record<string, unknown>) : ({} as Record<string, unknown>);
-const WS_KEY = "__af_ws__";
-const INIT_KEY = "__af_ws_init__";
+const GLOBAL_SCOPE = globalThis as Record<string, unknown>;
+const WS_RUNTIME_KEY = "__af_ws_runtime__";
 
-const ensureConnected = (): void => {
-  const existing = G[WS_KEY] as WebSocket | undefined;
-  if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+const getRuntime = (): WsRuntime => {
+  const existingRuntime = GLOBAL_SCOPE[WS_RUNTIME_KEY] as WsRuntime | undefined;
+  if (existingRuntime) {
+    return existingRuntime;
+  }
+
+  const nextRuntime: WsRuntime = {};
+  GLOBAL_SCOPE[WS_RUNTIME_KEY] = nextRuntime;
+  return nextRuntime;
+};
+
+const clearReconnectTimer = (): void => {
+  const runtime = getRuntime();
+  if (!runtime.reconnectTimer) {
     return;
   }
 
-  const agentUrl = useSettingsStore.getState().agentUrl;
-  const wsUrl = agentUrl.replace("http://", "ws://").replace("https://", "wss://");
+  clearTimeout(runtime.reconnectTimer);
+  runtime.reconnectTimer = undefined;
+};
 
-  const ws = new WebSocket(wsUrl);
-  G[WS_KEY] = ws;
+const disconnectSocket = (): void => {
+  const runtime = getRuntime();
+  const socket = runtime.socket;
+  if (!socket) {
+    return;
+  }
 
-  ws.onopen = () => {
-    console.log("[WS] Connected ✓ (stable)");
-    useProjectStore.getState().setConnected(true);
-  };
+  runtime.socket = undefined;
+  runtime.currentUrl = undefined;
+  socket.onopen = null;
+  socket.onmessage = null;
+  socket.onclose = null;
+  socket.onerror = null;
 
-  ws.onmessage = (event) => {
-    try {
-      useProjectStore.getState().handleWsMessage(JSON.parse(event.data));
-    } catch { /* skip */ }
-  };
+  if (
+    socket.readyState === WebSocket.OPEN ||
+    socket.readyState === WebSocket.CONNECTING
+  ) {
+    socket.close(1000, "agent-url-changed");
+  }
 
-  ws.onclose = (e) => {
-    console.log("[WS] Closed code=" + e.code + " clean=" + e.wasClean);
-    // Only reconnect if this is still THE active WS
-    if (G[WS_KEY] === ws) {
-      G[WS_KEY] = undefined;
-      useProjectStore.getState().setConnected(false);
-      // Single reconnect after 3s — no recursive cascade
-      setTimeout(() => ensureConnected(), 3000);
+  useProjectStore.getState().setConnected(false);
+};
+
+const scheduleReconnect = (): void => {
+  const runtime = getRuntime();
+  clearReconnectTimer();
+  runtime.reconnectTimer = setTimeout(() => {
+    runtime.reconnectTimer = undefined;
+    ensureConnected();
+  }, 3000);
+};
+
+const handleSocketMessage = (payload: string): void => {
+  try {
+    useProjectStore.getState().handleWsMessage(JSON.parse(payload));
+  } catch (error) {
+    console.error("[WS] Failed to parse message", error);
+  }
+};
+
+const ensureConnected = (): void => {
+  if (typeof WebSocket === "undefined") {
+    return;
+  }
+
+  const runtime = getRuntime();
+  const nextUrl = apiClient.getWebSocketUrl();
+  const existingSocket = runtime.socket;
+
+  if (
+    existingSocket &&
+    runtime.currentUrl === nextUrl &&
+    (existingSocket.readyState === WebSocket.OPEN ||
+      existingSocket.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
+
+  clearReconnectTimer();
+  disconnectSocket();
+
+  const socket = new WebSocket(nextUrl);
+  runtime.socket = socket;
+  runtime.currentUrl = nextUrl;
+
+  socket.onopen = () => {
+    if (getRuntime().socket !== socket) {
+      return;
     }
+
+    clearReconnectTimer();
+    useProjectStore.getState().setConnected(true);
+    console.log(`[WS] Connected ${nextUrl}`);
   };
 
-  ws.onerror = () => {
-    // onerror is always followed by onclose
+  socket.onmessage = (event) => {
+    handleSocketMessage(event.data);
+  };
+
+  socket.onclose = (event) => {
+    if (getRuntime().socket !== socket) {
+      return;
+    }
+
+    runtime.socket = undefined;
+    runtime.currentUrl = undefined;
+    useProjectStore.getState().setConnected(false);
+    console.log(`[WS] Closed code=${event.code} clean=${event.wasClean}`);
+    scheduleReconnect();
+  };
+
+  socket.onerror = () => {
+    console.warn(`[WS] Socket error for ${nextUrl}`);
   };
 };
 
-// Connect once on first import (guarded)
-if (typeof window !== "undefined" && !G[INIT_KEY]) {
-  G[INIT_KEY] = true;
-  // Delay to let Zustand stores hydrate from localStorage
-  setTimeout(() => ensureConnected(), 500);
-}
+const initializeRuntime = (): void => {
+  const runtime = getRuntime();
+  if (runtime.initialized) {
+    return;
+  }
 
-// ── React hook — thin wrapper, NO useEffect connection logic ──
-export const useWebSocket = () => {
-  // Force re-render when connection state changes
-  const isConnected = useProjectStore((s) => s.isConnected);
+  runtime.initialized = true;
+  let previousAgentUrl = normalizeBaseUrl(useSettingsStore.getState().agentUrl);
 
-  const send = useCallback((message: Record<string, unknown>) => {
-    const ws = G[WS_KEY] as WebSocket | undefined;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      console.warn("[WS] Not connected, cannot send");
+  useSettingsStore.subscribe((state) => {
+    const nextAgentUrl = normalizeBaseUrl(state.agentUrl);
+    if (nextAgentUrl === previousAgentUrl) {
       return;
     }
-    ws.send(JSON.stringify(message));
+
+    previousAgentUrl = nextAgentUrl;
+    clearReconnectTimer();
+    disconnectSocket();
+    ensureConnected();
+  });
+
+  setTimeout(() => {
+    ensureConnected();
+  }, 500);
+};
+
+initializeRuntime();
+
+export const useWebSocket = () => {
+  const isConnected = useProjectStore((state) => state.isConnected);
+
+  const send = useCallback((message: Record<string, unknown>): boolean => {
+    const socket = getRuntime().socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      console.warn("[WS] Not connected, retrying connection");
+      ensureConnected();
+      return false;
+    }
+
+    socket.send(JSON.stringify(message));
+    return true;
   }, []);
 
   const createProject = useCallback((description: string) => {
-    send({ type: "create_project", description, lmStudioUrl: useSettingsStore.getState().lmStudioUrl });
+    send({
+      type: "create_project",
+      description,
+      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+    });
   }, [send]);
 
   const iterate = useCallback((userRequest: string) => {
     const { projectName, messages } = useProjectStore.getState();
-    if (!projectName) return;
+    if (!projectName) {
+      return;
+    }
+
     const chatHistory = messages
-      .filter((m: { isHidden?: boolean; role: string }) => !m.isHidden && (m.role === "user" || m.role === "assistant"))
-      .map((m: { role: string; content: string }) => ({ role: m.role as "user" | "assistant", content: m.content }));
-    send({ type: "iterate", projectName, userRequest, chatHistory, lmStudioUrl: useSettingsStore.getState().lmStudioUrl });
+      .filter((message: { isHidden?: boolean; role: string }) => (
+        !message.isHidden &&
+        (message.role === "user" || message.role === "assistant")
+      ))
+      .map((message: { content: string; role: string }) => ({
+        role: message.role as "user" | "assistant",
+        content: message.content,
+      }));
+
+    send({
+      type: "iterate",
+      projectName,
+      userRequest,
+      chatHistory,
+      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+    });
   }, [send]);
 
-  const abortGeneration = useCallback(() => send({ type: "abort_generation" }), [send]);
+  const startPreview = useCallback((projectName: string) => {
+    send({
+      type: "start_preview",
+      projectName,
+      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+    });
+  }, [send]);
+
+  const abortGeneration = useCallback(() => {
+    send({ type: "abort_generation" });
+  }, [send]);
 
   const revertVersion = useCallback((commitHash: string) => {
     const projectName = useProjectStore.getState().projectName;
-    if (!projectName) return;
-    send({ type: "revert_version", projectName, commitHash });
+    if (!projectName) {
+      return;
+    }
+
+    send({
+      type: "revert_version",
+      projectName,
+      commitHash,
+      lmStudioUrl: useSettingsStore.getState().lmStudioUrl,
+    });
   }, [send]);
 
-  return { send, createProject, iterate, abortGeneration, revertVersion, isConnected };
+  return {
+    abortGeneration,
+    createProject,
+    isConnected,
+    iterate,
+    revertVersion,
+    send,
+    startPreview,
+  };
 };

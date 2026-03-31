@@ -1,34 +1,50 @@
+﻿// Validates LLM proxy requests and caches model discovery per LM Studio base URL.
 import type { Request, Response } from "express";
+import { respondInvalidInput } from "../lib/request-validation.js";
+import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
 
-const DEFAULT_LM_STUDIO_URL = "http://localhost:1234";
+const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
-// Auto-detect first loaded model from LM Studio
-let cachedModelId: string | null = null;
-let modelFetchPromise: Promise<string | null> | null = null;
+const cachedModelIds = new Map<string, string | null>();
+const modelFetchPromises = new Map<string, Promise<string | null>>();
 
 const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
-  if (cachedModelId) return cachedModelId;
-  if (modelFetchPromise) return modelFetchPromise;
+  if (cachedModelIds.has(baseUrl)) {
+    return cachedModelIds.get(baseUrl) ?? null;
+  }
 
-  modelFetchPromise = (async () => {
+  const existingPromise = modelFetchPromises.get(baseUrl);
+  if (existingPromise) {
+    return existingPromise;
+  }
+
+  const fetchPromise = (async () => {
     try {
       const resp = await fetch(`${baseUrl}/v1/models`);
-      if (!resp.ok) return null;
+      if (!resp.ok) {
+        cachedModelIds.set(baseUrl, null);
+        return null;
+      }
+
       const data = await resp.json();
       const models = data.data ?? [];
-      // Prefer qwen3-coder, then any first model
-      const preferred = models.find((m: { id: string }) => m.id.includes("qwen3-coder"));
-      cachedModelId = preferred?.id ?? models[0]?.id ?? null;
-      console.log(`[LLM] Auto-detected model: ${cachedModelId}`);
-      return cachedModelId;
+      const preferred = models.find((model: { id: string }) =>
+        model.id.includes("qwen3-coder")
+      );
+      const resolvedModel = preferred?.id ?? models[0]?.id ?? null;
+      cachedModelIds.set(baseUrl, resolvedModel);
+      console.log(`[LLM] Auto-detected model for ${baseUrl}: ${resolvedModel}`);
+      return resolvedModel;
     } catch {
+      cachedModelIds.set(baseUrl, null);
       return null;
     } finally {
-      modelFetchPromise = null;
+      modelFetchPromises.delete(baseUrl);
     }
   })();
 
-  return modelFetchPromise;
+  modelFetchPromises.set(baseUrl, fetchPromise);
+  return fetchPromise;
 };
 
 interface ChatMessage {
@@ -122,7 +138,7 @@ export const streamCompletion = async (
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) yield content;
           } catch {
-            // частичный JSON — пропускаем
+            // Partial JSON SSE chunks are ignored until a full payload arrives.
           }
         }
       }
@@ -146,7 +162,6 @@ export const completeNonStreaming = async (
   } = {}
 ): Promise<string> => {
   const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
-
   const resolvedModel = options.model || await getDefaultModel(baseUrl);
 
   const body: CompletionRequest = {
@@ -198,13 +213,21 @@ export const handleLLMProxyRoute = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { messages, temperature, max_tokens, stream, response_format, model } =
-    req.body;
-
-  if (!messages?.length) {
-    res.status(400).json({ error: "messages required", code: "INVALID_INPUT" });
+  const parsedBody = LlmCompleteBodySchema.safeParse(req.body);
+  if (!parsedBody.success) {
+    respondInvalidInput(res, parsedBody.error);
     return;
   }
+
+  const {
+    messages,
+    temperature,
+    max_tokens,
+    stream,
+    response_format,
+    model,
+    lmStudioUrl,
+  } = parsedBody.data;
 
   if (stream) {
     res.setHeader("Content-Type", "text/event-stream");
@@ -217,6 +240,7 @@ export const handleLLMProxyRoute = async (
         maxTokens: max_tokens,
         responseFormat: response_format,
         model,
+        lmStudioUrl,
       });
 
       for await (const chunk of generator) {
@@ -229,18 +253,20 @@ export const handleLLMProxyRoute = async (
       res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
       res.end();
     }
-  } else {
-    try {
-      const result = await completeNonStreaming(messages, {
-        temperature,
-        maxTokens: max_tokens,
-        responseFormat: response_format,
-        model,
-      });
-      res.json({ data: result });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      res.status(502).json({ error: message, code: "LLM_ERROR" });
-    }
+    return;
+  }
+
+  try {
+    const result = await completeNonStreaming(messages, {
+      temperature,
+      maxTokens: max_tokens,
+      responseFormat: response_format,
+      model,
+      lmStudioUrl,
+    });
+    res.json({ data: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(502).json({ error: message, code: "LLM_ERROR" });
   }
 };

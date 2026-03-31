@@ -1,6 +1,8 @@
+// Adds contract-aware plan validation so unsupported or incomplete app plans fail before generation starts.
 import { streamCompletion } from "../services/llm-proxy.js";
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
+import { validateAppPlan } from "./project-validator.js";
 
 interface PlannerOptions {
   description: string;
@@ -50,6 +52,15 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
       .map((i) => `${i.path.join(".")}: ${i.message}`)
       .join("; ");
     throw new Error(`Plan validation failed: ${issues}`);
+  }
+
+  const semanticIssues = validateAppPlan(result.data);
+  if (semanticIssues.length > 0) {
+    throw new Error(
+      `Plan validation failed: ${semanticIssues
+        .map((issue) => `${issue.filePath ?? "plan"}: ${issue.message}`)
+        .join("; ")}`
+    );
   }
 
   return result.data;

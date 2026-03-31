@@ -1,9 +1,11 @@
+// Validates project route params and file paths before touching the workspace.
 import { Router } from "express";
 import fs from "fs";
 import path from "path";
+import { parseOrRespond } from "../lib/request-validation.js";
+import { ProjectFileQuerySchema, ProjectParamsSchema, } from "../schemas/runtime-input.schema.js";
 import { getFileTree, readFile, listAllFiles, projectExists, getWorkspaceRoot, } from "../services/file-manager.js";
 export const projectRouter = Router();
-// List all projects in workspace (for sidebar on Welcome screen)
 projectRouter.get("/", (_req, res) => {
     const wsRoot = getWorkspaceRoot();
     if (!fs.existsSync(wsRoot)) {
@@ -12,48 +14,78 @@ projectRouter.get("/", (_req, res) => {
     }
     const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
     const projects = entries
-        .filter((e) => e.isDirectory() && e.name !== "template_cache" && !e.name.startsWith("."))
-        .map((e) => {
-        const displayName = e.name;
-        return { name: e.name, displayName, createdAt: fs.statSync(path.join(wsRoot, e.name)).birthtimeMs };
-    })
-        .sort((a, b) => b.createdAt - a.createdAt);
+        .filter((entry) => (entry.isDirectory() &&
+        entry.name !== "template_cache" &&
+        !entry.name.startsWith(".")))
+        .map((entry) => ({
+        name: entry.name,
+        displayName: entry.name,
+        createdAt: fs.statSync(path.join(wsRoot, entry.name)).birthtimeMs,
+    }))
+        .sort((left, right) => right.createdAt - left.createdAt);
     res.json({ data: projects });
 });
 projectRouter.get("/:name/files", (req, res) => {
-    const { name } = req.params;
-    if (!projectExists(name)) {
+    const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+    if (!params) {
+        return;
+    }
+    if (!projectExists(params.name)) {
         res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
         return;
     }
-    const tree = getFileTree(name);
-    res.json({ data: tree });
+    try {
+        res.json({ data: getFileTree(params.name) });
+    }
+    catch (error) {
+        res.status(400).json({
+            error: error instanceof Error ? error.message : "Invalid project path",
+            code: "INVALID_INPUT",
+        });
+    }
 });
 projectRouter.get("/:name/file", (req, res) => {
-    const { name } = req.params;
-    const filePath = req.query.path;
-    if (!filePath) {
-        res.status(400).json({ error: "path query required", code: "INVALID_INPUT" });
+    const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+    const query = parseOrRespond(ProjectFileQuerySchema, req.query, res);
+    if (!params || !query) {
         return;
     }
-    if (!projectExists(name)) {
+    if (!projectExists(params.name)) {
         res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
         return;
     }
-    const content = readFile(name, filePath);
-    if (content === null) {
-        res.status(404).json({ error: "File not found", code: "FILE_NOT_FOUND" });
-        return;
+    try {
+        const content = readFile(params.name, query.path);
+        if (content === null) {
+            res.status(404).json({ error: "File not found", code: "FILE_NOT_FOUND" });
+            return;
+        }
+        res.json({ data: { path: query.path, content } });
     }
-    res.json({ data: { path: filePath, content } });
+    catch (error) {
+        res.status(400).json({
+            error: error instanceof Error ? error.message : "Invalid file path",
+            code: "INVALID_INPUT",
+        });
+    }
 });
 projectRouter.get("/:name/all-files", (req, res) => {
-    const { name } = req.params;
-    if (!projectExists(name)) {
+    const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+    if (!params) {
+        return;
+    }
+    if (!projectExists(params.name)) {
         res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
         return;
     }
-    const files = listAllFiles(name);
-    res.json({ data: files });
+    try {
+        res.json({ data: listAllFiles(params.name) });
+    }
+    catch (error) {
+        res.status(400).json({
+            error: error instanceof Error ? error.message : "Invalid project path",
+            code: "INVALID_INPUT",
+        });
+    }
 });
 //# sourceMappingURL=project.js.map

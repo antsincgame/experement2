@@ -1,4 +1,6 @@
+// Aligns the app plan schema with the shared generation contract to reject unsupported shapes early.
 import { z } from "zod";
+import { SUPPORTED_NAVIGATION_TYPES } from "../lib/generation-contract.js";
 export const FileInPlanSchema = z.object({
     path: z.string().min(1),
     type: z.string().min(1),
@@ -18,7 +20,7 @@ export const AppPlanSchema = z.object({
     extraDependencies: z.array(z.string()).default([]),
     navigation: z
         .object({
-        type: z.enum(["stack", "tabs", "drawer"]).default("stack"),
+        type: z.enum(SUPPORTED_NAVIGATION_TYPES).default("stack"),
         screens: z.array(NavigationScreenSchema).default([]),
     })
         .optional(),

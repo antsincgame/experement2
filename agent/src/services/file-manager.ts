@@ -1,3 +1,4 @@
+﻿// Resolves workspace paths safely so project file access cannot escape the workspace root.
 import fs from "fs";
 import path from "path";
 
@@ -7,8 +8,63 @@ const ensureDir = (filepath: string): void => {
   fs.mkdirSync(path.dirname(filepath), { recursive: true });
 };
 
-const resolveProjectPath = (projectName: string, filePath: string): string =>
-  path.join(WORKSPACE_ROOT, projectName, filePath);
+const assertProjectName = (projectName: string): string => {
+  const trimmed = projectName.trim();
+  if (!trimmed) {
+    throw new Error("Project name is required");
+  }
+  if (trimmed !== path.basename(trimmed) || trimmed === "." || trimmed === "..") {
+    throw new Error(`Invalid project name: ${projectName}`);
+  }
+  if (trimmed.includes("\0")) {
+    throw new Error(`Invalid project name: ${projectName}`);
+  }
+  return trimmed;
+};
+
+const assertRelativeProjectPath = (filePath: string): string => {
+  const trimmed = filePath.trim();
+  if (!trimmed) {
+    throw new Error("File path is required");
+  }
+  if (path.isAbsolute(trimmed) || trimmed.includes("\0")) {
+    throw new Error(`Invalid file path: ${filePath}`);
+  }
+  return trimmed;
+};
+
+const assertWithinRoot = (rootPath: string, candidatePath: string): void => {
+  const relativePath = path.relative(rootPath, candidatePath);
+  if (
+    relativePath === "" ||
+    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+  ) {
+    return;
+  }
+  throw new Error(`Resolved path escapes allowed root: ${candidatePath}`);
+};
+
+const assertWorkspacePath = (candidatePath: string): string => {
+  const resolvedPath = path.resolve(candidatePath);
+  assertWithinRoot(WORKSPACE_ROOT, resolvedPath);
+  return resolvedPath;
+};
+
+export const safeResolveUnderRoot = (...segments: string[]): string => {
+  const resolvedPath = path.resolve(WORKSPACE_ROOT, ...segments);
+  assertWithinRoot(WORKSPACE_ROOT, resolvedPath);
+  return resolvedPath;
+};
+
+const resolveProjectPath = (projectName: string, filePath: string): string => {
+  const projectRoot = getProjectPath(projectName);
+  const resolvedPath = path.resolve(
+    projectRoot,
+    assertRelativeProjectPath(filePath)
+  );
+  assertWithinRoot(projectRoot, resolvedPath);
+  return resolvedPath;
+};
 
 export const writeFile = (
   projectName: string,
@@ -86,12 +142,12 @@ const buildTree = (dirPath: string, relativeTo: string): FileTreeNode[] => {
 };
 
 export const getFileTree = (projectName: string): FileTreeNode[] => {
-  const projectPath = path.join(WORKSPACE_ROOT, projectName);
+  const projectPath = getProjectPath(projectName);
   return buildTree(projectPath, projectPath);
 };
 
 export const listAllFiles = (projectName: string): string[] => {
-  const projectPath = path.join(WORKSPACE_ROOT, projectName);
+  const projectPath = getProjectPath(projectName);
   const files: string[] = [];
 
   const walk = (dir: string): void => {
@@ -113,14 +169,16 @@ export const listAllFiles = (projectName: string): string[] => {
 };
 
 export const getProjectPath = (projectName: string): string =>
-  path.join(WORKSPACE_ROOT, projectName);
+  safeResolveUnderRoot(assertProjectName(projectName));
 
 export const getWorkspaceRoot = (): string => WORKSPACE_ROOT;
 
 export const projectExists = (projectName: string): boolean =>
-  fs.existsSync(path.join(WORKSPACE_ROOT, projectName));
+  fs.existsSync(getProjectPath(projectName));
 
 export const copyDirectory = (src: string, dest: string): void => {
-  ensureDir(dest + "/placeholder");
-  fs.cpSync(src, dest, { recursive: true });
+  const destinationPath = assertWorkspacePath(dest);
+  ensureDir(path.join(destinationPath, "placeholder"));
+  fs.cpSync(path.resolve(src), destinationPath, { recursive: true });
 };
+

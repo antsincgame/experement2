@@ -1,3 +1,4 @@
+// Covers the schema-level contract so unsupported navigation shapes are rejected before generation.
 import { describe, it, expect } from "vitest";
 import { AppPlanSchema, FileInPlanSchema } from "./app-plan.schema";
 
@@ -20,9 +21,9 @@ describe("FileInPlanSchema", () => {
       path: "src/utils/helpers.ts",
       type: "utility",
       description: "Helper functions",
-      dependencies: ["lodash"],
+      dependencies: ["src/types/index.ts"],
     });
-    expect(result.dependencies).toEqual(["lodash"]);
+    expect(result.dependencies).toEqual(["src/types/index.ts"]);
   });
 
   it("defaults dependencies to empty array", () => {
@@ -115,12 +116,13 @@ describe("AppPlanSchema", () => {
     expect(result.navigation?.type).toBe("tabs");
   });
 
-  it("accepts navigation with drawer type", () => {
-    const result = AppPlanSchema.parse({
-      ...minimalPlan,
-      navigation: { type: "drawer", screens: [] },
-    });
-    expect(result.navigation?.type).toBe("drawer");
+  it("rejects navigation with unsupported drawer type", () => {
+    expect(() =>
+      AppPlanSchema.parse({
+        ...minimalPlan,
+        navigation: { type: "drawer", screens: [] },
+      })
+    ).toThrow();
   });
 
   it("defaults navigation type to stack", () => {
@@ -136,6 +138,18 @@ describe("AppPlanSchema", () => {
       AppPlanSchema.parse({
         ...minimalPlan,
         navigation: { type: "modal", screens: [] },
+      })
+    ).toThrow();
+  });
+
+  it("rejects navigation screens without path", () => {
+    expect(() =>
+      AppPlanSchema.parse({
+        ...minimalPlan,
+        navigation: {
+          type: "tabs",
+          screens: [{ name: "Home" }],
+        },
       })
     ).toThrow();
   });

@@ -1,3 +1,4 @@
+// Verifies Metro parsing stays categorized so downstream gates can react to dependency and syntax failures.
 import { describe, it, expect } from "vitest";
 import { parseMetroError } from "./log-watcher";
 
@@ -7,6 +8,7 @@ describe("parseMetroError", () => {
     const result = parseMetroError(output);
     expect(result).not.toBeNull();
     expect(result!.type).toContain("Unable to resolve module");
+    expect(result!.category).toBe("dependency");
     expect(result!.file).toBe("src/components/Icon.tsx");
   });
 
@@ -25,6 +27,7 @@ describe("parseMetroError", () => {
     const result = parseMetroError(output);
     expect(result).not.toBeNull();
     expect(result!.type).toContain("SyntaxError");
+    expect(result!.category).toBe("syntax");
     expect(result!.file).toBe("src/App.tsx");
     expect(result!.line).toBe("12");
   });

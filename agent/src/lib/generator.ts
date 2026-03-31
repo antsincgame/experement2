@@ -1,9 +1,23 @@
+// Generates files with contract-aware layouts, broader dependency context, and safer import normalization.
+import { Project, QuoteKind, ScriptKind } from "ts-morph";
 import { streamCompletion } from "../services/llm-proxy.js";
 import { writeFile, readFile } from "../services/file-manager.js";
 import { buildProjectSkeleton } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
-import { BOILERPLATE_TEMPLATES, getRootLayout } from "../prompts/templates.js";
+import {
+  BOILERPLATE_TEMPLATES,
+  getRootLayout,
+  getTabsLayout,
+} from "../prompts/templates.js";
+import {
+  ICON_CONTRACT,
+  MAX_DEPENDENCY_CONTEXT_CHARS,
+  MAX_DEPENDENCY_CONTEXT_FILES,
+  normalizeAliasSpecifier,
+  VECTOR_ICON_IMPORT_PATHS,
+} from "./generation-contract.js";
+import { validateAppPlan } from "./project-validator.js";
 
 interface GeneratorOptions {
   projectName: string;
@@ -15,49 +29,64 @@ interface GeneratorOptions {
   onFileComplete?: (filepath: string) => void;
 }
 
+const normalizeImportDeclarations = (code: string): string => {
+  try {
+    const project = new Project({
+      useInMemoryFileSystem: true,
+      manipulationSettings: { quoteKind: QuoteKind.Double },
+      skipLoadingLibFiles: true,
+    });
+    const sourceFile = project.createSourceFile("generated.tsx", code, {
+      overwrite: true,
+      scriptKind: ScriptKind.TSX,
+    });
+
+    for (const declaration of sourceFile.getImportDeclarations()) {
+      const normalizedSpecifier = normalizeAliasSpecifier(
+        declaration.getModuleSpecifierValue()
+      );
+
+      if (normalizedSpecifier !== declaration.getModuleSpecifierValue()) {
+        declaration.setModuleSpecifier(normalizedSpecifier);
+      }
+
+      if (normalizedSpecifier === "expo-router/tabs") {
+        declaration.setModuleSpecifier("expo-router");
+      }
+
+      if (normalizedSpecifier !== ICON_CONTRACT.packageName) {
+        continue;
+      }
+
+      const namedImports = declaration.getNamedImports().map((item) => item.getName());
+      const supportedIconName = namedImports.find(
+        (iconName) => VECTOR_ICON_IMPORT_PATHS[iconName]
+      );
+
+      declaration.removeNamedImports();
+      declaration.setDefaultImport(
+        supportedIconName ?? ICON_CONTRACT.defaultImportName
+      );
+      declaration.setModuleSpecifier(
+        supportedIconName
+          ? VECTOR_ICON_IMPORT_PATHS[supportedIconName]
+          : ICON_CONTRACT.defaultImportPath
+      );
+    }
+
+    return sourceFile.getFullText();
+  } catch {
+    return code;
+  }
+};
+
 /** Post-process: fix common LLM mistakes that cause crashes */
 const sanitizeGeneratedCode = (code: string): string => {
   let result = code;
 
-  // Fix: @/src/components → @/components (double src)
   result = result.replace(/from\s+["']@\/src\//g, 'from "@/');
-
-  // Fix: import { Tabs } from "expo-router/tabs" → "expo-router"
-  result = result.replace(/from\s+["']expo-router\/tabs["']/g, 'from "expo-router"');
-
-  // Fix: import { Ionicons } from "@expo/vector-icons" → default import
-  result = result.replace(
-    /import\s*\{\s*Ionicons\s*\}\s*from\s*["']@expo\/vector-icons["']/g,
-    'import Ionicons from "@expo/vector-icons/Ionicons"'
-  );
-
-  // Fix: import { MaterialIcons } from "@expo/vector-icons" → default import
-  result = result.replace(
-    /import\s*\{\s*MaterialIcons\s*\}\s*from\s*["']@expo\/vector-icons["']/g,
-    'import MaterialIcons from "@expo/vector-icons/MaterialIcons"'
-  );
-
-  // Fix: import { FontAwesome } from "@expo/vector-icons" → default import
-  result = result.replace(
-    /import\s*\{\s*FontAwesome\s*\}\s*from\s*["']@expo\/vector-icons["']/g,
-    'import FontAwesome from "@expo/vector-icons/FontAwesome"'
-  );
-
-  // Fix: import { AntDesign } from "@expo/vector-icons" → default import
-  result = result.replace(
-    /import\s*\{\s*AntDesign\s*\}\s*from\s*["']@expo\/vector-icons["']/g,
-    'import AntDesign from "@expo/vector-icons/AntDesign"'
-  );
-
-  // Fix: import { Home, Settings, ... } from "@expo/vector-icons" → remove (these don't exist)
-  // Replace with Ionicons default import
-  result = result.replace(
-    /import\s*\{[^}]+\}\s*from\s*["']@expo\/vector-icons["']\s*;?/g,
-    'import Ionicons from "@expo/vector-icons/Ionicons";'
-  );
-
-  // Fix: import { Tabs } from "expo-router/tabs" → "expo-router"
   result = result.replace(/from\s*["']expo-router\/tabs["']/g, 'from "expo-router"');
+  result = normalizeImportDeclarations(result);
 
   // Fix: React.useState/useEffect/useCallback → direct import (if React not imported)
   if (result.includes("React.use") && !result.includes("import React")) {
@@ -77,6 +106,38 @@ const sanitizeGeneratedCode = (code: string): string => {
   }
 
   return result;
+};
+
+const buildDependencyContext = (
+  projectName: string,
+  dependencies: string[]
+): string[] => {
+  const dependencyContents: string[] = [];
+  let currentSize = 0;
+
+  for (const dependencyPath of dependencies) {
+    if (dependencyContents.length >= MAX_DEPENDENCY_CONTEXT_FILES) {
+      break;
+    }
+
+    const content = readFile(projectName, dependencyPath);
+    if (!content) {
+      continue;
+    }
+
+    const block = `// --- ${dependencyPath} ---\n${content}`;
+    if (
+      dependencyContents.length > 0 &&
+      currentSize + block.length > MAX_DEPENDENCY_CONTEXT_CHARS
+    ) {
+      break;
+    }
+
+    dependencyContents.push(block);
+    currentSize += block.length;
+  }
+
+  return dependencyContents;
 };
 
 const extractCodeFromResponse = (response: string): { filepath: string; code: string } | null => {
@@ -114,6 +175,15 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     onFileComplete,
   } = options;
 
+  const planIssues = validateAppPlan(plan);
+  if (planIssues.length > 0) {
+    throw new Error(
+      `Plan is not internally consistent: ${planIssues
+        .map((issue) => `${issue.filePath ?? "plan"}: ${issue.message}`)
+        .join("; ")}`
+    );
+  }
+
   const generatedFiles: string[] = [];
 
   // Write static boilerplate (config files)
@@ -125,18 +195,14 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     }
   }
 
-  // Write dynamic root layout (Stack or Tabs based on navigation type)
+  // Write dynamic layouts from the validated navigation contract.
   const navType = plan.navigation?.type ?? "stack";
-  const layoutPath = navType === "tabs" ? "app/(tabs)/_layout.tsx" : "app/_layout.tsx";
-  const hasLayoutInPlan = plan.files.some((f) => f.path === layoutPath || f.path === "app/_layout.tsx");
-  if (!hasLayoutInPlan) {
-    writeFile(projectName, layoutPath, getRootLayout(navType));
-    generatedFiles.push(layoutPath);
-    // For tabs: also write root _layout.tsx that just re-exports
-    if (navType === "tabs") {
-      writeFile(projectName, "app/_layout.tsx", `import "../src/global.css";\nimport { Slot } from "expo-router";\nimport { StatusBar } from "expo-status-bar";\n\nexport default function RootLayout() {\n  return (\n    <>\n      <StatusBar style="dark" />\n      <Slot />\n    </>\n  );\n}\n`);
-      generatedFiles.push("app/_layout.tsx");
-    }
+  writeFile(projectName, "app/_layout.tsx", getRootLayout(plan.navigation));
+  generatedFiles.push("app/_layout.tsx");
+
+  if (navType === "tabs") {
+    writeFile(projectName, "app/(tabs)/_layout.tsx", getTabsLayout(plan.navigation));
+    generatedFiles.push("app/(tabs)/_layout.tsx");
   }
 
   const totalFiles = plan.files.length;
@@ -147,13 +213,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
     const skeleton = buildProjectSkeleton(projectPath);
 
-    const depContents: string[] = [];
-    for (const depPath of fileSpec.dependencies.slice(0, 3)) {
-      const content = readFile(projectName, depPath);
-      if (content) {
-        depContents.push(`// --- ${depPath} ---\n${content}`);
-      }
-    }
+    const depContents = buildDependencyContext(projectName, fileSpec.dependencies);
 
     const userMessage = `
 ## App Plan

@@ -1,7 +1,13 @@
+﻿// Builds generated Expo templates from the shared contract so runtime scaffolding stays version-locked with prompts.
 import fs from "fs";
 import path from "path";
-import { getWorkspaceRoot, copyDirectory } from "./file-manager.js";
+import { getWorkspaceRoot, copyDirectory, getProjectPath } from "./file-manager.js";
 import { npmInstall } from "./process-manager.js";
+import {
+  TEMPLATE_PACKAGE_DEPENDENCIES,
+  TEMPLATE_PACKAGE_DEV_DEPENDENCIES,
+  TEMPLATE_PACKAGE_SCRIPTS,
+} from "../lib/generation-contract.js";
 
 const TEMPLATE_DIR_NAME = "template_cache";
 
@@ -30,31 +36,9 @@ const BOILERPLATE_FILES: Record<string, string> = {
       main: "expo-router/entry",
       version: "1.0.0",
       private: true,
-      scripts: {
-        start: "expo start",
-        web: "expo start --web",
-      },
-      dependencies: {
-        expo: "~55.0.9",
-        "expo-router": "~55.0.8",
-        "expo-status-bar": "~55.0.4",
-        "expo-linking": "~55.0.9",
-        "expo-constants": "~55.0.9",
-        react: "19.2.0",
-        "react-dom": "19.2.0",
-        "react-native": "0.83.4",
-        "react-native-web": "~0.21.0",
-        "react-native-safe-area-context": "~5.6.2",
-        "react-native-screens": "~4.23.0",
-        "react-native-gesture-handler": "~2.30.0",
-        "react-native-reanimated": "4.2.1",
-        nativewind: "^4.0.0",
-        "tailwindcss": "^3.4.0",
-      },
-      devDependencies: {
-        "@types/react": "~19.2.2",
-        typescript: "~5.9.2",
-      },
+      scripts: TEMPLATE_PACKAGE_SCRIPTS,
+      dependencies: TEMPLATE_PACKAGE_DEPENDENCIES,
+      devDependencies: TEMPLATE_PACKAGE_DEV_DEPENDENCIES,
     },
     null,
     2
@@ -105,6 +89,9 @@ module.exports = {
   "nativewind-env.d.ts": `/// <reference types="nativewind/types" />
 `,
 
+  "expo-env.d.ts": `/// <reference types="expo/types" />
+`,
+
   "src/global.css": `@tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -152,7 +139,7 @@ export const initTemplateCache = async (): Promise<void> => {
     await npmInstall(templatePath);
 
     cacheReady = true;
-    console.log("[TemplateCache] ✅ Template cache ready!");
+    console.log("[TemplateCache] Template cache ready");
   })();
 
   return cacheInitPromise;
@@ -168,13 +155,13 @@ export const createProjectFromCache = async (
   }
 
   const templatePath = getTemplatePath();
-  const projectPath = path.join(getWorkspaceRoot(), projectName);
+  const projectPath = getProjectPath(projectName);
 
   if (fs.existsSync(projectPath)) {
     throw new Error(`Project "${projectName}" already exists`);
   }
 
-  console.log(`[TemplateCache] Copying template → ${projectName}...`);
+  console.log(`[TemplateCache] Copying template -> ${projectName}...`);
   copyDirectory(templatePath, projectPath);
 
   const appJson = JSON.parse(
@@ -199,3 +186,4 @@ export const createProjectFromCache = async (
 };
 
 export const isCacheReady = (): boolean => cacheReady;
+

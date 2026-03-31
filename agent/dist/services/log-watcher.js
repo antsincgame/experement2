@@ -31,6 +31,24 @@ const truncateError = (errorText) => {
         return errorText;
     return errorText.slice(0, METRO_ERROR_MAX_LENGTH - 3) + "...";
 };
+const categorizeError = (errorType) => {
+    const normalized = errorType.toLowerCase();
+    if (normalized.includes("unable to resolve module") ||
+        normalized.includes("cannot find module") ||
+        normalized.includes("module not found")) {
+        return "dependency";
+    }
+    if (normalized.includes("syntaxerror") || normalized.includes("unexpected token")) {
+        return "syntax";
+    }
+    if (normalized.includes("typeerror")) {
+        return "runtime";
+    }
+    if (normalized.includes("bundle") || normalized.includes("failed to compile")) {
+        return "bundle";
+    }
+    return "unknown";
+};
 export const parseMetroError = (output) => {
     const lines = output.split("\n").filter((l) => l.trim());
     if (lines.length === 0)
@@ -69,6 +87,7 @@ export const parseMetroError = (output) => {
     const raw = `${errorType}\n  File: ${file}:${line}\n  ${stackLines.join("\n  ")}`;
     return {
         type: errorType,
+        category: categorizeError(errorType),
         file,
         line,
         stack: stackLines.join("\n"),
