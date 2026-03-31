@@ -18,11 +18,16 @@ const ERROR_PATTERNS = [
   /Module not found:\s*(.+)/,
   /TypeError:\s*(.+)/,
   /Cannot find module\s*'(.+)'/,
+  /Unable to resolve module\s*(.+)/,
   /Unexpected token/,
   /Failed to compile/,
+  /error:\s*(.+)/i,
+  /BUNDLE\s+.*error/i,
 ] as const;
 
 const FILE_LINE_PATTERN = /(?:at\s+)?([^\s(]+\.(?:tsx?|jsx?|css|json)):(\d+)/;
+const METRO_FILE_PATTERN = /(?:in|from)\s+['"]?([^\s'"]+\.(?:tsx?|jsx?))['"]?/;
+const UNABLE_RESOLVE_PATTERN = /Unable to resolve module\s+["']?([^"'\s]+)["']?.*from\s+["']?([^"'\s:]+)["']?/;
 
 const isErrorLine = (line: string): boolean =>
   ERROR_PATTERNS.some((pattern) => pattern.test(line));
@@ -70,6 +75,18 @@ export const parseMetroError = (output: string): ParsedError | null => {
       line = fileMatch[2];
     }
 
+    // Metro "Unable to resolve module X from Y" format
+    const resolveMatch = l.match(UNABLE_RESOLVE_PATTERN);
+    if (resolveMatch && file === "unknown") {
+      file = resolveMatch[2]; // file that has the bad import
+    }
+
+    // Metro "in path/to/file.tsx" format
+    const metroFileMatch = l.match(METRO_FILE_PATTERN);
+    if (metroFileMatch && file === "unknown") {
+      file = metroFileMatch[1];
+    }
+
     if (!isNoiseLine(l) && stackLines.length < 5) {
       stackLines.push(l.trim());
     }
@@ -98,46 +115,62 @@ export const watchProcess = (
 ): (() => void) => {
   let errorBuffer = "";
   let successTimeout: NodeJS.Timeout | null = null;
+  let errorFlushTimeout: NodeJS.Timeout | null = null;
 
-  const handleStdout = (data: Buffer): void => {
-    const text = data.toString();
-
-    callback({ type: "build_log", message: text });
-
-    if (text.includes("Bundled") && !text.includes("error")) {
-      if (successTimeout) clearTimeout(successTimeout);
-      successTimeout = setTimeout(() => {
-        callback({ type: "build_success" });
-      }, 2000);
-    }
-  };
-
-  const handleStderr = (data: Buffer): void => {
-    const text = data.toString();
+  const checkForError = (text: string): void => {
     errorBuffer += text;
 
-    if (isErrorLine(text)) {
+    // Check both current chunk AND accumulated buffer for error patterns
+    if (isErrorLine(text) || isErrorLine(errorBuffer)) {
       if (successTimeout) {
         clearTimeout(successTimeout);
         successTimeout = null;
       }
 
-      const parsed = parseMetroError(errorBuffer);
-      if (parsed) {
-        callback({ type: "build_error", error: parsed.raw });
+      // Debounce: wait 500ms for more error chunks before parsing
+      if (errorFlushTimeout) clearTimeout(errorFlushTimeout);
+      errorFlushTimeout = setTimeout(() => {
+        const parsed = parseMetroError(errorBuffer);
+        if (parsed) {
+          callback({ type: "build_error", error: parsed.raw });
+        }
         errorBuffer = "";
-      }
+        errorFlushTimeout = null;
+      }, 500);
     }
-
-    callback({ type: "build_log", message: text });
   };
 
-  childProcess.stdout?.on("data", handleStdout);
-  childProcess.stderr?.on("data", handleStderr);
+  const handleData = (data: Buffer): void => {
+    const text = data.toString();
+
+    callback({ type: "build_log", message: text });
+
+    // Check for success (Metro "Bundled" message)
+    if (text.includes("Bundled") && !text.toLowerCase().includes("error")) {
+      if (successTimeout) clearTimeout(successTimeout);
+      if (errorFlushTimeout) {
+        clearTimeout(errorFlushTimeout);
+        errorFlushTimeout = null;
+      }
+      errorBuffer = "";
+      successTimeout = setTimeout(() => {
+        callback({ type: "build_success" });
+      }, 2000);
+      return;
+    }
+
+    // Check for errors in BOTH stdout and stderr (Metro web writes errors to stdout)
+    checkForError(text);
+  };
+
+  // Metro web writes BOTH logs and errors to stdout
+  childProcess.stdout?.on("data", handleData);
+  childProcess.stderr?.on("data", handleData);
 
   return () => {
-    childProcess.stdout?.off("data", handleStdout);
-    childProcess.stderr?.off("data", handleStderr);
+    childProcess.stdout?.off("data", handleData);
+    childProcess.stderr?.off("data", handleData);
     if (successTimeout) clearTimeout(successTimeout);
+    if (errorFlushTimeout) clearTimeout(errorFlushTimeout);
   };
 };
