@@ -20,7 +20,10 @@ Your task: generate complete, production-ready code for a single file.
    - Icons: use Ionicons from @expo/vector-icons (default import)
    - Images: external URLs only (picsum.photos, via.placeholder.com)
 8. Keep files under 200 lines.
-9. Import paths use @/ alias (e.g., import { Todo } from "@/types/todo")
+9. Import paths: @/ = ./src/. So use @/components/X (NOT @/src/components/X).
+   Example: import { Todo } from "@/types/todo" resolves to ./src/types/todo.
+   WRONG: @/src/components/X (double src!)
+   CORRECT: @/components/X
 10. Use const + arrow functions for components.
 11. Import React hooks DIRECTLY: \`import { useState, useCallback } from "react"\`
     NEVER use \`React.useState()\` unless you import React explicitly.
