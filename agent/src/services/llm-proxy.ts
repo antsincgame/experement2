@@ -38,7 +38,7 @@ export const streamCompletion = async (
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.4,
-    max_tokens: options.maxTokens ?? 8192,
+    max_tokens: options.maxTokens ?? 32768,
     stream: true,
     model: options.model ?? "",
   };
@@ -119,7 +119,7 @@ export const completeNonStreaming = async (
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.3,
-    max_tokens: options.maxTokens ?? 8192,
+    max_tokens: options.maxTokens ?? 32768,
     stream: false,
     model: options.model ?? "",
   };

@@ -11,7 +11,7 @@ interface PlannerOptions {
 }
 
 export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
-  const { description, temperature = 0.3, maxTokens = 8192, lmStudioUrl, onChunk } = options;
+  const { description, temperature = 0.3, maxTokens = 32768, lmStudioUrl, onChunk } = options;
 
   const messages = [
     { role: "system" as const, content: SYSTEM_PLANNER },

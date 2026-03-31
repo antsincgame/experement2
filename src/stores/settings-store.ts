@@ -23,8 +23,8 @@ export const useSettingsStore = create<SettingsState>()(
       lmStudioUrl: "http://localhost:1234",
       model: "",
       temperature: 0.4,
-      maxTokens: 8192,
-      maxContextTokens: 32000,
+      maxTokens: 32768,
+      maxContextTokens: 65536,
       agentUrl: "http://localhost:3100",
 
       setLmStudioUrl: (lmStudioUrl) => set({ lmStudioUrl }),

@@ -161,7 +161,7 @@ export const editProject = async (
 
   const generateGen = await streamCompletion(generateMessages, {
     temperature: 0.4,
-    maxTokens: 8192,
+    maxTokens: 32768,
     lmStudioUrl,
   });
 
