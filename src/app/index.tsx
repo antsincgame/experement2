@@ -125,9 +125,14 @@ export default function AppFactoryScreen() {
   const handleOpenProject = useCallback((name: string) => {
     const store = useProjectStore.getState();
     store.setProjectName(name);
-    store.setStatus("ready");
-    store.addProject({ name, displayName: name, status: "ready", port: null, createdAt: Date.now() });
+    store.setStatus("building");
+    store.addProject({ name, displayName: name, status: "building", port: null, createdAt: Date.now() });
     fetchProjectFiles(agentUrl, name);
+    // Start preview server for existing project
+    const ws = (window as Record<string, unknown>).__af_ws__ as WebSocket | undefined;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "start_preview", projectName: name }));
+    }
   }, [agentUrl]);
 
   // ── WELCOME ────────────────────────────────────────────
@@ -399,6 +404,11 @@ export default function AppFactoryScreen() {
               onPress={() => {
                 switchProject(p.name);
                 fetchProjectFiles("http://localhost:3100", p.name);
+                // Start preview for this project
+                const ws = (window as Record<string, unknown>).__af_ws__ as WebSocket | undefined;
+                if (ws?.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "start_preview", projectName: p.name }));
+                }
               }}
               className="flex-row items-center px-3 py-2 mx-1 rounded-lg"
               style={{

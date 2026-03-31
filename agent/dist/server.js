@@ -9,6 +9,8 @@ import { killAll } from "./services/process-manager.js";
 import { abortAll } from "./services/llm-proxy.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { createPreviewProxy } from "./services/preview-proxy.js";
+import { startExpo } from "./services/process-manager.js";
+import { getProjectPath } from "./services/file-manager.js";
 const PORT = 3100;
 const app = express();
 const server = createServer(app);
@@ -144,6 +146,26 @@ const handleWsMessage = (_clientId, message) => {
                 step: "iterate",
             }));
             break;
+        case "start_preview": {
+            const projName = message.projectName;
+            console.log("[WS] Start preview:", projName);
+            const projPath = getProjectPath(projName);
+            if (!projPath || !require("fs").existsSync(projPath)) {
+                broadcast({ type: "system_error", error: `Project not found: ${projName}` });
+                break;
+            }
+            broadcast({ type: "status", status: "building" });
+            startExpo(projName, projPath, (event) => {
+                broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
+            }).then(({ port }) => {
+                setPreviewPort(port);
+                broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
+                broadcast({ type: "status", status: "ready" });
+            }).catch((err) => {
+                broadcast({ type: "system_error", error: err instanceof Error ? err.message : "Failed to start preview" });
+            });
+            break;
+        }
         case "revert_version":
             console.log("[WS] Revert:", message.projectName, message.commitHash);
             revertVersion(message.projectName, message.commitHash, message.lmStudioUrl).catch((err) => broadcast({
