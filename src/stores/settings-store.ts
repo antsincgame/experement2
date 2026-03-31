@@ -62,7 +62,7 @@ export const useSettingsStore = create<SettingsState>()(
       addErrorLog: (entry) =>
         set((s) => ({
           errorLogs: [
-            ...s.errorLogs.slice(-99),
+            ...s.errorLogs.slice(-499),
             { ...entry, id: crypto.randomUUID(), timestamp: Date.now() },
           ],
         })),

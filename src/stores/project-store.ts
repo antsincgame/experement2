@@ -368,13 +368,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   handleWsMessage: (msg) => {
     const type = msg.type as string;
     const store = get();
+    const log = useSettingsStore.getState().addErrorLog;
 
     switch (type) {
       case "connected":
         set({ isConnected: true });
+        log({ level: "info", source: "websocket", message: "Connected to agent" });
         break;
       case "status":
         store.setStatus(msg.status as AppStatus);
+        log({ level: "info", source: "status", message: `Status → ${msg.status}` });
         break;
       case "plan_chunk":
         store.appendStreamingContent(msg.chunk as string);
@@ -384,6 +387,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         set({ plan: msg.plan as Record<string, unknown> });
         store.clearStreamingContent();
         store.addMessage(createSystemMessage("Plan created [ok]", false));
+        log({ level: "info", source: "pipeline", message: "Plan complete" });
         break;
 
       case "scaffold_complete":
@@ -403,6 +407,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           });
         }
         store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
+        log({ level: "info", source: "pipeline", message: `Scaffold complete: ${msg.projectName}` });
         break;
 
       case "file_generating":
@@ -417,20 +422,32 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         break;
       case "file_complete":
         store.addMessage(createSystemMessage(`File created: ${msg.filepath}`, true));
+        log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
         break;
 
       case "generation_complete":
         store.clearStreamingContent();
         store.addMessage(createAssistantMessage(`Generated ${msg.filesCount} files [ok]`));
+        log({ level: "info", source: "generator", message: `Generated ${msg.filesCount} files` });
         break;
 
-      case "build_event":
+      case "build_event": {
+        const eventType = msg.eventType as string;
+        if (eventType === "build_error") {
+          log({ level: "error", source: "metro", message: `Build error`, details: (msg.error as string)?.slice(0, 500) });
+        } else if (eventType === "build_success") {
+          log({ level: "info", source: "metro", message: "Build success" });
+        } else {
+          log({ level: "info", source: "metro", message: msg.message as string || eventType });
+        }
         break;
+      }
 
       case "preview_ready":
         store.setPreview(msg.proxyUrl as string, msg.port as number);
         store.setStatus("ready");
         store.addMessage(createAssistantMessage("Preview ready! App is running."));
+        log({ level: "info", source: "preview", message: `Preview ready on port ${msg.port}` });
         {
           const pName = get().projectName;
           if (pName) {
@@ -455,6 +472,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       }
       case "block_applied":
         store.addMessage(createSystemMessage(`Modified: ${msg.filepath}`, true));
+        log({ level: "info", source: "editor", message: `Block applied: ${msg.filepath}` });
         break;
 
       case "iteration_complete": {
@@ -486,13 +504,16 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           description: msg.description as string,
           timestamp: Date.now(),
         });
+        log({ level: "info", source: "git", message: `Version v${msg.version} committed`, details: `Hash: ${(msg.hash as string)?.slice(0, 8)}` });
         break;
 
       case "autofix_start":
         store.addMessage(createSystemMessage(`Autofix: ${msg.file} - ${(msg.error as string).slice(0, 100)}`, false));
+        log({ level: "warn", source: "autofix", message: `Starting autofix: ${msg.file}`, details: (msg.error as string)?.slice(0, 300) });
         break;
       case "autofix_success":
         store.addMessage(createAssistantMessage(`Error fixed (attempt ${msg.attempts}) [ok]`));
+        log({ level: "info", source: "autofix", message: `Fixed on attempt ${msg.attempts}` });
         break;
       case "autofix_failed":
         store.addMessage(createErrorMessage(
@@ -528,6 +549,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       case "generation_aborted":
         store.addMessage(createSystemMessage("Generation aborted by user", false));
         store.setStatus("ready");
+        log({ level: "warn", source: "pipeline", message: "Generation aborted by user" });
         break;
 
       case "project_created": {
@@ -543,6 +565,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           port: (msg.port as number) ?? existingProject?.port ?? null,
           createdAt: existingProject?.createdAt ?? Date.now(),
         });
+        log({ level: "info", source: "pipeline", message: `Project created: ${pName}`, details: `Port: ${msg.port ?? "none"}` });
         break;
       }
 
@@ -550,12 +573,27 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         break;
       case "autofix_attempt":
         store.addMessage(createSystemMessage(`Autofix: attempt ${msg.attempt}/${msg.maxAttempts}`, true));
+        log({ level: "warn", source: "autofix", message: `Attempt ${msg.attempt}/${msg.maxAttempts}` });
         break;
       case "autofix_block":
         store.addMessage(createSystemMessage(`Fix: ${msg.filepath}`, true));
+        log({ level: "info", source: "autofix", message: `Fix applied: ${msg.filepath}` });
         break;
-      case "lm_studio_status":
-        set({ lmStudioStatus: msg.status as "connected" | "disconnected" | "checking" });
+      case "lm_studio_status": {
+        const lmStatus = msg.status as "connected" | "disconnected" | "checking";
+        set({ lmStudioStatus: lmStatus });
+        if (lmStatus === "disconnected") {
+          log({ level: "error", source: "lm-studio", message: "LM Studio disconnected" });
+        } else if (lmStatus === "connected") {
+          log({ level: "info", source: "lm-studio", message: "LM Studio connected" });
+        }
+        break;
+      }
+      default:
+        // Log unknown message types for debugging
+        if (type !== "iteration_result") {
+          log({ level: "info", source: "ws", message: `Event: ${type}` });
+        }
         break;
     }
   },

@@ -266,59 +266,77 @@ const Field = ({ label, value, onChange, keyboardType = "default" }: FieldProps)
 );
 
 // ── Error Log Panel ──
+type LogFilter = "all" | "error" | "warn" | "info";
+
 const ErrorLogPanel = () => {
   const errorLogs = useSettingsStore((s) => s.errorLogs);
   const clearErrorLogs = useSettingsStore((s) => s.clearErrorLogs);
   const [expanded, setExpanded] = useState(false);
+  const [filter, setFilter] = useState<LogFilter>("all");
 
-  const copyAllLogs = useCallback(() => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      const text = errorLogs
-        .map((log) => {
-          const time = new Date(log.timestamp).toLocaleTimeString();
-          return `[${time}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}${log.details ? `\n  ${log.details}` : ""}`;
-        })
-        .join("\n\n");
-      navigator.clipboard.writeText(text).catch(() => {});
-    }
-  }, [errorLogs]);
+  const errorCount = errorLogs.filter((l) => l.level === "error").length;
+  const warnCount = errorLogs.filter((l) => l.level === "warn").length;
+  const infoCount = errorLogs.filter((l) => l.level === "info").length;
+
+  const filtered = filter === "all" ? errorLogs : errorLogs.filter((l) => l.level === filter);
+
+  const copyLogs = useCallback((logs: typeof errorLogs) => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    const text = logs
+      .map((l) => {
+        const time = new Date(l.timestamp).toLocaleTimeString();
+        return `[${time}] [${l.level.toUpperCase()}] [${l.source}] ${l.message}${l.details ? `\n  ${l.details}` : ""}`;
+      })
+      .join("\n");
+    navigator.clipboard.writeText(text).catch(() => {});
+  }, []);
 
   const copySingleLog = useCallback((log: typeof errorLogs[number]) => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      const time = new Date(log.timestamp).toLocaleTimeString();
-      const text = `[${time}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}${log.details ? `\n${log.details}` : ""}`;
-      navigator.clipboard.writeText(text).catch(() => {});
-    }
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    const time = new Date(log.timestamp).toLocaleTimeString();
+    const text = `[${time}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}${log.details ? `\n${log.details}` : ""}`;
+    navigator.clipboard.writeText(text).catch(() => {});
   }, []);
+
+  const headerColor = errorCount > 0 ? "#FF3366" : errorLogs.length > 0 ? "#00E5FF" : "#8888AA";
 
   return (
     <View
       className="rounded-xl overflow-hidden"
       style={{
-        backgroundColor: errorLogs.length > 0 ? "rgba(255, 51, 102, 0.04)" : "rgba(0,0,0,0.02)",
+        backgroundColor: errorCount > 0 ? "rgba(255, 51, 102, 0.04)" : "rgba(0, 229, 255, 0.02)",
         borderWidth: 1,
-        borderColor: errorLogs.length > 0 ? "rgba(255, 51, 102, 0.15)" : "rgba(0,0,0,0.04)",
+        borderColor: errorCount > 0 ? "rgba(255, 51, 102, 0.15)" : "rgba(0, 229, 255, 0.1)",
       }}
     >
+      {/* Header */}
       <Pressable
         onPress={() => setExpanded(!expanded)}
         className="flex-row items-center justify-between px-4 py-3"
       >
         <View className="flex-row items-center gap-2">
-          <AlertTriangle size={13} color={errorLogs.length > 0 ? "#FF3366" : "#8888AA"} strokeWidth={1.5} />
-          <Text className="text-ink-base text-xs font-semibold">
-            Error Log
-          </Text>
-          {errorLogs.length > 0 && (
-            <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,51,102,0.15)" }}>
-              <Text style={{ fontSize: 9, color: "#FF3366", fontWeight: "700" }}>{errorLogs.length}</Text>
+          <AlertTriangle size={13} color={headerColor} strokeWidth={1.5} />
+          <Text className="text-ink-base text-xs font-semibold">Event Log</Text>
+          <View className="flex-row items-center gap-1.5">
+            {errorCount > 0 && (
+              <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,51,102,0.15)" }}>
+                <Text style={{ fontSize: 8, color: "#FF3366", fontWeight: "700" }}>{errorCount} err</Text>
+              </View>
+            )}
+            {warnCount > 0 && (
+              <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,215,0,0.12)" }}>
+                <Text style={{ fontSize: 8, color: "#B8860B", fontWeight: "700" }}>{warnCount} warn</Text>
+              </View>
+            )}
+            <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(0,229,255,0.08)" }}>
+              <Text style={{ fontSize: 8, color: "#00BCD4", fontWeight: "600" }}>{errorLogs.length} total</Text>
             </View>
-          )}
+          </View>
         </View>
         <View className="flex-row items-center gap-2">
           {errorLogs.length > 0 && (
             <>
-              <Pressable onPress={copyAllLogs} className="p-1">
+              <Pressable onPress={() => copyLogs(filtered)} className="p-1">
                 <Copy size={12} color="#8888AA" strokeWidth={1.5} />
               </Pressable>
               <Pressable onPress={clearErrorLogs} className="p-1">
@@ -336,42 +354,73 @@ const ErrorLogPanel = () => {
       </Pressable>
 
       {expanded && (
-        <View className="px-3 pb-3" style={{ maxHeight: 300 }}>
-          {errorLogs.length === 0 ? (
+        <View className="px-3 pb-3">
+          {/* Filter tabs */}
+          <View className="flex-row gap-1 mb-2">
+            {(["all", "error", "warn", "info"] as const).map((level) => {
+              const isActive = filter === level;
+              const count = level === "all" ? errorLogs.length : level === "error" ? errorCount : level === "warn" ? warnCount : infoCount;
+              const color = level === "error" ? "#FF3366" : level === "warn" ? "#FFD700" : level === "info" ? "#00E5FF" : "#666";
+              return (
+                <Pressable
+                  key={level}
+                  onPress={() => setFilter(level)}
+                  className="px-2 py-1 rounded-lg"
+                  style={{
+                    backgroundColor: isActive ? `${color}15` : "rgba(0,0,0,0.02)",
+                    borderWidth: 1,
+                    borderColor: isActive ? `${color}30` : "transparent",
+                  }}
+                >
+                  <Text style={{ fontSize: 9, color: isActive ? color : "#888", fontWeight: isActive ? "700" : "500" }}>
+                    {level.toUpperCase()} ({count})
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Log entries */}
+          {filtered.length === 0 ? (
             <View className="items-center py-4">
               <Info size={16} color="#8888AA" strokeWidth={1} />
-              <Text style={{ fontSize: 10, color: "#8888AA", marginTop: 4 }}>No errors logged</Text>
+              <Text style={{ fontSize: 10, color: "#8888AA", marginTop: 4 }}>
+                {errorLogs.length === 0 ? "No events yet — logs appear during generation" : `No ${filter} events`}
+              </Text>
             </View>
           ) : (
-            <ScrollView style={{ maxHeight: 280 }}>
-              {[...errorLogs].reverse().map((log) => {
-                const time = new Date(log.timestamp).toLocaleTimeString();
-                const levelColor = log.level === "error" ? "#FF3366" : log.level === "warn" ? "#FFD700" : "#00E5FF";
+            <ScrollView style={{ maxHeight: 350 }}>
+              {[...filtered].reverse().map((entry) => {
+                const time = new Date(entry.timestamp).toLocaleTimeString();
+                const levelColor = entry.level === "error" ? "#FF3366" : entry.level === "warn" ? "#FFD700" : "#00E5FF";
                 return (
                   <Pressable
-                    key={log.id}
-                    onPress={() => copySingleLog(log)}
-                    className="mb-2 p-2 rounded-lg"
-                    style={{ backgroundColor: "rgba(0,0,0,0.03)" }}
+                    key={entry.id}
+                    onPress={() => copySingleLog(entry)}
+                    className="mb-1.5 p-2 rounded-lg"
+                    style={{
+                      backgroundColor: entry.level === "error" ? "rgba(255,51,102,0.04)" : "rgba(0,0,0,0.02)",
+                    }}
                   >
-                    <View className="flex-row items-center gap-1.5 mb-1">
+                    <View className="flex-row items-center gap-1.5 mb-0.5">
                       <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: levelColor }} />
-                      <Text style={{ fontSize: 9, color: "#8888AA", fontFamily: "monospace" }}>{time}</Text>
-                      <Text style={{ fontSize: 9, color: levelColor, fontWeight: "600" }}>{log.level.toUpperCase()}</Text>
-                      <Text style={{ fontSize: 9, color: "#666" }}>[{log.source}]</Text>
+                      <Text style={{ fontSize: 8, color: "#8888AA", fontFamily: "monospace" }}>{time}</Text>
+                      <Text style={{ fontSize: 8, color: levelColor, fontWeight: "700" }}>{entry.level.toUpperCase()}</Text>
+                      <Text style={{ fontSize: 8, color: "#666" }}>[{entry.source}]</Text>
+                      <View className="flex-1" />
+                      <Copy size={8} color="#CCC" />
                     </View>
-                    <Text style={{ fontSize: 11, color: "#4A4A6A", lineHeight: 16 }} numberOfLines={2}>
-                      {log.message}
+                    <Text style={{ fontSize: 11, color: "#4A4A6A", lineHeight: 15 }} numberOfLines={2}>
+                      {entry.message}
                     </Text>
-                    {log.details && (
+                    {entry.details && (
                       <Text
-                        style={{ fontSize: 9, color: "#888", fontFamily: "monospace", marginTop: 3, lineHeight: 13 }}
-                        numberOfLines={4}
+                        style={{ fontSize: 9, color: "#888", fontFamily: "monospace", marginTop: 2, lineHeight: 13 }}
+                        numberOfLines={5}
                       >
-                        {log.details}
+                        {entry.details}
                       </Text>
                     )}
-                    <Text style={{ fontSize: 8, color: "#AAA", marginTop: 2 }}>tap to copy</Text>
                   </Pressable>
                 );
               })}

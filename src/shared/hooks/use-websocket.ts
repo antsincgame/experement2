@@ -133,6 +133,7 @@ const ensureConnected = (): void => {
     runtime.currentUrl = undefined;
     useProjectStore.getState().setConnected(false);
     console.log(`[WS] Closed code=${event.code} clean=${event.wasClean}`);
+    logWarn("websocket", `Disconnected (code=${event.code}, clean=${event.wasClean}), reconnecting...`);
     scheduleReconnect();
   };
 
