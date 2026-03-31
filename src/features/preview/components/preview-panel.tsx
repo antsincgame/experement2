@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Globe, RotateCw, ExternalLink, Loader } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
@@ -7,9 +8,16 @@ const PreviewPanel = () => {
   const previewPort = useProjectStore((s) => s.previewPort);
   const status = useProjectStore((s) => s.status);
   const agentUrl = useSettingsStore((s) => s.agentUrl);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
-  const previewUrl = `${agentUrl}/preview/`;
+  const proxyUrl = `${agentUrl}/preview/`;
+  const directUrl = previewPort ? `http://localhost:${previewPort}` : null;
+
+  const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const handleOpenExternal = useCallback(() => {
+    if (directUrl) window.open(directUrl, "_blank");
+  }, [directUrl]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>
@@ -28,8 +36,8 @@ const PreviewPanel = () => {
           className="h-9 px-3 flex-row items-center gap-2"
           style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.04)" }}
         >
-          <Pressable style={{ opacity: 0.5 }}>
-            <RotateCw size={12} color="#4A4A6A" strokeWidth={1.5} />
+          <Pressable onPress={handleRefresh}>
+            <RotateCw size={12} color="#00E5FF" strokeWidth={1.5} />
           </Pressable>
           <View
             className="flex-1 h-6 rounded-md px-2.5 flex-row items-center"
@@ -39,15 +47,15 @@ const PreviewPanel = () => {
               localhost:{previewPort}
             </Text>
           </View>
-          <Pressable style={{ opacity: 0.5 }}>
-            <ExternalLink size={12} color="#4A4A6A" strokeWidth={1.5} />
+          <Pressable onPress={handleOpenExternal}>
+            <ExternalLink size={12} color="#00E5FF" strokeWidth={1.5} />
           </Pressable>
         </View>
       )}
 
       {isLoading && !previewPort ? (
         <View className="flex-1 items-center justify-center">
-          <View className="w-16 h-16 rounded-full items-center justify-center animate-glow-pulse"
+          <View className="w-16 h-16 rounded-full items-center justify-center"
             style={{
               backgroundColor: "rgba(0, 229, 255, 0.08)",
               borderWidth: 2,
@@ -68,10 +76,11 @@ const PreviewPanel = () => {
         <View className="flex-1">
           {typeof window !== "undefined" && (
             <iframe
-              src={previewUrl}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              key={refreshKey}
+              src={proxyUrl}
               style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FAFAFF" }}
               title="App Preview"
+              allow="clipboard-read; clipboard-write"
             />
           )}
         </View>
