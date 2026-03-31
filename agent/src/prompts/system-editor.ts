@@ -44,6 +44,9 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 6. Use NativeWind className for all styling.
 7. TypeScript strict — no \`any\`.
 8. FORBIDDEN: local binary assets. Use @expo/vector-icons or external URLs.
+9. Icons: \`import Ionicons from "@expo/vector-icons/Ionicons"\` (default import ONLY).
+   NEVER: \`import { Home } from "@expo/vector-icons"\` — named exports don't exist!
+   className does NOT work on icons — use style prop. Wrap in Pressable for onPress.
 
 ## Response Format
 

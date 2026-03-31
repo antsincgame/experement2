@@ -395,7 +395,7 @@ export default function AppFactoryScreen() {
       </View>
 
       {/* Project List */}
-      <View className="flex-1 py-1">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 4 }}>
         {projectList.map((p) => {
           const isActive = p.name === projectName;
           return (
@@ -448,7 +448,7 @@ export default function AppFactoryScreen() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
     </View>
   );
 
