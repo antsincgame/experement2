@@ -422,7 +422,7 @@ export default function AppFactoryScreen() {
             ...(Platform.OS === "web" ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
           } as never}
         >
-          <View className="flex-row items-center gap-2.5">
+          <Pressable onPress={handleCreateNew} className="flex-row items-center gap-2.5">
             <View
               className="w-6 h-6 rounded-md items-center justify-center"
               style={{ background: "linear-gradient(135deg, #00E5FF, #7C4DFF)", backgroundColor: "#00E5FF" } as never}
@@ -441,7 +441,7 @@ export default function AppFactoryScreen() {
               }}
             />
             <Text className="text-ink-light text-[10px] uppercase tracking-wider font-medium">{status}</Text>
-          </View>
+          </Pressable>
           <View className="flex-row items-center gap-2">
             {projectName && (
               <Pressable
