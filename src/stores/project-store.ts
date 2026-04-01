@@ -1,5 +1,6 @@
 ﻿// Keeps per-project UI state synchronized across scaffold/generation and active workspace switching.
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { apiClient } from "@/shared/lib/api-client";
 import type { ChatMessage } from "@/features/chat/schemas/message.schema";
 import {
@@ -176,7 +177,7 @@ const applyProjectFileSnapshot = (
   };
 };
 
-export const useProjectStore = create<ProjectState>()((set, get) => ({
+export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   // Top-level state
   projectName: null,
   projectList: [],
@@ -446,16 +447,19 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       case "preview_ready": {
         const previewProject = msg.projectName as string | undefined;
         const currentProject = get().projectName;
-        // Only apply if this preview_ready is for the current project
         if (!previewProject || previewProject === currentProject) {
+          const prevPort = get().previewPort;
           store.setPreview(msg.proxyUrl as string, msg.port as number);
           store.setStatus("ready");
-          store.addMessage(createAssistantMessage("Preview ready! App is running."));
+          // Only show message if preview wasn't already up for this port
+          if (prevPort !== (msg.port as number)) {
+            store.addMessage(createAssistantMessage(`Preview started on port ${msg.port}.`));
+          }
           if (currentProject) {
             void fetchProjectFiles(currentProject);
           }
         }
-        log({ level: "info", source: "preview", message: `Preview ready: ${previewProject ?? "unknown"} on port ${msg.port}` });
+        log({ level: "info", source: "preview", message: `Preview: ${previewProject ?? "unknown"} → port ${msg.port}` });
         break;
       }
 
@@ -600,6 +604,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         break;
     }
   },
+}), {
+  name: "app-factory-projects",
+  storage: createJSONStorage(() => localStorage),
+  partialize: (state) => ({
+    projectList: state.projectList,
+    projectChats: state.projectChats,
+  }),
 }));
   // File fetch helper
 export const fetchProjectFiles = async (projectName: string): Promise<void> => {
