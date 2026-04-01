@@ -24,8 +24,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
     setModelsLoading(true);
     try {
       setModels(await apiClient.listLmStudioModels());
-    } catch (error) {
-      console.error("[SettingsDrawer] Failed to load models", error);
+    } catch {
       setModels([]);
     } finally {
       setModelsLoading(false);
@@ -88,8 +87,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                   .then(() => {
                     alert("Agent connected!");
                   })
-                  .catch((error) => {
-                    console.error("[SettingsDrawer] Agent connection test failed", error);
+                  .catch((error: unknown) => {
                     alert(`Agent connection FAILED. ${error instanceof Error ? error.message : String(error)}`);
                   });
               }}

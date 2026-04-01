@@ -89,7 +89,7 @@ export default function AppFactoryScreen() {
         setWelcomeInput(improvedPrompt);
       }
     } catch (error) {
-      console.error("[AppFactoryScreen] Failed to enhance prompt", error);
+      // Enhance failed — silently ignore, user can retry
     } finally {
       setEnhancing(false);
     }
@@ -119,8 +119,8 @@ export default function AppFactoryScreen() {
             createdAt: project.createdAt ?? Date.now(),
           });
         }
-      } catch (error) {
-        console.error("[AppFactoryScreen] Failed to load projects", error);
+      } catch {
+        // Agent may be offline or extension blocking fetch — non-critical
       }
     };
 

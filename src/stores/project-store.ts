@@ -612,7 +612,7 @@ export const fetchProjectFiles = async (projectName: string): Promise<void> => {
         const fileData = await apiClient.getProjectFile(projectName, filePath);
         fileContents[filePath] = fileData.content;
       } catch (error) {
-        console.error(`[fetchProjectFiles] Failed to load ${filePath}`, error);
+        // File load failed — skip silently
       }
     }
 
@@ -620,7 +620,7 @@ export const fetchProjectFiles = async (projectName: string): Promise<void> => {
       applyProjectFileSnapshot(state, projectName, fileTree, fileContents)
     );
   } catch (error) {
-    console.error(`[fetchProjectFiles] Failed to load ${projectName}`, error);
+    // Project files load failed — agent may be offline
   }
 };
 

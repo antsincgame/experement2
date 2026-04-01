@@ -64,7 +64,7 @@ const ChatInput = ({
         setText(improvedPrompt);
       }
     } catch (error) {
-      console.error("[ChatInput] Failed to enhance prompt", error);
+      // Enhance failed — silently ignore
     } finally {
       setEnhancing(false);
     }
