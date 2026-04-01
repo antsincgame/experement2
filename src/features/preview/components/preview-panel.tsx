@@ -125,7 +125,7 @@ const PreviewPanel = () => {
             </>
           )}
         </View>
-      ) : previewPort ? (
+      ) : (
         <View className="flex-1">
           {typeof window !== "undefined" && (
             <iframe

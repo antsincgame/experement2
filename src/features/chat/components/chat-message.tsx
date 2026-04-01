@@ -5,6 +5,7 @@ import {
   AlertTriangle, Wrench, Copy, ChevronUp,
 } from "lucide-react-native";
 import type { ChatMessage as Msg } from "../schemas/message.schema";
+import MarkdownRenderer from "./markdown-renderer";
 
 interface ChatMessageProps {
   message: Msg;
@@ -203,13 +204,13 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
       )}
 
       <View className="ml-8">
-        <Text
-          className={`text-sm leading-6 ${
-            isUser ? "text-ink-dark font-medium" : "text-ink-base"
-          }`}
-        >
-          {message.content}
-        </Text>
+        {isUser ? (
+          <Text className="text-sm leading-6 text-ink-dark font-medium">
+            {message.content}
+          </Text>
+        ) : (
+          <MarkdownRenderer content={message.content} />
+        )}
       </View>
     </View>
   );

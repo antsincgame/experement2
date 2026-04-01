@@ -8,7 +8,6 @@ import FileTabBar from "@/features/explorer/components/file-tab-bar";
 import ProjectSidebar from "@/features/project/components/project-sidebar";
 import PreviewPanel from "@/features/preview/components/preview-panel";
 import TerminalPanel from "@/features/terminal/components/terminal-panel";
-import WorkspaceAgents from "@/features/playground/components/workspace-agents";
 import type { FileNode, ProjectEntry } from "@/stores/project-store";
 
 interface WorkspaceLayoutProps {
@@ -79,7 +78,6 @@ const WorkspaceLayout = ({
           <CodeViewer filepath={activeFile} />
         </View>
       </View>
-      <WorkspaceAgents />
       {terminalVisible && <TerminalPanel />}
     </View>
     <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
