@@ -443,18 +443,21 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         break;
       }
 
-      case "preview_ready":
-        store.setPreview(msg.proxyUrl as string, msg.port as number);
-        store.setStatus("ready");
-        store.addMessage(createAssistantMessage("Preview ready! App is running."));
-        log({ level: "info", source: "preview", message: `Preview ready on port ${msg.port}` });
-        {
-          const pName = get().projectName;
-          if (pName) {
-            void fetchProjectFiles(pName);
+      case "preview_ready": {
+        const previewProject = msg.projectName as string | undefined;
+        const currentProject = get().projectName;
+        // Only apply if this preview_ready is for the current project
+        if (!previewProject || previewProject === currentProject) {
+          store.setPreview(msg.proxyUrl as string, msg.port as number);
+          store.setStatus("ready");
+          store.addMessage(createAssistantMessage("Preview ready! App is running."));
+          if (currentProject) {
+            void fetchProjectFiles(currentProject);
           }
         }
+        log({ level: "info", source: "preview", message: `Preview ready: ${previewProject ?? "unknown"} on port ${msg.port}` });
         break;
+      }
 
       case "thinking":
         store.addMessage(createAssistantMessage(msg.content as string));

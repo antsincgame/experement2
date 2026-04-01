@@ -248,12 +248,13 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
     case "start_preview": {
       console.log("[WS] Start preview:", message.projectName);
 
-      // Fast path: if project is already running, just switch the proxy
-      const existingPort = getActivePort(message.projectName as string);
+      // Fast path: if project is already running, just register the port
+      const pName = message.projectName as string;
+      const existingPort = getActivePort(pName);
       if (existingPort) {
-        console.log(`[WS] Project ${message.projectName} already running on port ${existingPort}, switching proxy`);
-        setPreviewPort(existingPort);
-        broadcast({ type: "preview_ready", port: existingPort, proxyUrl: "/preview/" });
+        console.log(`[WS] Project ${pName} already running on port ${existingPort}`);
+        setPreviewPort(pName, existingPort);
+        broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
         broadcast({ type: "status", status: "ready" });
         return;
       }
@@ -335,8 +336,8 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             }
           });
 
-          setPreviewPort(port);
-          broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
+          setPreviewPort(message.projectName as string, port);
+          broadcast({ type: "preview_ready", port, projectName: message.projectName, proxyUrl: `/preview/${encodeURIComponent(message.projectName as string)}/` });
           broadcast({ type: "status", status: "ready" });
         }
       );

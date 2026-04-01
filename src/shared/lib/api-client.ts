@@ -134,8 +134,11 @@ class ApiClient {
     return toWebSocketUrl(this.getAgentUrl());
   }
 
-  getPreviewProxyUrl(): string {
-    return this.buildUrl(this.getAgentUrl(), "/preview/");
+  getPreviewProxyUrl(projectName?: string): string {
+    const path = projectName
+      ? `/preview/${encodeURIComponent(projectName)}/`
+      : "/preview/";
+    return this.buildUrl(this.getAgentUrl(), path);
   }
 
   getProjectExportUrl(projectName: string): string {

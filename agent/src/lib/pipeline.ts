@@ -361,8 +361,8 @@ export const createProject = async (
     broadcast({ type: "status", status: buildError ? "error" : "ready" });
   }
 
-  setPreviewPort(expoPort || null);
-  broadcast({ type: "preview_ready", port: expoPort, proxyUrl: "/preview/" });
+  setPreviewPort(projectSlug, expoPort || null);
+  broadcast({ type: "preview_ready", port: expoPort, projectName: projectSlug, proxyUrl: `/preview/${encodeURIComponent(projectSlug)}/` });
 
   // Git commit the successful state
   if (buildSuccess) {
@@ -486,8 +486,8 @@ export const revertVersion = async (
     await startExpoClearCache(projectName, projectPath, port, (event) => {
       broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
     });
-    setPreviewPort(port);
-    broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
+    setPreviewPort(projectName, port);
+    broadcast({ type: "preview_ready", port, projectName, proxyUrl: `/preview/${encodeURIComponent(projectName)}/` });
   } else {
     broadcast({ type: "status", status: "ready" });
   }
