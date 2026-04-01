@@ -23,7 +23,7 @@ export interface CommandResult {
 const activeProcesses = new Map<string, ManagedProcess>();
 
 // Max concurrent expo processes to prevent OOM
-const MAX_ACTIVE_EXPO = 3;
+const MAX_ACTIVE_EXPO = 5;
 
 const evictOldestIfNeeded = (): void => {
   if (activeProcesses.size < MAX_ACTIVE_EXPO) return;

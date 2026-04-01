@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { getRootLayout, getTabsLayout } from "./templates.js";
 
 describe("templates", () => {
-  it("creates a slot-based root layout for tabs", () => {
+  it("creates a stack-based root layout for tabs", () => {
     const layout = getRootLayout({
       type: "tabs",
       screens: [{ path: "app/(tabs)/index.tsx", name: "Home", icon: "home-outline" }],
     });
 
-    expect(layout).toContain('import { Slot } from "expo-router";');
-    expect(layout).not.toContain('import { Tabs } from "expo-router";');
+    expect(layout).toContain('import { Stack } from "expo-router";');
+    expect(layout).toContain("headerShown: false");
   });
 
   it("creates tabs from the navigation screens", () => {

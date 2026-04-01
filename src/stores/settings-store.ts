@@ -44,7 +44,7 @@ export const useSettingsStore = create<SettingsState>()(
       lmStudioUrl: LM_STUDIO_DEFAULT_URL,
       model: "",
       temperature: 0.4,
-      maxTokens: 32768,
+      maxTokens: 65536,
       maxContextTokens: 65536,
       agentUrl: AGENT_HTTP_URL,
       enhancerModel: "",

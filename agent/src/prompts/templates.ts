@@ -21,22 +21,7 @@ export const getRootLayout = (
 ): string => {
   const navType: SupportedNavigationType = navigation?.type ?? "stack";
 
-  if (navType === "tabs") {
-    return `import "../src/global.css";
-import { Slot } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-
-export default function RootLayout() {
-  return (
-    <>
-      <StatusBar style="dark" />
-      <Slot />
-    </>
-  );
-}
-`;
-  }
-
+  // Both tabs and stack use <Stack> as root — Expo Router auto-discovers (tabs) group
   return `import "../src/global.css";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -44,13 +29,8 @@ import { StatusBar } from "expo-status-bar";
 export default function RootLayout() {
   return (
     <>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: "#FAFAFA" },
-        }}
-      />
+      <StatusBar style="${navType === "tabs" ? "dark" : "dark"}" />
+      <Stack screenOptions={{ headerShown: false }} />
     </>
   );
 }
