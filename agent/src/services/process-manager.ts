@@ -84,7 +84,7 @@ export const startExpo = async (
   const port = await findFreePort();
 
   const npxCmd = isWindows ? "npx.cmd" : "npx";
-  const child = spawn(npxCmd, ["expo", "start", "--web", "--port", String(port)], {
+  const child = spawn(npxCmd, ["expo", "start", "--web", "--port", String(port), "--clear"], {
     cwd: projectPath,
     env: { ...process.env, BROWSER: "none" },
     shell: isWindows,
