@@ -51,6 +51,8 @@ export default function AppFactoryScreen() {
   const activeFile = useProjectStore((s) => s.activeFile);
   const fileTreeVisible = useProjectStore((s) => s.fileTreeVisible);
   const terminalVisible = useProjectStore((s) => s.terminalVisible);
+  const generationProgress = useProjectStore((s) => s.generationProgress);
+  const currentGeneratingFile = useProjectStore((s) => s.currentGeneratingFile);
   const projectList = useProjectStore((s) => s.projectList);
   const addMessage = useProjectStore((s) => s.addMessage);
   const addProject = useProjectStore((s) => s.addProject);
@@ -441,6 +443,16 @@ export default function AppFactoryScreen() {
               }}
             />
             <Text className="text-ink-light text-[10px] uppercase tracking-wider font-medium">{status}</Text>
+            {currentGeneratingFile && !["idle", "ready", "error"].includes(status) && (
+              <Text style={{ fontSize: 10, color: "#00BCD4", fontFamily: "monospace", marginLeft: 6 }} numberOfLines={1}>
+                {currentGeneratingFile}
+              </Text>
+            )}
+            {generationProgress > 0 && generationProgress < 1 && (
+              <Text style={{ fontSize: 9, color: "#888", fontWeight: "600", marginLeft: 4 }}>
+                {Math.round(generationProgress * 100)}%
+              </Text>
+            )}
           </Pressable>
           <View className="flex-row items-center gap-2">
             {projectName && (
@@ -461,6 +473,20 @@ export default function AppFactoryScreen() {
             </Pressable>
           </View>
         </View>
+
+        {/* Progress bar under header */}
+        {generationProgress > 0 && generationProgress < 1 && (
+          <View style={{ height: 2, backgroundColor: "rgba(0,0,0,0.04)" }}>
+            <View
+              style={{
+                height: "100%",
+                width: `${generationProgress * 100}%`,
+                backgroundColor: "#00E5FF",
+                ...(Platform.OS === "web" ? { transition: "width 0.3s ease" } : {}),
+              } as never}
+            />
+          </View>
+        )}
 
         <WorkspaceLayout
           activeFile={activeFile}

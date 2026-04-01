@@ -33,6 +33,7 @@ interface EditorOptions {
   maxTokens?: number;
   onThinking?: (text: string) => void;
   onBlock?: (block: SearchReplaceBlock) => void;
+  onDiff?: (filepath: string, before: string, after: string) => void;
   onAnalysis?: (action: EditAction) => void;
 }
 
@@ -56,6 +57,7 @@ export const editProject = async (
     maxTokens,
     onThinking,
     onBlock,
+    onDiff,
     onAnalysis,
   } = options;
 
@@ -184,6 +186,7 @@ export const editProject = async (
       );
 
       if (result) {
+        onDiff?.(block.filepath, currentContent, result);
         writeFile(projectName, block.filepath, result);
         appliedBlocks++;
       } else {
@@ -191,6 +194,7 @@ export const editProject = async (
         failedBlocks++;
       }
     } else if (block.type === "new_file" && block.content) {
+      onDiff?.(block.filepath, "", block.content);
       writeFile(projectName, block.filepath, block.content);
       appliedBlocks++;
     } else if (block.type === "delete") {

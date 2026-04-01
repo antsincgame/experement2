@@ -400,6 +400,8 @@ export const iterateProject = async (
       }),
     onBlock: (block) =>
       broadcast({ type: "block_applied", filepath: block.filepath, blockType: block.type }),
+    onDiff: (filepath, before, after) =>
+      broadcast({ type: "file_diff", filepath, before: before.slice(0, 5000), after: after.slice(0, 5000) }),
   });
 
   if (result.appliedBlocks > 0) {
