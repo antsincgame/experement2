@@ -148,6 +148,16 @@ const MatrixRain = () => {
 
     rafRef.current = requestAnimationFrame(draw);
 
+    // Pause when tab is hidden to save CPU
+    const handleVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(rafRef.current);
+      } else {
+        rafRef.current = requestAnimationFrame(draw);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     const resizeObserver = new ResizeObserver(() => {
       setupCanvas();
       // Re-clear on resize
@@ -163,6 +173,7 @@ const MatrixRain = () => {
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
       resizeObserver.disconnect();
       if (canvas.parentNode) {
         canvas.parentNode.removeChild(canvas);

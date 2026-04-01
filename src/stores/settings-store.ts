@@ -62,7 +62,7 @@ export const useSettingsStore = create<SettingsState>()(
       addErrorLog: (entry) =>
         set((s) => ({
           errorLogs: [
-            ...s.errorLogs.slice(-499),
+            ...s.errorLogs.slice(-199),
             { ...entry, id: crypto.randomUUID(), timestamp: Date.now() },
           ],
         })),
@@ -71,6 +71,10 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "app-factory-settings",
       storage: createJSONStorage(() => localStorage),
+      partialize: (state) => {
+        const { errorLogs: _logs, addErrorLog: _add, clearErrorLogs: _clear, ...persisted } = state;
+        return persisted;
+      },
     }
   )
 );

@@ -87,29 +87,43 @@ const PreviewPanel = () => {
         </View>
       )}
 
-      {isLoading && !previewPort ? (
+      {!previewPort ? (
         <View className="flex-1 items-center justify-center">
-          <View
-            className="w-16 h-16 rounded-full items-center justify-center"
-            style={{
-              backgroundColor: "rgba(0, 229, 255, 0.08)",
-              borderWidth: 2,
-              borderColor: "rgba(0, 229, 255, 0.2)",
-            }}
-          >
-            <Loader size={24} color="#00E5FF" strokeWidth={1.5} />
-          </View>
-          <Text className="text-neon-cyan text-xs mt-4 uppercase tracking-widest font-semibold">
-            {status === "planning"
-              ? "Planning..."
-              : status === "scaffolding"
-                ? "Scaffolding..."
-                : status === "generating"
-                  ? "Generating..."
-                  : status === "building"
-                    ? "Building..."
-                    : "Processing..."}
-          </Text>
+          {isLoading || projectName ? (
+            <>
+              <View
+                className="w-16 h-16 rounded-full items-center justify-center"
+                style={{
+                  backgroundColor: "rgba(0, 229, 255, 0.08)",
+                  borderWidth: 2,
+                  borderColor: "rgba(0, 229, 255, 0.2)",
+                }}
+              >
+                <Loader size={24} color="#00E5FF" strokeWidth={1.5} />
+              </View>
+              <Text className="text-neon-cyan text-xs mt-4 uppercase tracking-widest font-semibold">
+                {status === "planning"
+                  ? "Planning..."
+                  : status === "scaffolding"
+                    ? "Scaffolding..."
+                    : status === "generating"
+                      ? "Generating..."
+                      : "Starting preview..."}
+              </Text>
+            </>
+          ) : (
+            <>
+              <View
+                className="w-14 h-14 rounded-2xl items-center justify-center mb-3"
+                style={{ backgroundColor: "rgba(0, 229, 255, 0.08)" }}
+              >
+                <Globe size={24} color="#00E5FF" strokeWidth={1} />
+              </View>
+              <Text className="text-ink-light text-xs text-center leading-5">
+                Preview appears here{"\n"}after generation
+              </Text>
+            </>
+          )}
         </View>
       ) : previewPort ? (
         <View className="flex-1">
@@ -122,18 +136,6 @@ const PreviewPanel = () => {
               allow="clipboard-read; clipboard-write"
             />
           )}
-        </View>
-      ) : (
-        <View className="flex-1 items-center justify-center px-6">
-          <View
-            className="w-14 h-14 rounded-2xl items-center justify-center mb-3"
-            style={{ backgroundColor: "rgba(0, 229, 255, 0.08)" }}
-          >
-            <Globe size={24} color="#00E5FF" strokeWidth={1} />
-          </View>
-          <Text className="text-ink-light text-xs text-center leading-5">
-            Preview appears here{"\n"}after generation
-          </Text>
         </View>
       )}
     </View>
