@@ -141,7 +141,7 @@ export const streamCompletion = async (
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.4,
-    max_tokens: options.maxTokens ?? 32768,
+    max_tokens: options.maxTokens ?? 65536,
     stream: true,
     ...(resolvedModel ? { model: resolvedModel } : {}),
   };
@@ -226,7 +226,7 @@ export const completeNonStreaming = async (
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.3,
-    max_tokens: options.maxTokens ?? 32768,
+    max_tokens: options.maxTokens ?? 65536,
     stream: false,
     ...(resolvedModel ? { model: resolvedModel } : {}),
   };

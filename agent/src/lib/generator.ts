@@ -262,7 +262,7 @@ Generate the complete code for: ${fileSpec.path}`;
 
     const generator = await streamCompletion(messages, {
       temperature: temperature ?? 0.4,
-      maxTokens: maxTokens ?? 32768,
+      maxTokens: maxTokens ?? 65536,
       lmStudioUrl,
       model,
     });
