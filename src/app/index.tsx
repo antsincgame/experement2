@@ -129,7 +129,10 @@ export default function AppFactoryScreen() {
     void loadProjects();
   }, [agentUrl]);
 
-  const isWorkspace = projectName !== null || !["idle", "error"].includes(status);
+  // Show welcome screen if no active generation/building in progress
+  // Even if projectName is persisted, let user start fresh from welcome
+  const isActivelyWorking = !["idle", "ready", "error"].includes(status);
+  const isWorkspace = isActivelyWorking || (projectName !== null && status !== "idle");
 
   // ALL hooks must be before any early return (React rules of hooks)
   const handleCreateNew = useCallback(() => {
@@ -151,6 +154,7 @@ export default function AppFactoryScreen() {
 
   const handleCreate = useCallback(
     (text: string) => {
+      setProjectName(null); // Reset to ensure new project, not iterate on old
       setStatus("planning");
       createProject(text);
     },
