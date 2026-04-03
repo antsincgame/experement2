@@ -14,6 +14,7 @@ import {
   REQUIRED_TEMPLATE_FILES,
   type SupportedNavigationType,
 } from "./generation-contract.js";
+import { type ExportContract } from "./context-builder.js";
 
 export interface ValidationIssue {
   code: string;
@@ -309,8 +310,6 @@ export const validateGeneratedProject = (
 };
 
 // ── JSON Contract Validation ──
-
-import { extractExportContracts, type ExportContract } from "./context-builder.js";
 
 export interface ContractViolation {
   filePath: string;

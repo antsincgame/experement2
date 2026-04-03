@@ -12,14 +12,15 @@ import {
   runTypecheck,
   runWebExport,
 } from "../services/process-manager.js";
-import { getProjectPath } from "../services/file-manager.js";
+import { getProjectPath, readFile as readProjectFile } from "../services/file-manager.js";
 import { parseMetroError } from "../services/log-watcher.js";
 import { planApp } from "./planner.js";
-import { generateFiles } from "./generator.js";
+import { generateFiles, regenerateFileWithContracts } from "./generator.js";
 import { editProject } from "./editor.js";
 import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
-import { validateGeneratedProject } from "./project-validator.js";
+import { validateGeneratedProject, validateFileContracts } from "./project-validator.js";
+import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
 
 interface CreateOptions {
@@ -266,17 +267,12 @@ export const createProject = async (
 
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
-    const { extractExportContracts: extractContracts } = await import("./context-builder.js");
-    const { validateFileContracts } = await import("./project-validator.js");
-    const { regenerateFileWithContracts } = await import("./generator.js");
-    const { readFile: readProjectFile } = await import("../services/file-manager.js");
-
     const MAX_CONTRACT_RETRIES = 2;
 
     // Build contracts from all generated files
-    const allContracts: Record<string, import("./context-builder.js").ExportContract[]> = {};
+    const allContracts: Record<string, ExportContract[]> = {};
     for (const fp of files) {
-      const contracts = extractContracts(path.join(projectPath, fp));
+      const contracts = extractExportContracts(path.join(projectPath, fp));
       if (contracts) allContracts[fp] = contracts;
     }
 
@@ -306,7 +302,7 @@ export const createProject = async (
         );
 
         // Re-extract contracts after fix
-        const updatedContracts = extractContracts(path.join(projectPath, fp));
+        const updatedContracts = extractExportContracts(path.join(projectPath, fp));
         if (updatedContracts) allContracts[fp] = updatedContracts;
       }
     }

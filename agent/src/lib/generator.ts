@@ -5,6 +5,7 @@ import { writeFile, readFile } from "../services/file-manager.js";
 import path from "path";
 import { buildProjectSkeleton, extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
+import type { ContractViolation } from "./project-validator.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import {
   BOILERPLATE_TEMPLATES,
@@ -307,8 +308,6 @@ Generate the complete code for: ${fileSpec.path}`;
 };
 
 // ── Contract Auto-Fix: regenerate a single file with violation context ──
-
-import type { ContractViolation } from "./project-validator.js";
 
 export const regenerateFileWithContracts = async (
   projectName: string,
