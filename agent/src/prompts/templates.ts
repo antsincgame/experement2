@@ -14,7 +14,7 @@ const getScreenRouteName = (routePath: string): string => {
 const getScreenTitle = (screenName: string): string =>
   screenName.trim().length > 0 ? screenName.trim() : "Screen";
 
-const getScreenIcon = (icon?: string): string => icon?.trim() || "ellipse-outline";
+const getScreenIcon = (icon?: string): string => icon?.trim() || "circle";
 
 export const getRootLayout = (
   navigation: AppPlan["navigation"]

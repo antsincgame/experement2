@@ -12,7 +12,7 @@ Your task: create a detailed JSON plan for the app described by the user.
 ## Tech Stack (MANDATORY)
 - Expo SDK 55 + Expo Router (file-based routing in app/ directory)
 - React Native with TypeScript strict mode
-- NativeWind v4 (Tailwind CSS classes via className prop)
+- StyleSheet.create for ALL styling (NOT NativeWind/className)
 - Functional components only, hooks for state
 
 ## Rules
@@ -23,7 +23,18 @@ Your task: create a detailed JSON plan for the app described by the user.
 5. Types go in src/types/
 6. Utils go in src/lib/
 7. Stores go in src/stores/ (use Zustand if state management needed)
-8. Use NativeWind className for ALL styling — NO StyleSheet.create
+8. Use StyleSheet.create for ALL styling — NO NativeWind className
+
+## Design Requirements
+- Modern iOS-like interface with cards, soft shadows, and Indigo accent (#6366F1)
+- Background: #F8FAFC, Cards: #FFFFFF with borderRadius: 20
+- Large tappable buttons (height: 56, borderRadius: 28)
+- Use Feather icons (@expo/vector-icons/Feather) for clean look
+- NEVER build manual bottom tabs — use expo-router <Tabs>
+
+## Anti-Hallucination Rules for Types
+- Use TypeScript string unions (type Mode = 'work' | 'break'), NOT enums
+- Zustand stores: export named (export const useStore = create(...))
 9. NEVER reference local binary assets (images, fonts). Use:
    - ${ICON_CONTRACT.defaultImportPath} for icons
    - External URLs (picsum.photos, via.placeholder.com) for placeholder images

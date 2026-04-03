@@ -12,8 +12,8 @@ export const PATH_ALIAS = {
 
 export const ICON_CONTRACT = {
   packageName: "@expo/vector-icons",
-  defaultImportName: "Ionicons",
-  defaultImportPath: "@expo/vector-icons/Ionicons",
+  defaultImportName: "Feather",
+  defaultImportPath: "@expo/vector-icons/Feather",
 } as const;
 
 export const VECTOR_ICON_IMPORT_PATHS: Record<string, string> = {
