@@ -169,6 +169,8 @@ export const killExpo = (projectName: string): void => {
   activeProcesses.delete(projectName);
 };
 
+const NPM_INSTALL_TIMEOUT_MS = 120_000; // 2 minutes
+
 export const npmInstall = async (
   projectPath: string,
   packages?: string[]
@@ -179,11 +181,20 @@ export const npmInstall = async (
     : ["install"];
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+
     const child = spawn(npmCmd, args, {
       cwd: projectPath,
       shell: isWindows,
       stdio: ["ignore", "pipe", "pipe"],
     });
+
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      killProcess(child);
+      reject(new Error(`npm install timed out after ${NPM_INSTALL_TIMEOUT_MS / 1000}s`));
+    }, NPM_INSTALL_TIMEOUT_MS);
 
     let stderr = "";
 
@@ -192,6 +203,9 @@ export const npmInstall = async (
     });
 
     child.on("exit", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       if (code === 0) {
         resolve();
       } else {
@@ -199,7 +213,12 @@ export const npmInstall = async (
       }
     });
 
-    child.on("error", reject);
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(err);
+    });
   });
 };
 

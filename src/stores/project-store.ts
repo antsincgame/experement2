@@ -250,10 +250,12 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
 
   setFileContent: (path, content) =>
     set((s) => {
-      const updated = { ...s.fileContents, [path]: content };
-      const keys = Object.keys(updated);
-      if (keys.length > 40) { for (const k of keys.slice(0, keys.length - 40)) delete updated[k]; }
-      return { fileContents: updated, projectChats: saveToChats(s.projectChats, s.projectName, { fileContents: updated }) };
+      const merged = { ...s.fileContents, [path]: content };
+      const keys = Object.keys(merged);
+      const fileContents = keys.length > 40
+        ? Object.fromEntries(keys.slice(keys.length - 40).map((k) => [k, merged[k]]))
+        : merged;
+      return { fileContents, projectChats: saveToChats(s.projectChats, s.projectName, { fileContents }) };
     }),
 
   addVersion: (version) =>

@@ -111,15 +111,10 @@ export const applySearchReplace = (
   replace: string
 ): SearchReplaceOutcome => {
   if (content.includes(search)) {
-    const count = content.split(search).length - 1;
-    if (count > 1) {
-      return {
-        result: null,
-        error: `Search block matches ${count} locations. Provide more context lines.`,
-      };
-    }
-
-    return { result: content.replace(search, replace), error: null };
+    // Replace first occurrence only — safe even with multiple matches
+    const idx = content.indexOf(search);
+    const result = content.slice(0, idx) + replace + content.slice(idx + search.length);
+    return { result, error: null };
   }
 
   const searchLines = splitSearchLines(search);

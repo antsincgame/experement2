@@ -175,15 +175,21 @@ export const useWebSocket = () => {
   const isConnected = useProjectStore((state) => state.isConnected);
 
   const send = useCallback((message: Record<string, unknown>): boolean => {
-    const socket = getRuntime().socket;
+    const runtime = getRuntime();
+    const socket = runtime.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-      console.warn("[WS] Not connected, retrying connection");
       ensureConnected();
       return false;
     }
 
-    socket.send(JSON.stringify(message));
-    return true;
+    try {
+      socket.send(JSON.stringify(message));
+      return true;
+    } catch {
+      // Socket may have closed between readyState check and send
+      ensureConnected();
+      return false;
+    }
   }, []);
 
   const createProject = useCallback((description: string) => {

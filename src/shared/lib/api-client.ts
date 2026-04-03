@@ -98,7 +98,11 @@ class ApiClient {
       throw await this.buildError(response);
     }
 
-    return response.json() as Promise<T>;
+    try {
+      return await response.json() as T;
+    } catch {
+      throw new Error(`Invalid JSON response from ${url}`);
+    }
   }
 
   async getData<T>(

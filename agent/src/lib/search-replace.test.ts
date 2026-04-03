@@ -40,14 +40,14 @@ describe("applySearchReplace", () => {
     expect(result).toContain("const value = 2;");
   });
 
-  it("rejects ambiguous exact matches", () => {
+  it("replaces first occurrence when multiple exact matches exist", () => {
     const { result, error } = applySearchReplace(
       "const value = 1;\nconst value = 1;\n",
       "const value = 1;",
       "const value = 2;"
     );
 
-    expect(result).toBeNull();
-    expect(error).toContain("matches 2 locations");
+    expect(error).toBeNull();
+    expect(result).toBe("const value = 2;\nconst value = 1;\n");
   });
 });

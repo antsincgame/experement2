@@ -79,7 +79,7 @@ export const handlePreviewRequest = (
   // Extract project name from URL: /preview/:projectName/...
   const pathAfterPreview = req.path; // already stripped of /preview by Express mount
   const segments = pathAfterPreview.split("/").filter(Boolean);
-  const projectName = segments[0];
+  const projectName = segments[0] ? decodeURIComponent(segments[0]) : undefined;
 
   if (!projectName) {
     // Legacy fallback: if no project name, try first available

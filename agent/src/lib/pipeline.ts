@@ -341,6 +341,11 @@ export const createProject = async (
     buildSuccess = false;
     buildError = null;
     await waitForBuildOutcome(30000, () => buildSuccess || Boolean(buildError));
+
+    if (!buildSuccess && !buildError) {
+      broadcast({ type: "autofix_failed", attempts: autoFixAttempts, error: "Metro recompile timed out after fix" });
+      break;
+    }
   }
 
   if (buildSuccess) {

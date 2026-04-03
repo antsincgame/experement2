@@ -23,8 +23,8 @@ export const repairJson = (raw: string): string => {
     }
   }
 
-  // Remove single-line comments (// ...) but not inside strings
-  text = text.replace(/^(\s*)\/\/.*$/gm, "$1");
+  // Remove standalone comment lines (lines starting with //, ignoring lines with quotes which likely contain URLs)
+  text = text.replace(/^(\s*)\/\/(?!.*["']).*$/gm, "$1");
 
   // Fix trailing commas: ,] or ,}
   text = text.replace(/,\s*([\]}])/g, "$1");
