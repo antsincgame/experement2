@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { useKeyboardShortcuts } from "@/shared/hooks/use-keyboard-shortcuts";
+import ErrorBoundary from "@/shared/components/error-boundary";
 
 const AppShell = () => {
   useWebSocket();
@@ -14,16 +15,18 @@ const AppShell = () => {
 
 export default function RootLayout() {
   return (
-    <View style={{ flex: 1, backgroundColor: "#F0F0FF" }}>
-      <StatusBar style="dark" />
-      <AppShell />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: "transparent" },
-          animation: "fade",
-        }}
-      />
-    </View>
+    <ErrorBoundary fallbackLabel="App Factory crashed">
+      <View style={{ flex: 1, backgroundColor: "#F0F0FF" }}>
+        <StatusBar style="dark" />
+        <AppShell />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: "transparent" },
+            animation: "fade",
+          }}
+        />
+      </View>
+    </ErrorBoundary>
   );
 }

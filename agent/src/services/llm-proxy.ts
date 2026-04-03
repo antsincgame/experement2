@@ -111,6 +111,8 @@ interface CompletionRequest {
 }
 
 const activeControllers = new Map<string, AbortController>();
+const MAX_CONCURRENT_LLM_REQUESTS = 3;
+let activeRequestCount = 0;
 
 export const streamCompletion = async (
   messages: ChatMessage[],
@@ -123,6 +125,11 @@ export const streamCompletion = async (
     taskId?: string;
   } = {}
 ): Promise<AsyncGenerator<string>> => {
+  if (activeRequestCount >= MAX_CONCURRENT_LLM_REQUESTS) {
+    throw new Error(`Too many concurrent LLM requests (max ${MAX_CONCURRENT_LLM_REQUESTS})`);
+  }
+  activeRequestCount++;
+
   const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
   const controller = new AbortController();
   const taskId = options.taskId ?? crypto.randomUUID();
@@ -152,12 +159,14 @@ export const streamCompletion = async (
 
   if (!response.ok) {
     activeControllers.delete(taskId);
+    activeRequestCount = Math.max(0, activeRequestCount - 1);
     const errorText = await response.text();
     throw new Error(`LM Studio error (${response.status}): ${errorText}`);
   }
 
   if (!response.body) {
     activeControllers.delete(taskId);
+    activeRequestCount = Math.max(0, activeRequestCount - 1);
     throw new Error("LM Studio returned no body");
   }
 
@@ -194,6 +203,7 @@ export const streamCompletion = async (
     } finally {
       reader.releaseLock();
       activeControllers.delete(taskId);
+      activeRequestCount = Math.max(0, activeRequestCount - 1);
     }
   }
 

@@ -58,7 +58,7 @@ interface GateResult {
   errors: string[];
 }
 
-const GIT_HASH_PATTERN = /^[a-f0-9]{4,64}$/i;
+const GIT_HASH_PATTERN = /^[a-f0-9]{7,64}$/i;
 
 const runGitCommand = (
   projectPath: string,
@@ -103,7 +103,7 @@ const gitInit = (projectPath: string): void => {
     runGitCommand(projectPath, ["add", "-A"]);
     runGitCommand(projectPath, ["commit", "-m", "v1: initial generation"]);
   } catch (err) {
-    console.error("[Pipeline] git init failed:", err);
+    console.warn("[Pipeline] git init failed:", err);
   }
 };
 

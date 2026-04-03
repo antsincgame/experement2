@@ -100,8 +100,8 @@ export const LlmCompleteBodySchema = z.object({
 });
 
 const CommitHashSchema = z.string().trim().regex(
-  /^[a-f0-9]{4,64}$/i,
-  "commitHash must be a short git hash"
+  /^[a-f0-9]{7,64}$/i,
+  "commitHash must be a git hash (7-64 hex chars)"
 );
 
 export const WsAbortGenerationSchema = z.object({
