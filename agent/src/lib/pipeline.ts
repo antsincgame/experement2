@@ -1,6 +1,7 @@
 // Verifies generated projects with deterministic validation gates and event-bus updates before previewing.
 import { spawnSync } from "child_process";
 import fs from "fs";
+import path from "path";
 import { broadcast, setPreviewPort } from "./event-bus.js";
 import { createProjectFromCache } from "../services/template-cache.js";
 import {
