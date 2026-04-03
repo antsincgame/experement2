@@ -315,6 +315,16 @@ Generate the complete code for: ${fileSpec.path}`;
     }
   }
 
+  // Check for truncated files (missing // EOF marker)
+  for (const fp of generatedFiles) {
+    if (AUTO_LAYOUT_FILES.has(fp)) continue;
+    const content = readFile(projectName, fp);
+    if (content && !content.includes("// EOF")) {
+      // File may be truncated — strip marker if present elsewhere and note it
+      // For now just log, Fixer will handle in contract validation step
+    }
+  }
+
   return generatedFiles;
 };
 

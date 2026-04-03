@@ -124,6 +124,7 @@ export default function TabLayout() {
 8. Keep files under 200 lines.
 9. No local binary assets. Icons from ${ICON_CONTRACT.defaultImportPath} only.
 10. Do not generate drawer navigation. Use only supported navigation types.
+11. ALWAYS write \`// EOF\` as the very last line of every file. This marks the file as complete.
 
 ## PRE-FLIGHT CHECKLIST (verify before output)
 □ No \`${PATH_ALIAS.importPrefix}src/\` paths (use \`${PATH_ALIAS.importPrefix}\` directly)
