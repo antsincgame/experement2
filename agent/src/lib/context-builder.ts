@@ -1,6 +1,114 @@
-import { Project, type SourceFile } from "ts-morph";
+import { Project, Node, SyntaxKind, type SourceFile } from "ts-morph";
 import path from "path";
 import fs from "fs";
+
+// ── JSON Export Contracts ──
+
+export interface ExportContractParam {
+  name: string;
+  type: string;
+}
+
+export interface ExportContract {
+  name: string;
+  isDefaultExport: boolean;
+  kind: "function" | "component" | "hook" | "constant" | "type" | "interface";
+  params: ExportContractParam[];
+  returnType: string;
+  returnObjectKeys: string[];
+  propsInterface: string | null;
+}
+
+/** Extract structured JSON export contracts from a generated file using ts-morph */
+export const extractExportContracts = (filePath: string): ExportContract[] | null => {
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    const project = new Project({ compilerOptions: { strict: true, skipLibCheck: true } });
+    const sf = project.addSourceFileAtPath(filePath);
+    const contracts: ExportContract[] = [];
+
+    for (const [name, declarations] of sf.getExportedDeclarations()) {
+      const decl = declarations[0];
+      if (!decl) continue;
+
+      const isDefault = name === "default";
+      const actualName = Node.hasName(decl) ? (decl as { getName(): string }).getName() : (isDefault ? "defaultExport" : name);
+
+      let kind: ExportContract["kind"] = "constant";
+      let returnTypeStr = "";
+      let returnObjectKeys: string[] = [];
+      let propsInterface: string | null = null;
+      let params: ExportContractParam[] = [];
+
+      if (Node.isFunctionDeclaration(decl) || Node.isVariableDeclaration(decl)) {
+        const funcNode = Node.isVariableDeclaration(decl)
+          ? decl.getInitializerIfKind(SyntaxKind.ArrowFunction)
+          : decl;
+
+        if (funcNode && (Node.isFunctionDeclaration(funcNode) || Node.isArrowFunction(funcNode))) {
+          const returnType = funcNode.getReturnType();
+          returnTypeStr = returnType.getText(funcNode).slice(0, 300);
+
+          // Determine kind
+          if (actualName.startsWith("use")) {
+            kind = "hook";
+          } else if (/^[A-Z]/.test(actualName) && (returnTypeStr.includes("JSX") || returnTypeStr.includes("ReactNode") || returnTypeStr.includes("Element"))) {
+            kind = "component";
+          } else {
+            kind = "function";
+          }
+
+          // Extract params
+          params = funcNode.getParameters().map((p) => ({
+            name: p.getName(),
+            type: p.getType().getText(funcNode).slice(0, 100),
+          }));
+
+          // Extract return object keys (for hooks returning objects)
+          const baseType = returnType.isPromise() ? (returnType.getTypeArguments()[0] ?? returnType) : returnType;
+          if (baseType.isObject() && !baseType.isArray() && !returnTypeStr.includes("Element")) {
+            returnObjectKeys = baseType.getProperties().map((p) => p.getName());
+          }
+        }
+      } else if (Node.isInterfaceDeclaration(decl)) {
+        kind = "interface";
+        const members = decl.getProperties().map((p) => `${p.getName()}: ${p.getType().getText(p)}`).join("; ");
+        returnTypeStr = `{ ${members} }`;
+      } else if (Node.isTypeAliasDeclaration(decl)) {
+        kind = "type";
+        returnTypeStr = decl.getType().getText(decl).slice(0, 300);
+      }
+
+      // Find Props interface for components
+      if (kind === "component") {
+        const propsInt = sf.getInterfaces().find((i) =>
+          i.getName().endsWith("Props")
+        );
+        if (propsInt) {
+          const members = propsInt.getProperties().map((p) => `${p.getName()}: ${p.getType().getText(p)}`).join("; ");
+          propsInterface = `{ ${members} }`;
+        }
+      }
+
+      contracts.push({
+        name: actualName,
+        isDefaultExport: isDefault,
+        kind,
+        params,
+        returnType: returnTypeStr,
+        returnObjectKeys,
+        propsInterface,
+      });
+    }
+
+    return contracts.length > 0 ? contracts : null;
+  } catch {
+    return null;
+  }
+};
+
+// ── Skeleton Types ──
 
 export interface SkeletonEntry {
   path: string;

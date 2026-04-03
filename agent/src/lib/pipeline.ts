@@ -264,6 +264,36 @@ export const createProject = async (
 
   broadcast({ type: "generation_complete", filesCount: files.length });
 
+  // ── Step 3b: Contract Validation ────────────────────────
+  {
+    const { extractExportContracts } = await import("./context-builder.js");
+    const { validateFileContracts } = await import("./project-validator.js");
+    const { readFile: readProjectFile } = await import("../services/file-manager.js");
+
+    // Build contracts from all generated files
+    const allContracts: Record<string, import("./context-builder.js").ExportContract[]> = {};
+    for (const filePath of files) {
+      const fullPath = path.join(projectPath, filePath);
+      const contracts = extractExportContracts(fullPath);
+      if (contracts) allContracts[filePath] = contracts;
+    }
+
+    // Validate each file against contracts
+    const allViolations: import("./project-validator.js").ContractViolation[] = [];
+    for (const filePath of files) {
+      const content = readProjectFile(projectSlug, filePath);
+      if (!content) continue;
+      const violations = validateFileContracts(content, filePath, allContracts);
+      allViolations.push(...violations);
+    }
+
+    if (allViolations.length > 0) {
+      const summary = allViolations.map((v) => `${v.filePath}: ${v.message}`).join("\n");
+      broadcast({ type: "system_error", error: `Contract violations found:\n${summary}` });
+      // Continue anyway — Metro might still work, but log the issues
+    }
+  }
+
   // ── Step 4: Git init ──────────────────────────────────
   gitInit(projectPath);
 

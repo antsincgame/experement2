@@ -3,7 +3,7 @@ import { Project, QuoteKind, ScriptKind } from "ts-morph";
 import { streamCompletion } from "../services/llm-proxy.js";
 import { writeFile, readFile } from "../services/file-manager.js";
 import path from "path";
-import { buildProjectSkeleton, extractFileSignature } from "./context-builder.js";
+import { buildProjectSkeleton, extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import {
@@ -222,15 +222,17 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
     const depContents = buildDependencyContext(projectName, fileSpec.dependencies);
 
-    // Extract export signatures from already-generated dependencies
-    const depSignatures: string[] = [];
+    // Extract JSON export contracts from already-generated dependencies
+    const depContracts: Record<string, ExportContract[]> = {};
     for (const depPath of fileSpec.dependencies) {
       const fullPath = path.join(projectPath, depPath);
-      const sig = extractFileSignature(fullPath);
-      if (sig) {
-        depSignatures.push(`// ${depPath}\n${sig}`);
+      const contracts = extractExportContracts(fullPath);
+      if (contracts && contracts.length > 0) {
+        depContracts[depPath] = contracts;
       }
     }
+
+    const hasContracts = Object.keys(depContracts).length > 0;
 
     const userMessage = `
 ## App Plan
@@ -243,10 +245,17 @@ ${skeleton.summary}
 Path: ${fileSpec.path}
 Type: ${fileSpec.type}
 Description: ${fileSpec.description}
-${depSignatures.length > 0 ? `
-## IMPORTANT: Dependency Export Contracts
-These are the EXACT exports from dependency files. You MUST match these signatures when importing.
-${depSignatures.join("\n\n")}
+${hasContracts ? `
+## Dependency Export Contracts (JSON)
+\`\`\`json
+${JSON.stringify(depContracts, null, 2)}
+\`\`\`
+
+### CRITICAL IMPORT & DESTRUCTURING RULES:
+1. isDefaultExport: true → MUST use: \`import X from "path"\` (NO braces)
+2. isDefaultExport: false → MUST use: \`import { X } from "path"\` (WITH braces)
+3. returnObjectKeys → destructure ONLY these exact keys, no others
+4. propsInterface → your component props must match this shape
 ` : ""}
 ## Dependencies (full code)
 ${depContents.length > 0 ? depContents.join("\n\n") : "None yet"}

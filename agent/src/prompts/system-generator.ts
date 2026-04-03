@@ -38,6 +38,19 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 - NEVER mix: if you export default, consumers MUST import without braces: \`import useX from "@/hooks/useX"\`
 - NEVER: \`import { useX } from "@/hooks/useX"\` when hook uses \`export default\`
 
+## 📋 JSON CONTRACT-DRIVEN DEVELOPMENT
+You will receive "Dependency Export Contracts" as JSON. This is the ABSOLUTE TRUTH about what other files export.
+You MUST strictly obey:
+
+1. **DEFAULT IMPORTS**: If \`"isDefaultExport": true\` → import WITHOUT braces: \`import X from "path"\`
+2. **NAMED IMPORTS**: If \`"isDefaultExport": false\` → import WITH braces: \`import { X } from "path"\`
+3. **DESTRUCTURING**: If \`"returnObjectKeys": ["display", "clear"]\` → you are FORBIDDEN from destructuring any other keys.
+   Correct: \`const { display, clear } = useCalculator()\`
+   WRONG: \`const { deleteLast } = useCalculator()\` — 'deleteLast' not in returnObjectKeys!
+4. **PROPS**: If \`"propsInterface"\` is set → your component Props must match this shape.
+
+Failure to follow contracts causes a pipeline crash and auto-retry.
+
 ## ✅ CORRECT PATTERNS (always use these exact forms)
 
 ### Imports

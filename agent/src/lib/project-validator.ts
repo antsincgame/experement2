@@ -307,3 +307,90 @@ export const validateGeneratedProject = (
 
   return dedupeIssues(issues);
 };
+
+// ── JSON Contract Validation ──
+
+import { extractExportContracts, type ExportContract } from "./context-builder.js";
+
+export interface ContractViolation {
+  filePath: string;
+  dependencyPath: string;
+  code: "default_import_mismatch" | "named_import_mismatch" | "invalid_destructured_key";
+  message: string;
+  expected: string;
+  actual: string;
+}
+
+const IMPORT_SHAPE_REGEX = /import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
+const DESTRUCTURE_HOOK_REGEX = /const\s+\{\s*([^}]+)\s*\}\s*=\s*(use[A-Za-z0-9_]+)\s*\(/g;
+
+/** Validate that generated files respect export contracts of their dependencies */
+export const validateFileContracts = (
+  fileContent: string,
+  filePath: string,
+  contracts: Record<string, ExportContract[]>,
+): ContractViolation[] => {
+  const violations: ContractViolation[] = [];
+  const allContracts = Object.values(contracts).flat();
+
+  let match: RegExpExecArray | null;
+  IMPORT_SHAPE_REGEX.lastIndex = 0;
+
+  while ((match = IMPORT_SHAPE_REGEX.exec(fileContent)) !== null) {
+    const defaultImport = match[1];
+    const namedImports = match[2];
+    const modulePath = match[3];
+
+    if (defaultImport) {
+      const contract = allContracts.find((c) => c.name === defaultImport);
+      if (contract && !contract.isDefaultExport) {
+        violations.push({
+          filePath, dependencyPath: modulePath, code: "named_import_mismatch",
+          message: `'${defaultImport}' imported as default but is a named export`,
+          expected: `import { ${contract.name} } from "${modulePath}"`,
+          actual: `import ${defaultImport} from "${modulePath}"`,
+        });
+      }
+    }
+
+    if (namedImports) {
+      for (const raw of namedImports.split(",")) {
+        const imp = raw.trim().split(/\s+as\s+/)[0].trim();
+        if (!imp) continue;
+        const contract = allContracts.find((c) => c.name === imp);
+        if (contract && contract.isDefaultExport) {
+          violations.push({
+            filePath, dependencyPath: modulePath, code: "default_import_mismatch",
+            message: `'${imp}' imported as named but is a default export`,
+            expected: `import ${imp} from "${modulePath}"`,
+            actual: `import { ${imp} } from "${modulePath}"`,
+          });
+        }
+      }
+    }
+  }
+
+  DESTRUCTURE_HOOK_REGEX.lastIndex = 0;
+
+  while ((match = DESTRUCTURE_HOOK_REGEX.exec(fileContent)) !== null) {
+    const keys = match[1];
+    const hookName = match[2];
+    const contract = allContracts.find((c) => c.name === hookName);
+
+    if (contract && contract.returnObjectKeys.length > 0) {
+      const destructuredKeys = keys.split(",").map((k) => k.split(":")[0].trim()).filter(Boolean);
+      for (const key of destructuredKeys) {
+        if (!contract.returnObjectKeys.includes(key)) {
+          violations.push({
+            filePath, dependencyPath: "", code: "invalid_destructured_key",
+            message: `Hook '${hookName}' does not return key '${key}'`,
+            expected: `{ ${contract.returnObjectKeys.join(", ")} }`,
+            actual: `{ ${destructuredKeys.join(", ")} }`,
+          });
+        }
+      }
+    }
+  }
+
+  return violations;
+};
