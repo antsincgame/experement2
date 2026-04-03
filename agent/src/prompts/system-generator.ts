@@ -130,34 +130,38 @@ export default function TabLayout() {
 4. **NEVER invent API methods.** If a store/hook returns \`{ data, loading }\`, don't call \`data.fetch()\` — \`fetch\` doesn't exist on the data.
 
 ### UI/UX DESIGN SYSTEM (CRITICAL)
-You MUST build a premium, modern iOS-like interface using standard \`StyleSheet.create\`.
-Follow these exact design tokens:
+You MUST use \`StyleSheet.create\` for ALL styling.
+The App Plan contains a "theme" object. Use ONLY these colors:
 
-1. **Colors:** NEVER use pure black (#000) or pure white (#fff) for backgrounds.
-   - App Background: \`#F8FAFC\` (Slate 50)
-   - Card Background: \`#FFFFFF\`
-   - Primary Text: \`#0F172A\` (Slate 900)
-   - Secondary Text: \`#64748B\` (Slate 500)
-   - Accent/Brand Color: \`#6366F1\` (Indigo 500)
+1. **Read theme from plan:** The plan's \`theme\` field defines ALL colors.
+   - \`theme.background\` → app/screen background color
+   - \`theme.surface\` → card/container background
+   - \`theme.primary\` → buttons, accent elements
+   - \`theme.primaryText\` → main text color
+   - \`theme.secondaryText\` → labels, hints
+   - \`theme.accent\` → borders, highlights
+   - \`theme.isDark\` → if true, use light text on dark backgrounds
 
 2. **Cards & Surfaces:**
-   Wrap content in modern cards.
-   Styles: \`backgroundColor: '#FFF', borderRadius: 20, padding: 20, marginHorizontal: 16, marginBottom: 16\`.
-   Add soft shadows: \`shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2\`.
+   Wrap content in cards: \`backgroundColor: theme.surface, borderRadius: theme.cardRadius || 20, padding: 20, marginHorizontal: 16, marginBottom: 16\`.
+   Shadows: \`shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: theme.isDark ? 0.3 : 0.05, shadowRadius: 12, elevation: 2\`.
 
 3. **Buttons:**
-   Must be large and tappable.
-   Styles: \`backgroundColor: '#6366F1', height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center'\`. Button text: \`color: '#FFF', fontSize: 16, fontWeight: '600'\`.
+   Large and tappable: \`backgroundColor: theme.primary, height: 56, borderRadius: theme.buttonRadius || 28\`.
 
 4. **Typography:**
-   Titles: \`fontSize: 28, fontWeight: '700', marginBottom: 8, color: '#0F172A'\`.
-   Subtitles: \`fontSize: 14, color: '#64748B'\`.
+   Titles: \`fontSize: 28, fontWeight: '700', color: theme.primaryText\`.
 
-5. **Navigation (CRITICAL):**
-   NEVER build manual bottom tabs using Views. ALWAYS use expo-router \`<Tabs>\` component in \`app/(tabs)/_layout.tsx\`.
+5. **Navigation:** NEVER build manual bottom tabs. Use expo-router \`<Tabs>\`.
 
-6. **Icons:**
-   Use \`@expo/vector-icons/Feather\` for a clean, modern look. Import: \`import Feather from "@expo/vector-icons/Feather"\`.
+6. **Icons:** Use \`@expo/vector-icons/Feather\`. Import: \`import Feather from "@expo/vector-icons/Feather"\`.
+
+7. **Textures (for themed apps):**
+   Since you CANNOT load external images/textures, simulate them using:
+   - \`expo-linear-gradient\` for gradient backgrounds (add to extraDependencies)
+   - Multiple borders/shadows for metallic/stone effects
+   - Semi-transparent overlays for depth
+   Example for dark fantasy: nested Views with \`borderWidth: 2, borderColor: theme.accent, opacity: 0.8\` layered with gradients.
 9. No local binary assets. Icons from ${ICON_CONTRACT.defaultImportPath} only.
 10. Do not generate drawer navigation. Use only supported navigation types.
 11. ALWAYS write \`// EOF\` as the very last line of every file. This marks the file as complete.

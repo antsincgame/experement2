@@ -25,12 +25,13 @@ Your task: create a detailed JSON plan for the app described by the user.
 7. Stores go in src/stores/ (use Zustand if state management needed)
 8. Use StyleSheet.create for ALL styling — NO NativeWind className
 
-## Design Requirements
-- Modern iOS-like interface with cards, soft shadows, and Indigo accent (#6366F1)
-- Background: #F8FAFC, Cards: #FFFFFF with borderRadius: 20
-- Large tappable buttons (height: 56, borderRadius: 28)
-- Use Feather icons (@expo/vector-icons/Feather) for clean look
-- NEVER build manual bottom tabs — use expo-router <Tabs>
+## Design & Theme (CRITICAL)
+Analyze the user's request for visual style cues. Generate a "theme" object in the plan:
+- If user mentions dark/gothic/cyberpunk/retro/fantasy/neon/gaming → create CUSTOM theme
+- If no specific style → use DEFAULT "premium" theme (Apple-like)
+- The Generator will use ONLY these colors. Do NOT hardcode colors in file descriptions.
+
+NEVER build manual bottom tabs — use expo-router <Tabs>.
 
 ## Anti-Hallucination Rules for Types
 - Use TypeScript string unions (type Mode = 'work' | 'break'), NOT enums
@@ -109,14 +110,33 @@ Start with { and end with }
     }
   ],
   "extraDependencies": ["zustand", "${ICON_CONTRACT.packageName}"],
+  "theme": {
+    "style": "premium",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primary": "#6366F1",
+    "primaryText": "#0F172A",
+    "secondaryText": "#64748B",
+    "accent": "#6366F1",
+    "cardRadius": 20,
+    "buttonRadius": 28,
+    "isDark": false
+  },
   "navigation": {
     "type": "tabs",
     "screens": [
-      {"path": "app/(tabs)/index.tsx", "name": "Home", "icon": "home-outline"},
-      {"path": "app/(tabs)/settings.tsx", "name": "Settings", "icon": "settings-outline"}
+      {"path": "app/(tabs)/index.tsx", "name": "Home", "icon": "home"},
+      {"path": "app/(tabs)/settings.tsx", "name": "Settings", "icon": "settings"}
     ]
   }
 }
+
+THEME EXAMPLES:
+- Premium (default): { "style": "premium", "background": "#F8FAFC", "surface": "#FFFFFF", "primary": "#6366F1", "primaryText": "#0F172A", "secondaryText": "#64748B", "isDark": false }
+- Dark Fantasy: { "style": "dark-fantasy", "background": "#1A1A1D", "surface": "#2D2D30", "primary": "#C9A84C", "primaryText": "#E8D5B5", "secondaryText": "#8B8B8B", "accent": "#8B4513", "isDark": true }
+- Cyberpunk: { "style": "cyberpunk", "background": "#0D0D1A", "surface": "#1A1A2E", "primary": "#00F0FF", "primaryText": "#E0E0FF", "secondaryText": "#6B6B8D", "accent": "#FF2D55", "isDark": true }
+- Retro: { "style": "retro", "background": "#FFF8E7", "surface": "#FFFFFF", "primary": "#E85D04", "primaryText": "#2D1B00", "secondaryText": "#8B6914", "isDark": false }
+- Neon: { "style": "neon", "background": "#0A0A0A", "surface": "#1A1A2E", "primary": "#39FF14", "primaryText": "#FFFFFF", "secondaryText": "#888888", "accent": "#FF00FF", "isDark": true }
 
 CRITICAL RULES FOR FILES ARRAY:
 - Do NOT include app/_layout.tsx — it's auto-generated based on navigation type
