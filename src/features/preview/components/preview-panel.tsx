@@ -12,15 +12,17 @@ const PreviewPanel = () => {
 
   // Force refresh when preview becomes ready or project switches
   useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout>;
     const unsub = useProjectStore.subscribe((state, prevState) => {
       const portChanged = state.previewPort !== prevState.previewPort;
       const projectChanged = state.projectName !== prevState.projectName;
 
       if ((portChanged || projectChanged) && state.previewPort) {
-        setTimeout(() => setRefreshKey((k) => k + 1), 500);
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => setRefreshKey((k) => k + 1), 500);
       }
     });
-    return unsub;
+    return () => { unsub(); clearTimeout(refreshTimer); };
   }, []);
 
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);

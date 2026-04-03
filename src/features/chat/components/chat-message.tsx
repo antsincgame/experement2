@@ -28,7 +28,7 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
 
   const isUser = message.role === "user";
   const isStreaming = message.status === "streaming";
-  const isError = message.isError || isErrorContent(message.content);
+  const isError = message.isError === true;
 
   if (isError && !isUser) {
     return (
@@ -213,16 +213,6 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
         )}
       </View>
     </View>
-  );
-};
-
-const isErrorContent = (content: string): boolean => {
-  const lower = content.toLowerCase();
-  return (
-    lower.startsWith("error:") ||
-    lower.includes("could not fix") ||
-    lower.includes("failed to") ||
-    (lower.includes("error") && lower.includes("attempt"))
   );
 };
 

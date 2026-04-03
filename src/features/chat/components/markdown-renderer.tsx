@@ -38,17 +38,20 @@ const parseMarkdown = (text: string): ParsedBlock[] => {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Code block: ```lang ... ```
+    // Code block: ```lang ... ``` (closing must be standalone ``` line)
     if (line.trim().startsWith('```')) {
       const lang = line.trim().slice(3).trim();
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+      while (i < lines.length) {
+        const trimmed = lines[i].trim();
+        // Closing fence: line is exactly ``` (possibly with trailing whitespace)
+        if (trimmed === '```' || trimmed === '````') break;
         codeLines.push(lines[i]);
         i++;
       }
       blocks.push({ type: 'code', content: codeLines.join('\n'), lang: lang || undefined });
-      i++; // skip closing ```
+      if (i < lines.length) i++; // skip closing ```
       continue;
     }
 

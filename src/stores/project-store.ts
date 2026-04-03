@@ -129,15 +129,17 @@ const saveToChats = (
   return { ...chats, [name]: { ...existing, ...patch } };
 };
 
+const MAX_CACHED_FILES = 80;
+
 const limitFileContents = (
   fileContents: Record<string, string>
 ): Record<string, string> => {
   const entries = Object.entries(fileContents);
-  if (entries.length <= 40) {
+  if (entries.length <= MAX_CACHED_FILES) {
     return fileContents;
   }
 
-  return Object.fromEntries(entries.slice(entries.length - 40));
+  return Object.fromEntries(entries.slice(entries.length - MAX_CACHED_FILES));
 };
 
 const applyProjectFileSnapshot = (
@@ -252,8 +254,8 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     set((s) => {
       const merged = { ...s.fileContents, [path]: content };
       const keys = Object.keys(merged);
-      const fileContents = keys.length > 40
-        ? Object.fromEntries(keys.slice(keys.length - 40).map((k) => [k, merged[k]]))
+      const fileContents = keys.length > MAX_CACHED_FILES
+        ? Object.fromEntries(keys.slice(keys.length - MAX_CACHED_FILES).map((k) => [k, merged[k]]))
         : merged;
       return { fileContents, projectChats: saveToChats(s.projectChats, s.projectName, { fileContents }) };
     }),

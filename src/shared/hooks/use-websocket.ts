@@ -66,13 +66,23 @@ const disconnectSocket = (): void => {
   useProjectStore.getState().setConnected(false);
 };
 
+let reconnectAttempt = 0;
+
+const getBackoffDelay = (): number => {
+  const base = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
+  const jitter = Math.random() * 1000;
+  return base + jitter;
+};
+
 const scheduleReconnect = (): void => {
   const runtime = getRuntime();
   clearReconnectTimer();
+  const delay = getBackoffDelay();
+  reconnectAttempt++;
   runtime.reconnectTimer = setTimeout(() => {
     runtime.reconnectTimer = undefined;
     ensureConnected();
-  }, 3000);
+  }, delay);
 };
 
 const handleSocketMessage = (payload: string): void => {
@@ -114,6 +124,7 @@ const ensureConnected = (): void => {
     if (getRuntime().socket !== socket) {
       return;
     }
+    reconnectAttempt = 0;
 
     clearReconnectTimer();
     useProjectStore.getState().setConnected(true);

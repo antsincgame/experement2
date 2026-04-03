@@ -175,7 +175,7 @@ export const watchProcess = (
         successTimeout = null;
       }
 
-      // Debounce: wait 500ms for more error chunks before parsing
+      // Debounce: wait 200ms for more error chunks before parsing
       if (errorFlushTimeout) clearTimeout(errorFlushTimeout);
       errorFlushTimeout = setTimeout(() => {
         const parsed = parseMetroError(errorBuffer);
@@ -184,7 +184,7 @@ export const watchProcess = (
         }
         errorBuffer = "";
         errorFlushTimeout = null;
-      }, 500);
+      }, 200);
     }
   };
 
