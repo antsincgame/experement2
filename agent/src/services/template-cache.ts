@@ -50,6 +50,7 @@ const BOILERPLATE_FILES: Record<string, string> = {
       extends: "expo/tsconfig.base",
       compilerOptions: {
         strict: true,
+        skipLibCheck: true,
         paths: { "@/*": ["./src/*"] },
       },
       include: ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],

@@ -2,7 +2,8 @@
 import { Project, QuoteKind, ScriptKind } from "ts-morph";
 import { streamCompletion } from "../services/llm-proxy.js";
 import { writeFile, readFile } from "../services/file-manager.js";
-import { buildProjectSkeleton } from "./context-builder.js";
+import path from "path";
+import { buildProjectSkeleton, extractFileSignature } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import {
@@ -221,6 +222,16 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
     const depContents = buildDependencyContext(projectName, fileSpec.dependencies);
 
+    // Extract export signatures from already-generated dependencies
+    const depSignatures: string[] = [];
+    for (const depPath of fileSpec.dependencies) {
+      const fullPath = path.join(projectPath, depPath);
+      const sig = extractFileSignature(fullPath);
+      if (sig) {
+        depSignatures.push(`// ${depPath}\n${sig}`);
+      }
+    }
+
     const userMessage = `
 ## App Plan
 ${JSON.stringify(plan, null, 2)}
@@ -232,7 +243,11 @@ ${skeleton.summary}
 Path: ${fileSpec.path}
 Type: ${fileSpec.type}
 Description: ${fileSpec.description}
-
+${depSignatures.length > 0 ? `
+## IMPORTANT: Dependency Export Contracts
+These are the EXACT exports from dependency files. You MUST match these signatures when importing.
+${depSignatures.join("\n\n")}
+` : ""}
 ## Dependencies (full code)
 ${depContents.length > 0 ? depContents.join("\n\n") : "None yet"}
 

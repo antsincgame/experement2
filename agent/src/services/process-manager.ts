@@ -54,13 +54,15 @@ const killProcess = (cp: ChildProcess): void => {
 
   try {
     if (isWindows) {
+      // /T kills the process tree (all children)
       runWindowsTaskkill(cp.pid);
       return;
     }
 
-    cp.kill("SIGTERM");
+    // Kill entire process group on Unix (negative PID = process group)
+    try { process.kill(-cp.pid, "SIGTERM"); } catch { cp.kill("SIGTERM"); }
     setTimeout(() => {
-      if (!cp.killed) cp.kill("SIGKILL");
+      try { if (!cp.killed) process.kill(-cp.pid, "SIGKILL"); } catch { /* already dead */ }
     }, 5000);
   } catch {
     // The process may have already exited before cleanup completed.

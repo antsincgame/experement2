@@ -280,6 +280,17 @@ export const createProject = async (
     return { projectName: projectSlug, port: 0, plan };
   }
 
+  // ── Step 5b: Quick typecheck before Metro (catches signature mismatches early)
+  try {
+    const typecheckResult = await runTypecheck(projectPath);
+    if (!typecheckResult.success) {
+      broadcast({ type: "system_error", error: `TypeScript errors:\n${typecheckResult.output.slice(0, 1000)}` });
+      // Don't abort — try to build anyway, Metro may fix some issues
+    }
+  } catch {
+    // Typecheck failed to run — continue anyway
+  }
+
   // ── Step 6: Build Verification Loop ───────────────────
   broadcast({ type: "status", status: "building" });
 
