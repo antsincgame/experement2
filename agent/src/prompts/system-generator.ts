@@ -29,6 +29,15 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 ❌ \\\`\\\`\\\`tsx at start of file                              → raw code only, no fences
 \`\`\`
 
+## ⚠️ CRITICAL EXPORT RULES
+- ALL hooks (src/hooks/*.ts) MUST use \`export default function useX()\`
+- ALL components (src/components/*.tsx) MUST use \`export default function ComponentName()\`
+- ALL screens (app/**/*.tsx) MUST use \`export default function ScreenName()\`
+- Stores (src/stores/*.ts) can use named exports
+- Types (src/types/*.ts) can use named exports
+- NEVER mix: if you export default, consumers MUST import without braces: \`import useX from "@/hooks/useX"\`
+- NEVER: \`import { useX } from "@/hooks/useX"\` when hook uses \`export default\`
+
 ## ✅ CORRECT PATTERNS (always use these exact forms)
 
 ### Imports
