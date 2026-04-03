@@ -150,12 +150,23 @@ export const streamCompletion = async (
     body.response_format = options.responseFormat;
   }
 
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: controller.signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (fetchError) {
+    activeControllers.delete(taskId);
+    activeRequestCount = Math.max(0, activeRequestCount - 1);
+    const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+    if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
+      throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl}. Check that LM Studio or Ollama is running.`);
+    }
+    throw new Error(`LLM_NETWORK_ERROR: ${msg}`);
+  }
 
   if (!response.ok) {
     activeControllers.delete(taskId);

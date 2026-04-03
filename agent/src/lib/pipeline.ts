@@ -207,6 +207,29 @@ export const createProject = async (
 ): Promise<CreateResult> => {
   const { description, lmStudioUrl, model, temperature, maxTokens, onProjectNameResolved } = options;
 
+  try {
+    return await _createProjectInner(options);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+
+    // Detect LLM server down — stop immediately, don't autofix
+    if (msg.includes("LLM_SERVER_DOWN") || msg.includes("LLM_NETWORK_ERROR")) {
+      broadcast({ type: "system_error", error: `AI server disconnected: ${msg}` });
+      broadcast({ type: "status", status: "error" });
+      return { projectName: "error", port: 0, plan: {} as any };
+    }
+
+    broadcast({ type: "system_error", error: msg });
+    broadcast({ type: "status", status: "error" });
+    return { projectName: "error", port: 0, plan: {} as any };
+  }
+};
+
+const _createProjectInner = async (
+  options: CreateOptions
+): Promise<CreateResult> => {
+  const { description, lmStudioUrl, model, temperature, maxTokens, onProjectNameResolved } = options;
+
   // ── Step 1: Plan ──────────────────────────────────────
   broadcast({ type: "status", status: "planning" });
 
@@ -451,6 +474,23 @@ export const createProject = async (
 };
 
 export const iterateProject = async (
+  options: IterateOptions
+): Promise<IterateResult> => {
+  try {
+    return await _iterateProjectInner(options);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes("LLM_SERVER_DOWN") || msg.includes("LLM_NETWORK_ERROR")) {
+      broadcast({ type: "system_error", error: `AI server disconnected: ${msg}` });
+    } else {
+      broadcast({ type: "system_error", error: msg });
+    }
+    broadcast({ type: "status", status: "error" });
+    return { appliedBlocks: 0, failedBlocks: 0, errors: [msg] };
+  }
+};
+
+const _iterateProjectInner = async (
   options: IterateOptions
 ): Promise<IterateResult> => {
   const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens } = options;

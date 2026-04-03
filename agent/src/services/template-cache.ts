@@ -159,8 +159,10 @@ export const createProjectFromCache = async (
   const templatePath = getTemplatePath();
   const projectPath = getProjectPath(projectName);
 
+  // Clean slate: remove any existing project directory to prevent contamination
   if (fs.existsSync(projectPath)) {
-    throw new Error(`Project "${projectName}" already exists`);
+    console.log(`[TemplateCache] Cleaning existing project: ${projectName}`);
+    fs.rmSync(projectPath, { recursive: true, force: true });
   }
 
   console.log(`[TemplateCache] Copying template -> ${projectName}...`);
