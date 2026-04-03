@@ -50,7 +50,6 @@ export const extractExportContracts = (filePath: string): ExportContract[] | nul
           const returnType = funcNode.getReturnType();
           returnTypeStr = returnType.getText(funcNode).slice(0, 300);
 
-          // Determine kind
           if (actualName.startsWith("use")) {
             kind = "hook";
           } else if (/^[A-Z]/.test(actualName) && (returnTypeStr.includes("JSX") || returnTypeStr.includes("ReactNode") || returnTypeStr.includes("Element"))) {
@@ -59,16 +58,39 @@ export const extractExportContracts = (filePath: string): ExportContract[] | nul
             kind = "function";
           }
 
-          // Extract params
           params = funcNode.getParameters().map((p) => ({
             name: p.getName(),
             type: p.getType().getText(funcNode).slice(0, 100),
           }));
 
-          // Extract return object keys (for hooks returning objects)
           const baseType = returnType.isPromise() ? (returnType.getTypeArguments()[0] ?? returnType) : returnType;
           if (baseType.isObject() && !baseType.isArray() && !returnTypeStr.includes("Element")) {
             returnObjectKeys = baseType.getProperties().map((p) => p.getName());
+          }
+        } else if (Node.isVariableDeclaration(decl) && actualName.startsWith("use")) {
+          // Zustand store: const useStore = create<StoreInterface>((set) => ({...}))
+          // Extract keys from the store's return type (the hook's call signature)
+          kind = "hook";
+          const declType = decl.getType();
+          const callSigs = declType.getCallSignatures();
+          if (callSigs.length > 0) {
+            const returnType = callSigs[0].getReturnType();
+            returnTypeStr = returnType.getText().slice(0, 300);
+            if (returnType.isObject() && !returnType.isArray()) {
+              returnObjectKeys = returnType.getProperties().map((p) => p.getName());
+            }
+          }
+          // Fallback: scan file for interface with matching name pattern
+          if (returnObjectKeys.length === 0) {
+            const storeName = actualName.replace(/^use/, "").replace(/Store$/, "");
+            for (const iface of sf.getInterfaces()) {
+              const ifaceName = iface.getName();
+              if (ifaceName.includes(storeName) || ifaceName.includes("Store") || ifaceName.includes("State")) {
+                returnObjectKeys = iface.getProperties().map((p) => p.getName());
+                returnTypeStr = `{ ${returnObjectKeys.join("; ")} }`;
+                break;
+              }
+            }
           }
         }
       } else if (Node.isInterfaceDeclaration(decl)) {

@@ -323,6 +323,27 @@ export interface ContractViolation {
 const IMPORT_SHAPE_REGEX = /import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
 const DESTRUCTURE_HOOK_REGEX = /const\s+\{\s*([^}]+)\s*\}\s*=\s*(use[A-Za-z0-9_]+)\s*\(/g;
 
+/** Extract interface/type keys from store source code via regex (fallback when ts-morph fails) */
+const extractStoreKeysFromSource = (
+  projectPath: string,
+  storePath: string,
+): string[] => {
+  try {
+    const fs = require("fs");
+    const fullPath = require("path").join(projectPath, storePath);
+    if (!fs.existsSync(fullPath)) return [];
+    const content = fs.readFileSync(fullPath, "utf-8");
+
+    // Match interface body: interface XStore { key1: type; key2: type; ... }
+    const ifaceMatch = content.match(/interface\s+\w+(?:Store|State)\s*\{([^}]+)\}/);
+    if (ifaceMatch) {
+      const body = ifaceMatch[1];
+      return body.split(/[;\n]/).map((line: string) => line.trim().split(/[:(]/)[0].trim()).filter(Boolean);
+    }
+  } catch { /* ignore */ }
+  return [];
+};
+
 /** Validate that generated files respect export contracts of their dependencies */
 export const validateFileContracts = (
   fileContent: string,
@@ -374,16 +395,45 @@ export const validateFileContracts = (
   while ((match = DESTRUCTURE_HOOK_REGEX.exec(fileContent)) !== null) {
     const keys = match[1];
     const hookName = match[2];
-    const contract = allContracts.find((c) => c.name === hookName);
+    let contract = allContracts.find((c) => c.name === hookName);
 
-    if (contract && contract.returnObjectKeys.length > 0) {
+    // Fallback: if no contract found (ts-morph couldn't parse Zustand store),
+    // try to find the store file and extract keys via regex
+    let validKeys = contract?.returnObjectKeys ?? [];
+    if (validKeys.length === 0 && hookName.includes("Store")) {
+      // Find the store file path from imports in this file
+      const storeImportMatch = fileContent.match(
+        new RegExp(`import.*${hookName}.*from\\s+["']([^"']+)["']`)
+      );
+      if (storeImportMatch) {
+        const storePath = storeImportMatch[1]
+          .replace("@/", "src/")
+          .replace(/^\.\//, "") + ".ts";
+        const allFiles = Object.keys(contracts);
+        const storeFile = allFiles.find((f) => f.includes(storePath.split("/").pop()?.replace(".ts", "") ?? ""));
+        if (storeFile) {
+          const storeContracts = contracts[storeFile];
+          if (storeContracts) {
+            // Store exports useXStore which returns store interface keys
+            for (const sc of storeContracts) {
+              if (sc.returnObjectKeys.length > 0) {
+                validKeys = sc.returnObjectKeys;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (validKeys.length > 0) {
       const destructuredKeys = keys.split(",").map((k) => k.split(":")[0].trim()).filter(Boolean);
       for (const key of destructuredKeys) {
-        if (!contract.returnObjectKeys.includes(key)) {
+        if (!validKeys.includes(key)) {
           violations.push({
             filePath, dependencyPath: "", code: "invalid_destructured_key",
-            message: `Hook '${hookName}' does not return key '${key}'`,
-            expected: `{ ${contract.returnObjectKeys.join(", ")} }`,
+            message: `Hook '${hookName}' does not return key '${key}'. Available: [${validKeys.join(", ")}]`,
+            expected: `{ ${validKeys.join(", ")} }`,
             actual: `{ ${destructuredKeys.join(", ")} }`,
           });
         }
