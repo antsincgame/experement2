@@ -78,7 +78,33 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
         </View>
 
         <ScrollView className="px-6 py-4 pb-8" contentContainerStyle={{ gap: 16 }}>
-          <Field label="LM Studio URL" value={settings.lmStudioUrl} onChange={settings.setLmStudioUrl} />
+          <View>
+            <Field label="LLM Provider URL" value={settings.lmStudioUrl} onChange={settings.setLmStudioUrl} />
+            <View className="flex-row gap-1.5 mt-1.5">
+              <Pressable
+                onPress={() => settings.setLmStudioUrl("http://localhost:1234")}
+                className="px-2.5 py-1 rounded-lg"
+                style={{
+                  backgroundColor: settings.lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
+                  borderWidth: 1,
+                  borderColor: settings.lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
+                }}
+              >
+                <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("1234") ? "#00BCD4" : "#888", fontWeight: "600" }}>LM Studio :1234</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => settings.setLmStudioUrl("http://localhost:11434/v1")}
+                className="px-2.5 py-1 rounded-lg"
+                style={{
+                  backgroundColor: settings.lmStudioUrl.includes("11434") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
+                  borderWidth: 1,
+                  borderColor: settings.lmStudioUrl.includes("11434") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
+                }}
+              >
+                <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("11434") ? "#00BCD4" : "#888", fontWeight: "600" }}>Ollama :11434</Text>
+              </Pressable>
+            </View>
+          </View>
           <View>
             <Field label="Agent URL" value={settings.agentUrl} onChange={settings.setAgentUrl} />
             <Pressable

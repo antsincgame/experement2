@@ -47,6 +47,7 @@ export const TEMPLATE_PACKAGE_DEPENDENCIES = {
   nativewind: "^4.0.0",
   tailwindcss: "^3.4.0",
   "@expo/vector-icons": "^14.0.0",
+  "@react-native-async-storage/async-storage": "2.2.0",
 } as const;
 
 export const TEMPLATE_PACKAGE_DEV_DEPENDENCIES = {
