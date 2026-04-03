@@ -215,8 +215,19 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
   const totalFiles = plan.files.length;
 
+  // Auto-generated layout files — skip if LLM plan includes them
+  const AUTO_LAYOUT_FILES = new Set(["app/_layout.tsx", "app/(tabs)/_layout.tsx"]);
+
   for (let i = 0; i < totalFiles; i++) {
     const fileSpec = plan.files[i];
+
+    // Skip auto-generated layouts — already written above
+    if (AUTO_LAYOUT_FILES.has(fileSpec.path)) {
+      onFileStart?.(fileSpec.path, i, totalFiles);
+      onFileComplete?.(fileSpec.path);
+      continue;
+    }
+
     onFileStart?.(fileSpec.path, i, totalFiles);
 
     const skeleton = buildProjectSkeleton(projectPath);
