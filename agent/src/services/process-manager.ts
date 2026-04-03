@@ -94,6 +94,7 @@ export const startExpo = async (
     cwd: projectPath,
     env: { ...process.env, BROWSER: "none" },
     shell: isWindows,
+    detached: !isWindows, // Unix: create process group so kill(-pid) works
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -141,6 +142,7 @@ export const startExpoClearCache = async (
       cwd: projectPath,
       env: { ...process.env, BROWSER: "none" },
       shell: isWindows,
+      detached: !isWindows,
       stdio: ["ignore", "pipe", "pipe"],
     }
   );

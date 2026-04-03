@@ -45,9 +45,14 @@ export const createWsHandler = (
       log({ level: "info", source: "status", message: `Status → ${msg.status}` });
       break;
 
-    case "plan_chunk":
-      store.appendStreamingContent(msg.chunk as string);
+    case "plan_chunk": {
+      // Only append if we're actively planning (not viewing another project)
+      const planStatus = get().status;
+      if (planStatus === "planning" || planStatus === "scaffolding") {
+        store.appendStreamingContent(msg.chunk as string);
+      }
       break;
+    }
 
     case "plan_complete":
       set({ plan: msg.plan as Record<string, unknown> });
@@ -85,9 +90,13 @@ export const createWsHandler = (
       });
       break;
 
-    case "code_chunk":
-      store.appendStreamingContent(msg.chunk as string);
+    case "code_chunk": {
+      const codeStatus = get().status;
+      if (codeStatus === "generating" || codeStatus === "analyzing") {
+        store.appendStreamingContent(msg.chunk as string);
+      }
       break;
+    }
 
     case "file_complete":
       store.addMessage(createSystemMessage(`File created: ${msg.filepath}`, true));

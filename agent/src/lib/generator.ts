@@ -385,13 +385,13 @@ export const regenerateFileWithContracts = async (
   const messages = [
     {
       role: "system" as const,
-      content: `You are fixing a React Native TypeScript file that violated export/import contracts.
-Return ONLY the corrected code. No markdown fences. No explanations.
+      content: `You are fixing a React Native TypeScript file.
+Output ONLY raw TypeScript code. NO greetings. NO markdown. NO explanations.
+The very first line of your response MUST be an import statement or export statement.
+If you add ANY text before the code, the build will fail.
 
-AVAILABLE CONTRACTS:
-\`\`\`json
+CONTRACTS:
 ${JSON.stringify(contracts, null, 2)}
-\`\`\`
 
 RULES:
 - isDefaultExport: true → import X from "path" (NO braces)
@@ -417,11 +417,22 @@ RULES:
     fixedCode += chunk;
   }
 
-  // Strip markdown fences if LLM added them
+  // Strip markdown fences and LLM preamble
   fixedCode = fixedCode.trim()
     .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
     .replace(/\n?```\s*$/, "")
     .trim();
+
+  // Strip any non-code preamble (LLM sometimes adds "Here is the fix:" etc)
+  const firstImport = fixedCode.indexOf("import ");
+  const firstExport = fixedCode.indexOf("export ");
+  const codeStart = Math.min(
+    firstImport >= 0 ? firstImport : Infinity,
+    firstExport >= 0 ? firstExport : Infinity,
+  );
+  if (codeStart > 0 && codeStart < Infinity) {
+    fixedCode = fixedCode.slice(codeStart);
+  }
 
   if (fixedCode.length < 10) return null;
 

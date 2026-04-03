@@ -53,7 +53,8 @@ const TerminalPanel = () => {
         {streamingContent ? (
           <Text style={{ color: "#80F0FF", fontFamily: "monospace", fontSize: 11, lineHeight: 18 }}>
             {streamingContent.split("\n").map((line, i) => {
-              const isError = line.toLowerCase().includes("error") || line.toLowerCase().includes("failed");
+              const lower = line.toLowerCase();
+              const isError = (lower.includes("error:") || lower.includes("error ") || lower.startsWith("error")) && !lower.includes("0 error");
               return (
                 <Text key={i} style={{ color: isError ? "#FF3366" : undefined }}>
                   {line}{"\n"}

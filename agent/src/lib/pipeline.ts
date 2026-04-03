@@ -102,6 +102,9 @@ const gitCommit = (projectPath: string, message: string): string | null => {
 const gitInit = (projectPath: string): void => {
   try {
     runGitCommand(projectPath, ["init"]);
+    // Set local git identity so commit works even without global config
+    runGitCommand(projectPath, ["config", "user.email", "agent@appfactory.local"]);
+    runGitCommand(projectPath, ["config", "user.name", "App Factory Agent"]);
     runGitCommand(projectPath, ["add", "-A"]);
     runGitCommand(projectPath, ["commit", "-m", "v1: initial generation"]);
   } catch (err) {

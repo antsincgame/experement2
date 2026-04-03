@@ -150,6 +150,17 @@ export const streamCompletion = async (
     body.response_format = options.responseFormat;
   }
 
+  // Guard: prevent absurdly large payloads from crashing fetch
+  const payloadSize = JSON.stringify(body).length;
+  if (payloadSize > 5_000_000) {
+    // Truncate messages content to fit
+    for (const m of body.messages) {
+      if (m.content.length > 50_000) {
+        m.content = m.content.slice(0, 50_000) + "\n... [truncated]";
+      }
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(`${baseUrl}/v1/chat/completions`, {
