@@ -156,7 +156,9 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
             {/* Streaming text content */}
             {streamingContent ? (
               <View className="ml-8">
-                <MarkdownRenderer content={streamingContent.slice(-2000)} />
+                <Text style={{ color: "#4A4A6A", fontSize: 12, fontFamily: "monospace", lineHeight: 18 }} numberOfLines={8}>
+                  {streamingContent.slice(-500)}
+                </Text>
               </View>
             ) : currentFile ? (
               <View className="ml-8">

@@ -28,18 +28,16 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   if (!filepath && status === "generating") {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
-        <MatrixRain />
+      <View className="flex-1" style={{ backgroundColor: "#09090B" }}>
         <ScrollView
           className="flex-1"
-          style={{ backgroundColor: "transparent" }}
           contentContainerStyle={{ padding: 16 }}
         >
-          <Text className="text-accent-cyan text-xs font-mono opacity-40 mb-2">
+          <Text style={{ color: "#00E5FF", fontFamily: "monospace", fontSize: 10, opacity: 0.5, marginBottom: 8 }}>
             Generating...
           </Text>
           <Text style={{ color: "#00FF41", fontFamily: "monospace", fontSize: 12, opacity: 0.9, lineHeight: 20 }}>
-            {streamingContent}
+            {streamingContent.length > 800 ? streamingContent.slice(-800) : streamingContent}
           </Text>
         </ScrollView>
       </View>
