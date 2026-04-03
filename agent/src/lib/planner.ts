@@ -31,10 +31,19 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
     model,
   });
 
+  let planChunkBuffer = "";
+  let planLastSend = Date.now();
+
   for await (const chunk of generator) {
     fullJson += chunk;
-    onChunk?.(chunk);
+    planChunkBuffer += chunk;
+    if (Date.now() - planLastSend > 100) {
+      onChunk?.(planChunkBuffer);
+      planChunkBuffer = "";
+      planLastSend = Date.now();
+    }
   }
+  if (planChunkBuffer) onChunk?.(planChunkBuffer);
 
   const trimmed = fullJson.trim();
 

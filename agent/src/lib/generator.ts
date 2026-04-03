@@ -329,10 +329,20 @@ Generate the complete code for: ${fileSpec.path}`;
       model,
     });
 
+    // Buffer chunks — send to frontend max every 100ms to prevent React re-render storm
+    let chunkBuffer = "";
+    let lastSendTime = Date.now();
+
     for await (const chunk of generator) {
       responseBuffer += chunk;
-      onChunk?.(chunk);
+      chunkBuffer += chunk;
+      if (Date.now() - lastSendTime > 100) {
+        onChunk?.(chunkBuffer);
+        chunkBuffer = "";
+        lastSendTime = Date.now();
+      }
     }
+    if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
 
     const extracted = extractCodeFromResponse(responseBuffer);
     if (extracted) {

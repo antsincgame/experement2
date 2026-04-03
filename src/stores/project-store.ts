@@ -284,8 +284,9 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   appendStreamingContent: (chunk) =>
     set((s) => {
       const next = s.streamingContent + chunk;
-      const streamingContent = next.length > 12_000 ? next.slice(-12_000) : next;
-      return { streamingContent, projectChats: saveToChats(s.projectChats, s.projectName, { streamingContent }) };
+      // Keep only last 4KB — streaming is transient, don't persist to projectChats
+      const streamingContent = next.length > 4_000 ? next.slice(-4_000) : next;
+      return { streamingContent };
     }),
 
   clearStreamingContent: () =>

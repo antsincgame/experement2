@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable, Linking } from "react-native";
 import { Globe, RotateCw, ExternalLink, Loader } from "lucide-react-native";
 import { apiClient } from "@/shared/lib/api-client";
@@ -8,54 +8,49 @@ const PreviewPanel = () => {
   const previewPort = useProjectStore((state) => state.previewPort);
   const projectName = useProjectStore((state) => state.projectName);
   const status = useProjectStore((state) => state.status);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [iframeSrc, setIframeSrc] = useState("");
 
-  // Force refresh when preview becomes ready or project switches
+  // Update iframe src when project or port changes — NO key change, reuse same iframe
+  useEffect(() => {
+    if (previewPort && projectName) {
+      const url = `${apiClient.getPreviewProxyUrl(projectName)}?v=${Date.now()}`;
+      setIframeSrc(url);
+    } else {
+      setIframeSrc("");
+    }
+  }, [previewPort, projectName]);
+
+  // Subscribe to store changes for live updates
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout>;
     const unsub = useProjectStore.subscribe((state, prevState) => {
       const portChanged = state.previewPort !== prevState.previewPort;
       const projectChanged = state.projectName !== prevState.projectName;
 
-      if ((portChanged || projectChanged) && state.previewPort) {
+      if ((portChanged || projectChanged) && state.previewPort && state.projectName) {
         clearTimeout(refreshTimer);
-        refreshTimer = setTimeout(() => setRefreshKey((k) => k + 1), 500);
+        refreshTimer = setTimeout(() => {
+          const url = `${apiClient.getPreviewProxyUrl(state.projectName!)}?v=${Date.now()}`;
+          setIframeSrc(url);
+        }, 800);
       }
     });
     return () => { unsub(); clearTimeout(refreshTimer); };
   }, []);
 
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
-  const proxyUrl = projectName ? apiClient.getPreviewProxyUrl(projectName) : apiClient.getPreviewProxyUrl();
+  const proxyUrl = projectName ? apiClient.getPreviewProxyUrl(projectName) : "";
 
-  // Auto-retry: verify proxy is responding, refresh iframe if not
-  useEffect(() => {
-    if (!previewPort || !projectName) return;
-    let retries = 0;
-    const maxRetries = 5;
-    const check = async () => {
-      try {
-        const resp = await fetch(proxyUrl, { method: "HEAD", signal: AbortSignal.timeout(3000) });
-        if (!resp.ok && retries < maxRetries) {
-          retries++;
-          retryTimer = setTimeout(check, 3000 * retries);
-        }
-      } catch {
-        if (retries < maxRetries) {
-          retries++;
-          retryTimer = setTimeout(check, 3000 * retries);
-        }
-      }
-      if (retries > 0 && retries <= maxRetries) {
-        setRefreshKey((k) => k + 1);
-      }
-    };
-    let retryTimer = setTimeout(check, 2000);
-    return () => clearTimeout(retryTimer);
-  }, [previewPort, projectName, proxyUrl]);
+  const handleRefresh = useCallback(() => {
+    if (proxyUrl) {
+      setIframeSrc(`${proxyUrl}?v=${Date.now()}`);
+    }
+  }, [proxyUrl]);
 
-  const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
-  const handleOpenExternal = useCallback(() => { void Linking.openURL(proxyUrl); }, [proxyUrl]);
+  const handleOpenExternal = useCallback(() => {
+    if (proxyUrl) void Linking.openURL(proxyUrl);
+  }, [proxyUrl]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: "rgba(255,255,255,0.3)" }}>
@@ -94,7 +89,7 @@ const PreviewPanel = () => {
       )}
 
       {/* Content */}
-      {!previewPort ? (
+      {!iframeSrc ? (
         <View className="flex-1 items-center justify-center">
           {isLoading || projectName ? (
             <>
@@ -123,8 +118,8 @@ const PreviewPanel = () => {
         <View className="flex-1">
           {typeof window !== "undefined" && (
             <iframe
-              key={`${projectName}-${previewPort}-${refreshKey}`}
-              src={`${proxyUrl}?v=${previewPort}-${refreshKey}`}
+              ref={iframeRef as never}
+              src={iframeSrc}
               style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FAFAFF" }}
               title="App Preview"
               allow="clipboard-read; clipboard-write"
