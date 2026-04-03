@@ -114,7 +114,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               <Field label="Temperature" value={String(settings.temperature)} onChange={(v) => settings.setTemperature(parseFloat(v) || 0.4)} keyboardType="numeric" />
             </View>
             <View className="flex-1">
-              <Field label="Max Tokens" value={String(settings.maxTokens)} onChange={(v) => settings.setMaxTokens(parseInt(v, 10) || 32768)} keyboardType="numeric" />
+              <Field label="Max Tokens" value={String(settings.maxTokens)} onChange={(v) => settings.setMaxTokens(parseInt(v, 10) || 65536)} keyboardType="numeric" />
             </View>
           </View>
 
