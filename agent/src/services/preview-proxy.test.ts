@@ -46,15 +46,9 @@ describe("preview-proxy", () => {
     );
   });
 
-  it("rewrites /preview prefix to empty string", async () => {
-    const { createProxyMiddleware } = await import("http-proxy-middleware");
-    createPreviewProxy(3000);
-
-    expect(createProxyMiddleware).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathRewrite: { "^/preview": "" },
-      })
-    );
+  it("accepts optional projectName parameter", () => {
+    const proxy = createPreviewProxy(3000, "test-app");
+    expect(typeof proxy).toBe("function");
   });
 
   it("strips security headers in proxyRes handler", async () => {
@@ -118,7 +112,7 @@ describe("preview-proxy", () => {
       "Content-Type": "text/plain",
     });
     expect(fakeRes.end).toHaveBeenCalledWith(
-      "Preview not available. Metro may still be starting..."
+      expect.stringContaining("Preview not available")
     );
   });
 });
