@@ -184,52 +184,6 @@ const isProjectFile = (filePath: string): boolean =>
   !filePath.includes("dist") &&
   (filePath.endsWith(".ts") || filePath.endsWith(".tsx"));
 
-/** Extract function return type and signature from a generated file */
-export const extractFileSignature = (filePath: string): string | null => {
-  if (!fs.existsSync(filePath)) return null;
-
-  try {
-    const project = new Project({ compilerOptions: { strict: true, skipLibCheck: true } });
-    const sf = project.addSourceFileAtPath(filePath);
-
-    const parts: string[] = [];
-
-    // Default export function signature
-    const defaultExport = sf.getDefaultExportSymbol();
-    if (defaultExport) {
-      const decl = defaultExport.getValueDeclaration();
-      if (decl) {
-        const type = decl.getType();
-        parts.push(`default export: ${type.getText(decl).slice(0, 200)}`);
-      }
-    }
-
-    // Named exports
-    for (const [name, decls] of sf.getExportedDeclarations()) {
-      if (name === "default") continue;
-      const decl = decls[0];
-      if (decl) {
-        const type = decl.getType();
-        parts.push(`export ${name}: ${type.getText(decl).slice(0, 200)}`);
-      }
-    }
-
-    // Interfaces/types
-    for (const iface of sf.getInterfaces()) {
-      if (iface.isExported()) {
-        const members = iface.getProperties()
-          .map((p) => `${p.getName()}: ${p.getType().getText(p)}`)
-          .join("; ");
-        parts.push(`interface ${iface.getName()} { ${members} }`);
-      }
-    }
-
-    return parts.length > 0 ? parts.join("\n") : null;
-  } catch {
-    return null;
-  }
-};
-
 export const buildProjectSkeleton = (projectPath: string): ProjectSkeleton => {
   const tsconfigPath = path.join(projectPath, "tsconfig.json");
 

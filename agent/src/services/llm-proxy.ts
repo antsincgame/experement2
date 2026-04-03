@@ -82,7 +82,7 @@ const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
         resolvedModel,
         resolvedModel ? SUCCESS_MODEL_CACHE_TTL_MS : FAILED_MODEL_CACHE_TTL_MS
       );
-      console.log(`[LLM] Auto-detected model for ${baseUrl}: ${resolvedModel}`);
+      // Model auto-detected silently
       return resolvedModel;
     } catch {
       setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);

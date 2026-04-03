@@ -305,3 +305,65 @@ Generate the complete code for: ${fileSpec.path}`;
 
   return generatedFiles;
 };
+
+// ── Contract Auto-Fix: regenerate a single file with violation context ──
+
+import type { ContractViolation } from "./project-validator.js";
+
+export const regenerateFileWithContracts = async (
+  projectName: string,
+  projectPath: string,
+  filePath: string,
+  violations: ContractViolation[],
+  contracts: Record<string, ExportContract[]>,
+  options: { lmStudioUrl?: string; model?: string; maxTokens?: number } = {},
+): Promise<string | null> => {
+  const currentContent = readFile(projectName, filePath) ?? "";
+  const violationsText = violations.map((v) => `- [${v.code}] ${v.message}`).join("\n");
+
+  const messages = [
+    {
+      role: "system" as const,
+      content: `You are fixing a React Native TypeScript file that violated export/import contracts.
+Return ONLY the corrected code. No markdown fences. No explanations.
+
+AVAILABLE CONTRACTS:
+\`\`\`json
+${JSON.stringify(contracts, null, 2)}
+\`\`\`
+
+RULES:
+- isDefaultExport: true → import X from "path" (NO braces)
+- isDefaultExport: false → import { X } from "path" (WITH braces)
+- returnObjectKeys → destructure ONLY these exact keys`,
+    },
+    {
+      role: "user" as const,
+      content: `Fix ${filePath}. Violations:\n${violationsText}\n\nCurrent code:\n${currentContent}`,
+    },
+  ];
+
+  let fixedCode = "";
+
+  const generator = await streamCompletion(messages, {
+    temperature: 0.2,
+    maxTokens: options.maxTokens ?? 65536,
+    lmStudioUrl: options.lmStudioUrl,
+    model: options.model,
+  });
+
+  for await (const chunk of generator) {
+    fixedCode += chunk;
+  }
+
+  // Strip markdown fences if LLM added them
+  fixedCode = fixedCode.trim()
+    .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
+    .replace(/\n?```\s*$/, "")
+    .trim();
+
+  if (fixedCode.length < 10) return null;
+
+  writeFile(projectName, filePath, sanitizeGeneratedCode(fixedCode));
+  return fixedCode;
+};

@@ -264,33 +264,51 @@ export const createProject = async (
 
   broadcast({ type: "generation_complete", filesCount: files.length });
 
-  // ── Step 3b: Contract Validation ────────────────────────
+  // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
-    const { extractExportContracts } = await import("./context-builder.js");
+    const { extractExportContracts: extractContracts } = await import("./context-builder.js");
     const { validateFileContracts } = await import("./project-validator.js");
+    const { regenerateFileWithContracts } = await import("./generator.js");
     const { readFile: readProjectFile } = await import("../services/file-manager.js");
+
+    const MAX_CONTRACT_RETRIES = 2;
 
     // Build contracts from all generated files
     const allContracts: Record<string, import("./context-builder.js").ExportContract[]> = {};
-    for (const filePath of files) {
-      const fullPath = path.join(projectPath, filePath);
-      const contracts = extractExportContracts(fullPath);
-      if (contracts) allContracts[filePath] = contracts;
+    for (const fp of files) {
+      const contracts = extractContracts(path.join(projectPath, fp));
+      if (contracts) allContracts[fp] = contracts;
     }
 
-    // Validate each file against contracts
-    const allViolations: import("./project-validator.js").ContractViolation[] = [];
-    for (const filePath of files) {
-      const content = readProjectFile(projectSlug, filePath);
-      if (!content) continue;
-      const violations = validateFileContracts(content, filePath, allContracts);
-      allViolations.push(...violations);
-    }
+    // Validate + auto-fix loop per file
+    for (const fp of files) {
+      let retries = 0;
 
-    if (allViolations.length > 0) {
-      const summary = allViolations.map((v) => `${v.filePath}: ${v.message}`).join("\n");
-      broadcast({ type: "system_error", error: `Contract violations found:\n${summary}` });
-      // Continue anyway — Metro might still work, but log the issues
+      while (retries <= MAX_CONTRACT_RETRIES) {
+        const content = readProjectFile(projectSlug, fp);
+        if (!content) break;
+
+        const violations = validateFileContracts(content, fp, allContracts);
+        if (violations.length === 0) break;
+
+        if (retries === MAX_CONTRACT_RETRIES) {
+          const summary = violations.map((v) => v.message).join("; ");
+          broadcast({ type: "system_error", error: `Contract violations in ${fp} after ${MAX_CONTRACT_RETRIES} retries: ${summary}` });
+          break;
+        }
+
+        retries++;
+        broadcast({ type: "autofix_start", file: fp, error: `Contract violations: ${violations.length}` });
+
+        await regenerateFileWithContracts(
+          projectSlug, projectPath, fp, violations, allContracts,
+          { lmStudioUrl, model, maxTokens },
+        );
+
+        // Re-extract contracts after fix
+        const updatedContracts = extractContracts(path.join(projectPath, fp));
+        if (updatedContracts) allContracts[fp] = updatedContracts;
+      }
     }
   }
 

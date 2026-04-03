@@ -30,7 +30,7 @@ const evictOldestIfNeeded = (): void => {
 
   // Kill the oldest process (first inserted into the Map)
   const [oldestName, oldest] = activeProcesses.entries().next().value as [string, ManagedProcess];
-  console.log(`[process-manager] Evicting oldest expo process: ${oldestName} (limit: ${MAX_ACTIVE_EXPO})`);
+  // Debug: eviction logged only when needed
   killProcess(oldest.process);
   oldest.cleanup();
   activeProcesses.delete(oldestName);
