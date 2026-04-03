@@ -28,6 +28,32 @@ const PreviewPanel = () => {
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
   const proxyUrl = projectName ? apiClient.getPreviewProxyUrl(projectName) : apiClient.getPreviewProxyUrl();
 
+  // Auto-retry: verify proxy is responding, refresh iframe if not
+  useEffect(() => {
+    if (!previewPort || !projectName) return;
+    let retries = 0;
+    const maxRetries = 5;
+    const check = async () => {
+      try {
+        const resp = await fetch(proxyUrl, { method: "HEAD", signal: AbortSignal.timeout(3000) });
+        if (!resp.ok && retries < maxRetries) {
+          retries++;
+          retryTimer = setTimeout(check, 3000 * retries);
+        }
+      } catch {
+        if (retries < maxRetries) {
+          retries++;
+          retryTimer = setTimeout(check, 3000 * retries);
+        }
+      }
+      if (retries > 0 && retries <= maxRetries) {
+        setRefreshKey((k) => k + 1);
+      }
+    };
+    let retryTimer = setTimeout(check, 2000);
+    return () => clearTimeout(retryTimer);
+  }, [previewPort, projectName, proxyUrl]);
+
   const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
   const handleOpenExternal = useCallback(() => { void Linking.openURL(proxyUrl); }, [proxyUrl]);
 
@@ -98,7 +124,7 @@ const PreviewPanel = () => {
           {typeof window !== "undefined" && (
             <iframe
               key={`${projectName}-${previewPort}-${refreshKey}`}
-              src={proxyUrl}
+              src={`${proxyUrl}?v=${previewPort}-${refreshKey}`}
               style={{ width: "100%", height: "100%", border: "none", backgroundColor: "#FAFAFF" }}
               title="App Preview"
               allow="clipboard-read; clipboard-write"

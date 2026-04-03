@@ -38,6 +38,17 @@ import {
 import { killAll, startExpo, getActivePort } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 
+const waitForMetroReady = async (port: number, maxRetries = 40): Promise<boolean> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const resp = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(2000) });
+      if (resp.ok) return true;
+    } catch { /* Metro not ready yet */ }
+    await new Promise((r) => setTimeout(r, 750));
+  }
+  return false;
+};
+
 const PORT = Number(process.env.AGENT_PORT ?? 3100);
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const app = express();
@@ -253,15 +264,19 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
     case "start_preview": {
       console.log("[WS] Start preview:", message.projectName);
 
-      // Fast path: if project is already running, just register the port
+      // Fast path: if project is already running, health-check then register
       const pName = message.projectName as string;
       const existingPort = getActivePort(pName);
       if (existingPort) {
-        console.log(`[WS] Project ${pName} already running on port ${existingPort}`);
-        setPreviewPort(pName, existingPort);
-        broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
-        broadcast({ type: "status", status: "ready" });
-        return;
+        console.log(`[WS] Project ${pName} running on port ${existingPort}, verifying...`);
+        const healthy = await waitForMetroReady(existingPort, 5);
+        if (healthy) {
+          setPreviewPort(pName, existingPort);
+          broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
+          broadcast({ type: "status", status: "ready" });
+          return;
+        }
+        console.log(`[WS] Port ${existingPort} not healthy, restarting...`);
       }
 
       runQueuedOperation(

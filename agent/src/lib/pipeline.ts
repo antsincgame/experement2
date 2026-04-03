@@ -289,6 +289,7 @@ export const createProject = async (
   const MAX_BUILD_AUTOFIX = 3;
   const BUILD_TIMEOUT = 60000; // 60s for first build (Metro is slow)
 
+  // clearCache=true for initial project build
   const { port: expoPort } = await startExpo(projectSlug, projectPath, (event) => {
     broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
 
@@ -300,7 +301,7 @@ export const createProject = async (
     if (event.type === "build_error" && event.error) {
       buildError = event.error;
     }
-  });
+  }, true); // clearCache for initial build
 
   // Wait for first build result (success or error)
   await waitForBuildOutcome(
@@ -366,8 +367,21 @@ export const createProject = async (
     broadcast({ type: "status", status: buildError ? "error" : "ready" });
   }
 
-  setPreviewPort(projectSlug, expoPort || null);
-  broadcast({ type: "preview_ready", port: expoPort, projectName: projectSlug, proxyUrl: `/preview/${encodeURIComponent(projectSlug)}/` });
+  if (expoPort) {
+    // Wait for Metro to actually accept requests before announcing preview
+    let metroReady = false;
+    for (let i = 0; i < 40; i++) {
+      try {
+        const resp = await fetch(`http://127.0.0.1:${expoPort}`, { signal: AbortSignal.timeout(2000) });
+        if (resp.ok) { metroReady = true; break; }
+      } catch { /* not ready */ }
+      await new Promise((r) => setTimeout(r, 750));
+    }
+    setPreviewPort(projectSlug, expoPort);
+    if (metroReady) {
+      broadcast({ type: "preview_ready", port: expoPort, projectName: projectSlug, proxyUrl: `/preview/${encodeURIComponent(projectSlug)}/` });
+    }
+  }
 
   // Git commit the successful state
   if (buildSuccess) {

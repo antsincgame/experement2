@@ -70,7 +70,8 @@ const killProcess = (cp: ChildProcess): void => {
 export const startExpo = async (
   projectName: string,
   projectPath: string,
-  onLog: LogCallback
+  onLog: LogCallback,
+  clearCache = false,
 ): Promise<{ port: number; process: ChildProcess }> => {
   const existing = activeProcesses.get(projectName);
   if (existing) {
@@ -84,7 +85,10 @@ export const startExpo = async (
   const port = await findFreePort();
 
   const npxCmd = isWindows ? "npx.cmd" : "npx";
-  const child = spawn(npxCmd, ["expo", "start", "--web", "--port", String(port), "--clear"], {
+  const args = ["expo", "start", "--web", "--port", String(port)];
+  if (clearCache) args.push("--clear");
+
+  const child = spawn(npxCmd, args, {
     cwd: projectPath,
     env: { ...process.env, BROWSER: "none" },
     shell: isWindows,
