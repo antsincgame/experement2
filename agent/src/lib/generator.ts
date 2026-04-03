@@ -86,11 +86,14 @@ const normalizeImportDeclarations = (code: string): string => {
 };
 
 /** Post-process: fix common LLM mistakes that cause crashes */
-const sanitizeGeneratedCode = (code: string): string => {
+const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   let result = code;
 
   result = result.replace(/from\s+["']@\/src\//g, 'from "@/');
   result = result.replace(/from\s*["']expo-router\/tabs["']/g, 'from "expo-router"');
+  result = fixHookImports(result);
+  result = fixComponentImports(result);
+  result = ensureDefaultExport(result, filePath);
   result = normalizeImportDeclarations(result);
 
   // Fix: React.useState/useEffect/useCallback → direct import (if React not imported)
@@ -111,6 +114,44 @@ const sanitizeGeneratedCode = (code: string): string => {
   }
 
   return result;
+};
+
+/** Ensure hooks and components use export default (not named export) */
+const ensureDefaultExport = (code: string, filePath: string): string => {
+  // Only apply to hooks and components
+  const isHook = filePath.includes("/hooks/") && filePath.match(/use[A-Z]/);
+  const isComponent = filePath.includes("/components/") && filePath.match(/\/[A-Z]/);
+  const isScreen = filePath.startsWith("app/");
+
+  if (!isHook && !isComponent && !isScreen) return code;
+
+  // If already has export default → OK
+  if (/export\s+default\s+/.test(code)) return code;
+
+  // Fix: export function useX() → export default function useX()
+  // Fix: export function ComponentName() → export default function ComponentName()
+  return code.replace(
+    /^(export)\s+(function\s+(?:use[A-Z]|[A-Z])\w*)/m,
+    "$1 default $2"
+  );
+};
+
+/** Fix named imports of hooks — hooks use export default, must be imported without braces */
+const fixHookImports = (code: string): string => {
+  // Match: import { useX } from "@/hooks/useX" → import useX from "@/hooks/useX"
+  return code.replace(
+    /import\s*\{\s*(use[A-Z]\w*)\s*\}\s*from\s*(["']@\/hooks\/[^"']+["'])/g,
+    "import $1 from $2"
+  );
+};
+
+/** Fix named imports of components — components use export default */
+const fixComponentImports = (code: string): string => {
+  // Match: import { ComponentName } from "@/components/ComponentName" → import ComponentName from ...
+  return code.replace(
+    /import\s*\{\s*([A-Z]\w*)\s*\}\s*from\s*(["']@\/components\/[^"']+["'])/g,
+    "import $1 from $2"
+  );
 };
 
 const buildDependencyContext = (
@@ -164,7 +205,7 @@ const extractCodeFromResponse = (response: string): { filepath: string; code: st
   }
 
   // Post-process: fix common LLM mistakes that cause crashes
-  code = sanitizeGeneratedCode(code);
+  code = sanitizeGeneratedCode(code, filepath);
 
   return { filepath, code };
 };
@@ -305,7 +346,7 @@ Generate the complete code for: ${fileSpec.path}`;
         .trim();
 
       // ALWAYS run sanitizer (bug fix: fallback was missing sanitization)
-      code = sanitizeGeneratedCode(code);
+      code = sanitizeGeneratedCode(code, fileSpec.path);
 
       if (code.length > 10) {
         writeFile(projectName, fileSpec.path, code);
@@ -384,6 +425,6 @@ RULES:
 
   if (fixedCode.length < 10) return null;
 
-  writeFile(projectName, filePath, sanitizeGeneratedCode(fixedCode));
+  writeFile(projectName, filePath, sanitizeGeneratedCode(fixedCode, filePath));
   return fixedCode;
 };
