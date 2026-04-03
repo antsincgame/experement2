@@ -269,14 +269,16 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
       const existingPort = getActivePort(pName);
       if (existingPort) {
         console.log(`[WS] Project ${pName} running on port ${existingPort}, verifying...`);
-        const healthy = await waitForMetroReady(existingPort, 5);
-        if (healthy) {
-          setPreviewPort(pName, existingPort);
-          broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
-          broadcast({ type: "status", status: "ready" });
-          return;
-        }
-        console.log(`[WS] Port ${existingPort} not healthy, restarting...`);
+        waitForMetroReady(existingPort, 5).then((healthy) => {
+          if (healthy) {
+            setPreviewPort(pName, existingPort);
+            broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
+            broadcast({ type: "status", status: "ready" });
+          } else {
+            console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
+          }
+        });
+        return;
       }
 
       runQueuedOperation(
