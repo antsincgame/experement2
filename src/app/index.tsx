@@ -152,13 +152,16 @@ export default function AppFactoryScreen() {
     void Linking.openURL(apiClient.getProjectExportUrl(projectName));
   }, [projectName]);
 
+  const setPendingProjectName = useProjectStore((s) => s.setPendingProjectName);
+
   const handleCreate = useCallback(
     (text: string) => {
-      setProjectName(null); // Reset to ensure new project, not iterate on old
+      setProjectName(null);
+      setPendingProjectName("__creating__"); // Mark that we're actively creating
       setStatus("planning");
       createProject(text);
     },
-    [setStatus, createProject]
+    [setStatus, setPendingProjectName, createProject]
   );
 
   const handleChatSend = useCallback(

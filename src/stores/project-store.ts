@@ -85,6 +85,7 @@ interface ProjectState {
   currentGeneratingFile: string | null;
   isConnected: boolean;
   lmStudioStatus: "connected" | "disconnected" | "checking";
+  pendingProjectName: string | null;
   streamingContent: string;
   fileTreeVisible: boolean;
   terminalVisible: boolean;
@@ -107,6 +108,7 @@ interface ProjectState {
   setGenerationProgress: (progress: number, file: string | null) => void;
   setConnected: (connected: boolean) => void;
   setLmStudioStatus: (status: "connected" | "disconnected" | "checking") => void;
+  setPendingProjectName: (name: string | null) => void;
   appendStreamingContent: (chunk: string) => void;
   clearStreamingContent: () => void;
   toggleFileTree: () => void;
@@ -193,6 +195,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   currentGeneratingFile: null as string | null,
   isConnected: false,
   lmStudioStatus: "checking" as "connected" | "disconnected" | "checking",
+  pendingProjectName: null as string | null,
   streamingContent: "",
   fileTreeVisible: true,
   terminalVisible: true,
@@ -275,6 +278,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
     set({ generationProgress, currentGeneratingFile }),
 
   setConnected: (isConnected) => set({ isConnected }),
+  setPendingProjectName: (pendingProjectName) => set({ pendingProjectName }),
   setLmStudioStatus: (lmStudioStatus) => set({ lmStudioStatus }),
 
   appendStreamingContent: (chunk) =>
@@ -375,7 +379,23 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   storage: createJSONStorage(() => localStorage),
   partialize: (state) => ({
     projectList: state.projectList,
-    projectChats: state.projectChats,
+    // Persist only lightweight data — exclude fileContents (8MB+) and streamingContent
+    projectChats: Object.fromEntries(
+      Object.entries(state.projectChats).map(([name, chat]) => [
+        name,
+        {
+          messages: chat.messages.slice(-50),
+          versions: chat.versions,
+          fileTree: chat.fileTree,
+          openFiles: chat.openFiles,
+          activeFile: chat.activeFile,
+          fileContents: {},
+          streamingContent: "",
+          previewUrl: null,
+          previewPort: null,
+        },
+      ])
+    ),
   }),
 }));
   // File fetch helper

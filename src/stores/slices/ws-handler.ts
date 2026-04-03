@@ -58,8 +58,14 @@ export const createWsHandler = (
 
     case "scaffold_complete": {
       const projectName = msg.projectName as string;
+      const pending = (get() as { pendingProjectName?: string | null }).pendingProjectName;
+      // Only switch if user is actively creating (pending="__creating__" accepts any, or exact match)
+      if (pending && pending !== "__creating__" && pending !== projectName) {
+        log({ level: "warn", source: "pipeline", message: `Ignoring scaffold_complete for ${projectName} (pending: ${pending})` });
+        break;
+      }
       const existing = store.projectList.find((p) => p.name === projectName);
-      set({ projectName });
+      set({ projectName, pendingProjectName: null });
       store.addProject({
         name: projectName,
         displayName: existing?.displayName ?? projectName,
