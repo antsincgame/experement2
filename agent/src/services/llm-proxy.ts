@@ -211,10 +211,34 @@ export const streamCompletion = async (
   }
 
   if (!response.ok) {
-    activeControllers.delete(taskId);
-    activeRequestCount = Math.max(0, activeRequestCount - 1);
     const errorText = await response.text();
-    throw new Error(`LM Studio error (${response.status}): ${errorText}`);
+
+    // If model not found (404) — clear cache and retry with auto-detected model
+    if (response.status === 404 && errorText.includes("not found") && resolvedModel) {
+      clearModelCache(baseUrl);
+      const fallbackModel = await getDefaultModel(baseUrl);
+      if (fallbackModel && fallbackModel !== resolvedModel) {
+        console.log(`[LLM] Model '${resolvedModel}' not found, falling back to '${fallbackModel}'`);
+        body.model = fallbackModel;
+        try {
+          const retryResp = await fetch(`${baseUrl}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+          if (retryResp.ok && retryResp.body) {
+            response = retryResp;
+          }
+        } catch { /* fall through to error */ }
+      }
+    }
+
+    if (!response.ok) {
+      activeControllers.delete(taskId);
+      activeRequestCount = Math.max(0, activeRequestCount - 1);
+      throw new Error(`LLM error (${response.status}): ${errorText}`);
+    }
   }
 
   if (!response.body) {

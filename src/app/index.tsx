@@ -201,11 +201,26 @@ export default function AppFactoryScreen() {
                 ...(Platform.OS === "web" ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
               } as never}
             >
-              <View className="px-4 py-3 flex-row items-center gap-2" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.4)" }}>
-                <FolderOpen size={14} color="#7C4DFF" strokeWidth={1.5} />
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#4A4A6A", letterSpacing: 0.5, textTransform: "uppercase" }}>
-                  My Projects ({allProjects.length})
-                </Text>
+              <View className="px-4 py-3 flex-row items-center justify-between" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.4)" }}>
+                <View className="flex-row items-center gap-2">
+                  <FolderOpen size={14} color="#7C4DFF" strokeWidth={1.5} />
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#4A4A6A", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                    My Projects ({allProjects.length})
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    // Clear all projects from store + disk
+                    useProjectStore.getState().reset();
+                    void apiClient.postData("/api/projects/all", {}).catch(() => {});
+                    // Also try DELETE
+                    void fetch(`${apiClient.getAgentUrl()}/api/projects/all`, { method: "DELETE" }).catch(() => {});
+                    setDiskProjects([]);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Text style={{ fontSize: 9, color: "#FF3366", fontWeight: "600" }}>Clear All</Text>
+                </Pressable>
               </View>
               <ScrollView className="flex-1" contentContainerStyle={{ paddingVertical: 4 }}>
                 {allProjects.map((p) => (
