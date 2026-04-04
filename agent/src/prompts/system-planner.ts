@@ -63,8 +63,14 @@ date-fns, dayjs, axios, @react-native-async-storage/async-storage,
 react-native-chart-kit, react-native-calendars, react-native-modal, burnt
 
 ## Output Format
-Respond with a single JSON object. No markdown, no explanation, no code fences.
-Start with { and end with }
+CRITICAL: Respond with ONLY a single JSON object.
+- NO text before the JSON. NO text after the JSON.
+- NO markdown fences. NO explanation. NO thinking.
+- The VERY FIRST character of your response MUST be {
+- The VERY LAST character of your response MUST be }
+- Do NOT write "Here is the plan:" or any preamble.
+- Do NOT use <think> tags.
+- Language of ALL values must be ENGLISH (not Russian, not Chinese).
 
 ## JSON Schema
 {
