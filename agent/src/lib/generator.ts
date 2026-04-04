@@ -366,13 +366,57 @@ Generate the complete code for: ${fileSpec.path}`;
     }
   }
 
-  // Check for truncated files (missing // EOF marker)
+  // Check for truncated files (missing // EOF marker) — retry once
+  const truncated: string[] = [];
   for (const fp of generatedFiles) {
     if (AUTO_LAYOUT_FILES.has(fp)) continue;
+    if (fp === "src/theme.ts") continue; // boilerplate, already has EOF
     const content = readFile(projectName, fp);
-    if (content && !content.includes("// EOF")) {
-      // File may be truncated — strip marker if present elsewhere and note it
-      // For now just log, Fixer will handle in contract validation step
+    if (content && !content.includes("// EOF") && content.length > 20) {
+      truncated.push(fp);
+    }
+  }
+
+  if (truncated.length > 0 && onChunk) {
+    onChunk(`\n[Truncation detected: ${truncated.length} files missing // EOF — retrying]\n`);
+
+    for (const fp of truncated) {
+      const fileSpec = plan.files.find((f) => f.path === fp);
+      if (!fileSpec) continue;
+
+      const currentContent = readFile(projectName, fp) ?? "";
+      const retryMessages = [
+        { role: "system" as const, content: SYSTEM_GENERATOR },
+        {
+          role: "user" as const,
+          content: `The following file was TRUNCATED (cut off). Regenerate it COMPLETELY.\nPath: ${fp}\nDescription: ${fileSpec.description}\n\nTruncated content (for reference):\n${currentContent.slice(0, 2000)}\n\nWrite the COMPLETE file. End with // EOF.`,
+        },
+      ];
+
+      let retryCode = "";
+      const retryGen = await streamCompletion(retryMessages, {
+        temperature: temperature ?? 0.3,
+        maxTokens: maxTokens ?? 65536,
+        lmStudioUrl,
+        model,
+      });
+
+      for await (const chunk of retryGen) {
+        retryCode += chunk;
+      }
+
+      retryCode = retryCode.trim()
+        .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
+        .replace(/\n?```\s*$/, "")
+        .trim();
+
+      const firstImport = retryCode.indexOf("import ");
+      if (firstImport > 0) retryCode = retryCode.slice(firstImport);
+
+      if (retryCode.length > 50) {
+        writeFile(projectName, fp, sanitizeGeneratedCode(retryCode, fp));
+        onChunk?.(`[Retry OK: ${fp}]\n`);
+      }
     }
   }
 

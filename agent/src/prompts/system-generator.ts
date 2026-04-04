@@ -125,6 +125,7 @@ export default function TabLayout() {
 6. EVERY import must reference: (a) node_modules package, or (b) file that EXISTS in the plan.
 7. If you need a hook/store/util — define it INLINE or ensure it's in the plan's file list.
 8. Keep files under 200 lines.
+9. **CRITICAL: Always write \`// EOF\` as the very last line of every file.** This marker proves the file is complete. If missing, the file is considered truncated and will be regenerated.
 
 ## ❌ ANTI-HALLUCINATION RULES (causes instant crash)
 1. **NEVER call functions that don't exist in the store.** If Zustand store has \`{ expenses, addExpense, removeExpense }\`, you CANNOT call \`getExpenses()\` — it doesn't exist. Use the state directly: \`expenses\` (not a function call).

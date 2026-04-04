@@ -80,16 +80,38 @@ export const extractExportContracts = (filePath: string): ExportContract[] | nul
               returnObjectKeys = returnType.getProperties().map((p) => p.getName());
             }
           }
-          // Fallback: scan file for interface with matching name pattern
+          // Fallback: scan file for store interface
           if (returnObjectKeys.length === 0) {
             const storeName = actualName.replace(/^use/, "").replace(/Store$/, "");
-            for (const iface of sf.getInterfaces()) {
-              const ifaceName = iface.getName();
-              if (ifaceName.includes(storeName) || ifaceName.includes("Store") || ifaceName.includes("State")) {
-                returnObjectKeys = iface.getProperties().map((p) => p.getName());
-                returnTypeStr = `{ ${returnObjectKeys.join("; ")} }`;
-                break;
-              }
+            const interfaces = sf.getInterfaces();
+
+            // Priority 1: interface matching store name
+            let matched = interfaces.find((i) => {
+              const n = i.getName();
+              return n.includes(storeName) || n.includes("Store") || n.includes("State");
+            });
+
+            // Priority 2: any interface with 3+ properties (likely the store shape)
+            if (!matched) {
+              matched = interfaces.find((i) => i.getProperties().length >= 3);
+            }
+
+            if (matched) {
+              returnObjectKeys = matched.getProperties().map((p) => p.getName());
+              returnTypeStr = `{ ${returnObjectKeys.join("; ")} }`;
+            }
+          }
+
+          // Fallback 2: parse store interface from raw source via regex
+          if (returnObjectKeys.length === 0) {
+            const src = sf.getFullText();
+            const ifaceMatch = src.match(/interface\s+\w+\s*\{([^}]+)\}/);
+            if (ifaceMatch) {
+              const body = ifaceMatch[1];
+              returnObjectKeys = body
+                .split(/[;\n]/)
+                .map((line) => line.trim().split(/[:(]/)[0].trim())
+                .filter((k) => k.length > 0 && !k.startsWith("//"));
             }
           }
         }

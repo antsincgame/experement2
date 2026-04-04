@@ -397,31 +397,33 @@ export const validateFileContracts = (
     const hookName = match[2];
     let contract = allContracts.find((c) => c.name === hookName);
 
-    // Fallback: if no contract found (ts-morph couldn't parse Zustand store),
-    // try to find the store file and extract keys via regex
+    // Fallback chain for Zustand store hooks
     let validKeys = contract?.returnObjectKeys ?? [];
-    if (validKeys.length === 0 && hookName.includes("Store")) {
-      // Find the store file path from imports in this file
+
+    if (validKeys.length === 0) {
+      // Try 1: find store contract by hook name
       const storeImportMatch = fileContent.match(
         new RegExp(`import.*${hookName}.*from\\s+["']([^"']+)["']`)
       );
       if (storeImportMatch) {
-        const storePath = storeImportMatch[1]
-          .replace("@/", "src/")
-          .replace(/^\.\//, "") + ".ts";
+        const importPath = storeImportMatch[1].replace("@/", "src/").replace(/^\.\//, "");
         const allFiles = Object.keys(contracts);
-        const storeFile = allFiles.find((f) => f.includes(storePath.split("/").pop()?.replace(".ts", "") ?? ""));
+        const storeFile = allFiles.find((f) =>
+          f.includes(importPath.split("/").pop()?.replace(/\.ts$/, "") ?? "")
+        );
         if (storeFile) {
-          const storeContracts = contracts[storeFile];
-          if (storeContracts) {
-            // Store exports useXStore which returns store interface keys
-            for (const sc of storeContracts) {
-              if (sc.returnObjectKeys.length > 0) {
-                validKeys = sc.returnObjectKeys;
-                break;
-              }
+          for (const sc of (contracts[storeFile] ?? [])) {
+            if (sc.returnObjectKeys.length > 0) {
+              validKeys = sc.returnObjectKeys;
+              break;
             }
           }
+        }
+
+        // Try 2: read store source file and extract interface keys via regex
+        if (validKeys.length === 0 && storeFile) {
+          const storeKeys = extractStoreKeysFromSource("", storeFile);
+          if (storeKeys.length > 0) validKeys = storeKeys;
         }
       }
     }
