@@ -62,41 +62,17 @@ const BOILERPLATE_FILES: Record<string, string> = {
   "babel.config.js": `module.exports = function (api) {
   api.cache(true);
   return {
-    presets: [
-      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
-      "nativewind/babel",
-    ],
+    presets: ["babel-preset-expo"],
     plugins: ["react-native-reanimated/plugin"],
   };
 };
 `,
 
   "metro.config.js": `const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
-
-const config = getDefaultConfig(__dirname);
-
-module.exports = withNativeWind(config, { input: "./src/global.css" });
-`,
-
-  "tailwind.config.js": `/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: ["./src/**/*.{js,jsx,ts,tsx}", "./app/**/*.{js,jsx,ts,tsx}"],
-  presets: [require("nativewind/preset")],
-  theme: { extend: {} },
-  plugins: [],
-};
-`,
-
-  "nativewind-env.d.ts": `/// <reference types="nativewind/types" />
+module.exports = getDefaultConfig(__dirname);
 `,
 
   "expo-env.d.ts": `/// <reference types="expo/types" />
-`,
-
-  "src/global.css": `@tailwind base;
-@tailwind components;
-@tailwind utilities;
 `,
 
   ".gitignore": `node_modules/

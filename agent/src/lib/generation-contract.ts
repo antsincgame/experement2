@@ -44,8 +44,6 @@ export const TEMPLATE_PACKAGE_DEPENDENCIES = {
   "react-native-screens": "~4.23.0",
   "react-native-gesture-handler": "~2.30.0",
   "react-native-reanimated": "4.2.1",
-  nativewind: "^4.0.0",
-  tailwindcss: "^3.4.0",
   "@expo/vector-icons": "^14.0.0",
   "@react-native-async-storage/async-storage": "2.2.0",
 } as const;
@@ -60,10 +58,7 @@ export const REQUIRED_TEMPLATE_FILES = [
   "tsconfig.json",
   "babel.config.js",
   "metro.config.js",
-  "tailwind.config.js",
-  "nativewind-env.d.ts",
   "expo-env.d.ts",
-  "src/global.css",
   ".gitignore",
   "app/_layout.tsx",
 ] as const;

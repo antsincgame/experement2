@@ -161,22 +161,53 @@ export const streamCompletion = async (
     }
   }
 
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (fetchError) {
+  // Auto-retry with exponential backoff (3 attempts: 2s, 4s, 8s)
+  const MAX_RETRIES = 3;
+  const BACKOFF_BASE = 2000;
+  let response: Response | undefined;
+  let lastError = "";
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      response = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      break; // success — exit retry loop
+    } catch (fetchError) {
+      const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      lastError = msg;
+
+      if (msg.includes("abort") || msg.includes("cancel")) {
+        // User aborted — don't retry
+        activeControllers.delete(taskId);
+        activeRequestCount = Math.max(0, activeRequestCount - 1);
+        throw new Error(`LLM request aborted`);
+      }
+
+      if (attempt < MAX_RETRIES) {
+        const delay = BACKOFF_BASE * Math.pow(2, attempt); // 2s, 4s, 8s
+        console.log(`[LLM] Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms (${msg})`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+
+      // All retries exhausted
+      activeControllers.delete(taskId);
+      activeRequestCount = Math.max(0, activeRequestCount - 1);
+      if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
+        throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl} after ${MAX_RETRIES} retries. Check that LM Studio or Ollama is running.`);
+      }
+      throw new Error(`LLM_NETWORK_ERROR: ${msg}`);
+    }
+  }
+
+  if (!response) {
     activeControllers.delete(taskId);
     activeRequestCount = Math.max(0, activeRequestCount - 1);
-    const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
-    if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
-      throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl}. Check that LM Studio or Ollama is running.`);
-    }
-    throw new Error(`LLM_NETWORK_ERROR: ${msg}`);
+    throw new Error(`LLM_SERVER_DOWN: No response after ${MAX_RETRIES} retries. Last error: ${lastError}`);
   }
 
   if (!response.ok) {

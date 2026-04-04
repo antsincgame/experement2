@@ -22,8 +22,7 @@ export const getRootLayout = (
   const navType: SupportedNavigationType = navigation?.type ?? "stack";
 
   // Both tabs and stack use <Stack> as root — Expo Router auto-discovers (tabs) group
-  return `import "../src/global.css";
-import { Stack } from "expo-router";
+  return `import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -71,4 +70,54 @@ ${tabsScreens}
 };
 
 /** Static boilerplate remains centralized in template-cache; this stays for prompt-side dynamic layouts only. */
-export const BOILERPLATE_TEMPLATES: Record<string, string> = {};
+export const BOILERPLATE_TEMPLATES: Record<string, string> = {
+  "src/theme.ts": `// App theme — design tokens for consistent styling
+export const colors = {
+  background: "#F8FAFC",
+  surface: "#FFFFFF",
+  primary: "#6366F1",
+  primaryLight: "#818CF8",
+  text: "#0F172A",
+  textSecondary: "#64748B",
+  textMuted: "#94A3B8",
+  border: "#E2E8F0",
+  success: "#10B981",
+  warning: "#F59E0B",
+  error: "#EF4444",
+  card: "#FFFFFF",
+};
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+};
+
+export const borderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 20,
+  full: 9999,
+};
+
+export const shadows = {
+  card: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+};
+
+export const typography = {
+  title: { fontSize: 28, fontWeight: "700" as const, color: colors.text },
+  subtitle: { fontSize: 16, fontWeight: "600" as const, color: colors.text },
+  body: { fontSize: 14, color: colors.text },
+  caption: { fontSize: 12, color: colors.textSecondary },
+};
+// EOF
+`,
+};
