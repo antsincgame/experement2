@@ -228,7 +228,7 @@ class ApiClient {
     return Array.isArray(response.data) ? response.data : [];
   }
 
-  /** List models from any OpenAI-compatible endpoint (LM Studio or Ollama) */
+  /** List models from the configured LM Studio-compatible endpoint. */
   async listModelsFromUrl(url: string): Promise<LmModel[]> {
     try {
       const response = await this.fetchJson<{ data?: LmModel[] }>(
@@ -240,7 +240,7 @@ class ApiClient {
     }
   }
 
-  /** Test connection to any LLM server */
+  /** Test connection to the configured LM Studio server. */
   async testLlmConnection(url: string, timeoutMs = 5000): Promise<{ ok: boolean; models: number; error?: string }> {
     try {
       const controller = new AbortController();

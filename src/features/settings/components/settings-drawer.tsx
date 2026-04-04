@@ -1,3 +1,4 @@
+// Keeps the settings drawer LM Studio-only so the UI no longer exposes legacy secondary-provider paths.
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, TextInput, Pressable, Modal, Platform, ScrollView } from "react-native";
 import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info } from "lucide-react-native";
@@ -76,7 +77,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
         <View className="flex-row gap-4 px-6 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.04)" }}>
           <StatusBadge icon={isConnected ? Wifi : WifiOff} label="Agent" connected={isConnected} />
-          <StatusBadge icon={Server} label="LLM Server" connected={lmStatus === "connected"} />
+          <StatusBadge icon={Server} label="LM Studio" connected={lmStatus === "connected"} />
           <View className="flex-row items-center gap-1">
             <Text className="text-ink-muted text-[10px]">{models.length} models</Text>
             <Pressable onPress={fetchModels} className="w-4 h-4 items-center justify-center">
@@ -87,7 +88,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
         <ScrollView className="px-6 py-4 pb-8" contentContainerStyle={{ gap: 16 }}>
           <View>
-            <Field label="LLM Provider URL" value={settings.lmStudioUrl} onChange={settings.setLmStudioUrl} />
+            <Field label="LM Studio URL" value={settings.lmStudioUrl} onChange={settings.setLmStudioUrl} />
             <View className="flex-row gap-1.5 mt-1.5">
               <Pressable
                 onPress={() => settings.setLmStudioUrl("http://localhost:1234")}
@@ -99,17 +100,6 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                 }}
               >
                 <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("1234") ? "#00BCD4" : "#888", fontWeight: "600" }}>LM Studio :1234</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => settings.setLmStudioUrl("http://localhost:11434")}
-                className="px-2.5 py-1 rounded-lg"
-                style={{
-                  backgroundColor: settings.lmStudioUrl.includes("11434") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
-                  borderWidth: 1,
-                  borderColor: settings.lmStudioUrl.includes("11434") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
-                }}
-              >
-                <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("11434") ? "#00BCD4" : "#888", fontWeight: "600" }}>Ollama :11434</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -125,7 +115,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                 className="px-2.5 py-1 rounded-lg"
                 style={{ backgroundColor: "rgba(0,255,136,0.1)", borderWidth: 1, borderColor: "rgba(0,255,136,0.2)" }}
               >
-                <Text style={{ fontSize: 9, color: "#00CC66", fontWeight: "600" }}>Test LLM</Text>
+                <Text style={{ fontSize: 9, color: "#00CC66", fontWeight: "600" }}>Test LM Studio</Text>
               </Pressable>
             </View>
           </View>

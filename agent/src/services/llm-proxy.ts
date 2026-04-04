@@ -200,7 +200,7 @@ export const streamCompletion = async (
       activeControllers.delete(taskId);
       activeRequestCount = Math.max(0, activeRequestCount - 1);
       if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
-        throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl} after ${MAX_RETRIES} retries. Check that LM Studio or Ollama is running.`);
+        throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl} after ${MAX_RETRIES} retries. Check that LM Studio is running.`);
       }
       throw new Error(`LLM_NETWORK_ERROR: ${msg}`);
     }

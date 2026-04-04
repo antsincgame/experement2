@@ -1,3 +1,4 @@
+<!-- Updated for LM Studio-only setup so the public docs match the single supported local provider. -->
 # ⚡ App Factory
 
 **Generate full React Native apps from natural language. Runs 100% locally.**
@@ -20,7 +21,7 @@ Describe an app → AI plans, generates, builds, and previews it — all on your
 ## Quick Start
 
 ```bash
-# Prerequisites: Node.js 20+, LM Studio or Ollama with a coding model
+# Prerequisites: Node.js 20+, LM Studio with a coding model
 
 git clone https://github.com/antsincgame/experement2.git
 cd experement2
@@ -36,7 +37,7 @@ Open http://localhost:8081 and start building.
 |-------|------|
 | Frontend | Expo 55 + React Native Web + NativeWind |
 | Backend | Express + WebSocket + ts-morph |
-| LLM | Any OpenAI-compatible API (LM Studio, Ollama) |
+| LLM | LM Studio (OpenAI-compatible local API) |
 | State | Zustand |
 | Validation | Zod + JSON Export Contracts |
 

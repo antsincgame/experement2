@@ -1,10 +1,10 @@
-// Drives the real browser/UI happy-path for opening an existing project, starting preview, and applying one iteration.
+// Drives the real browser/UI happy-path against a deterministic LM Studio-style mock so open-project, preview, and iteration stay stable.
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 
 const AGENT_URL = "http://127.0.0.1:3100";
-const MOCK_LLM_URL = "http://127.0.0.1:11434";
+const MOCK_LLM_URL = "http://127.0.0.1:1235";
 const EXISTING_PROJECT_FIXTURE = {
   name: "e2e-existing-project",
   displayName: "E2E Existing Project",

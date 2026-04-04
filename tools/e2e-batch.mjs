@@ -1,4 +1,4 @@
-// E2E Batch Test Runner — generates projects via WebSocket and checks results
+// E2E Batch Test Runner for the LM Studio-only path — generates projects via WebSocket and records outcomes.
 import WebSocket from "ws";
 import fs from "fs";
 import path from "path";
@@ -44,7 +44,7 @@ async function generateProject(prompt, index) {
       ws.send(JSON.stringify({
         type: "create_project",
         description: prompt,
-        lmStudioUrl: "http://localhost:11434",
+        lmStudioUrl: "http://localhost:1234",
         model: "qwen3-coder-next-q2_k_l",
         maxTokens: 65536,
       }));

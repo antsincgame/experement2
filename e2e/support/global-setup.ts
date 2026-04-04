@@ -1,4 +1,4 @@
-// Starts missing runtime services for the browser E2E while reusing already healthy local agent and Expo sessions.
+// Starts the LM Studio-only browser E2E runtime on a dedicated mock port while reusing healthy local agent and Expo sessions.
 import type { FullConfig } from "@playwright/test";
 import {
   ensureRuntimeProcess,
@@ -10,7 +10,7 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
 
   await ensureRuntimeProcess(started, {
     name: "mock-llm",
-    url: "http://127.0.0.1:11434/health",
+    url: "http://127.0.0.1:1235/health",
     command: process.execPath,
     args: ["./e2e/support/mock-openai-server.mjs"],
     timeoutMs: 30_000,

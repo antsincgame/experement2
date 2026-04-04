@@ -3,7 +3,7 @@
  * Extracts and repairs JSON from LLM output that may contain:
  * - Markdown code fences (```json ... ```)
  * - Thinking blocks (<think>...</think>)
- * - Text before/after the JSON block (common with Ollama)
+ * - Text before/after the JSON block from verbose local-model responses
  * - Trailing commas in arrays/objects
  * - Single-line comments (// ...)
  * - Russian/English preamble text
@@ -11,7 +11,7 @@
 export const repairJson = (raw: string): string => {
   let text = raw.trim();
 
-  // Strip <think>...</think> blocks (Ollama/DeepSeek thinking)
+  // Strip <think>...</think> blocks from thinking-enabled local models
   text = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
   // Strip markdown code fences

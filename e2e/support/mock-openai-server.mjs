@@ -1,7 +1,7 @@
-// Serves deterministic OpenAI-compatible responses so the web happy-path E2E can run without a real LM Studio instance.
+// Serves deterministic LM Studio-style responses on a dedicated test port so local E2E never collides with a real LM Studio instance.
 import http from "node:http";
 
-const PORT = Number(process.env.E2E_MOCK_LLM_PORT ?? 11434);
+const PORT = Number(process.env.E2E_MOCK_LLM_PORT ?? 1235);
 
 const ITERATION_RESPONSE = [
   "filepath: app/index.tsx\n",
