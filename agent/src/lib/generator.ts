@@ -89,6 +89,10 @@ const normalizeImportDeclarations = (code: string): string => {
 const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   let result = code;
 
+  // Strip Qwen3 thinking blocks
+  result = result.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  if (result.includes("<think>")) result = result.replace(/<think>[\s\S]*/g, "").trim();
+
   result = result.replace(/from\s+["']@\/src\//g, 'from "@/');
   result = result.replace(/from\s*["']expo-router\/tabs["']/g, 'from "expo-router"');
   result = fixHookImports(result);
@@ -317,7 +321,7 @@ Generate the complete code for: ${fileSpec.path}`;
 
     const messages = [
       { role: "system" as const, content: SYSTEM_GENERATOR },
-      { role: "user" as const, content: userMessage },
+      { role: "user" as const, content: `/no_think\n${userMessage}` },
     ];
 
     let responseBuffer = "";

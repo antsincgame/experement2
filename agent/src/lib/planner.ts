@@ -19,7 +19,7 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
 
   const messages = [
     { role: "system" as const, content: SYSTEM_PLANNER },
-    { role: "user" as const, content: `Create an app plan for: ${description}` },
+    { role: "user" as const, content: `/no_think\nCreate an app plan for: ${description}\n\nRespond with ONLY a JSON object. No thinking, no explanation, no markdown.` },
   ];
 
   let fullJson = "";
@@ -45,7 +45,12 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   }
   if (planChunkBuffer) onChunk?.(planChunkBuffer);
 
-  const trimmed = fullJson.trim();
+  // Strip Qwen3 thinking blocks: <think>...</think>
+  let trimmed = fullJson.trim().replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Also strip unclosed thinking block (model started thinking but didn't close)
+  if (trimmed.includes("<think>")) {
+    trimmed = trimmed.replace(/<think>[\s\S]*/g, "").trim();
+  }
 
   let parsed: unknown;
   try {
