@@ -1,4 +1,5 @@
 ﻿import { useState, useCallback, useRef, useEffect } from "react";
+import { useRouter } from "expo-router";
 
 import {
   View,
@@ -40,7 +41,7 @@ import LotusToast from "@/shared/components/effects/lotus-toast";
 // react-resizable-panels disabled: uses import.meta which breaks Hermes bundler
 
 export default function AppFactoryScreen() {
-
+  const router = useRouter();
   const { createProject, iterate, abortGeneration, revertVersion, startPreview } = useWebSocket();
 
   const projectName = useProjectStore((s) => s.projectName);
@@ -97,6 +98,13 @@ export default function AppFactoryScreen() {
     }
   }, [welcomeInput, enhancerModel, lmStudioUrl]);
 
+  // Navigate to project page when a new project is created
+  useEffect(() => {
+    if (projectName && status !== "idle") {
+      router.push(`/project/${encodeURIComponent(projectName)}`);
+    }
+  }, [projectName]);
+
   const prevStatus = useRef(status);
   useEffect(() => {
     if (prevStatus.current !== "ready" && status === "ready" && projectName) {
@@ -129,10 +137,7 @@ export default function AppFactoryScreen() {
     void loadProjects();
   }, [agentUrl]);
 
-  // Show welcome screen if no active generation/building in progress
-  // Even if projectName is persisted, let user start fresh from welcome
-  const isActivelyWorking = !["idle", "ready", "error"].includes(status);
-  const isWorkspace = isActivelyWorking || (projectName !== null && status !== "idle");
+  // Welcome screen is always shown on "/" — workspace is at /project/:name
 
   // ALL hooks must be before any early return (React rules of hooks)
   const handleCreateNew = useCallback(() => {
@@ -173,23 +178,12 @@ export default function AppFactoryScreen() {
     [addMessage, projectName, handleCreate, iterate]
   );
 
-  // Open existing project
+  // Open existing project — navigate to /project/:name
   const handleOpenProject = useCallback((name: string) => {
-    const existingProject = diskProjects.find((project) => project.name === name);
-    addProject({
-      name,
-      displayName: existingProject?.displayName ?? name,
-      status: "building",
-      port: null,
-      createdAt: existingProject?.createdAt ?? Date.now(),
-    });
-    switchProject(name);
-    setStatus("building");
-    void fetchProjectFiles(name);
-    startPreview(name);
+    router.push(`/project/${encodeURIComponent(name)}`);
   }, [addProject, diskProjects, setStatus, startPreview, switchProject]);
 
-  if (!isWorkspace) {
+  {
     const allProjects = projectList.length > 0 ? projectList : diskProjects.map((p) => ({ ...p, status: "ready" as AppStatus, port: null, createdAt: p.createdAt ?? Date.now() }));
 
     return (
@@ -418,107 +412,6 @@ export default function AppFactoryScreen() {
     );
   }
 
-  return (
-    <AuroraBackground intensity="subtle">
-      <View className="flex-1">
-        {/* Header */}
-        <View
-          className="h-11 flex-row items-center justify-between px-4"
-          style={{
-            backgroundColor: "rgba(255,255,255,0.5)",
-            borderBottomWidth: 1,
-            borderBottomColor: "rgba(0,0,0,0.06)",
-            ...(Platform.OS === "web" ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : {}),
-          } as never}
-        >
-          <Pressable onPress={handleCreateNew} className="flex-row items-center gap-2.5">
-            <View
-              className="w-6 h-6 rounded-md items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #00E5FF, #7C4DFF)", backgroundColor: "#00E5FF" } as never}
-            >
-              <Zap size={12} color="#FFFFFF" strokeWidth={2} />
-            </View>
-            <Text className="text-ink-dark text-sm font-semibold">{projectName ?? "App Factory"}</Text>
-            <View
-              className="w-2 h-2 rounded-full"
-              style={{
-                backgroundColor:
-                  status === "ready" ? "#00FF88" : status === "error" ? "#FF3366" : "#FFD700",
-                ...(status !== "ready" && status !== "error"
-                  ? { shadowColor: "#FFD700", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 4 }
-                  : {}),
-              }}
-            />
-            <Text className="text-ink-light text-[10px] uppercase tracking-wider font-medium">{status}</Text>
-            {currentGeneratingFile && !["idle", "ready", "error"].includes(status) && (
-              <Text style={{ fontSize: 10, color: "#00BCD4", fontFamily: "monospace", marginLeft: 6 }} numberOfLines={1}>
-                {currentGeneratingFile}
-              </Text>
-            )}
-            {generationProgress > 0 && generationProgress < 1 && (
-              <Text style={{ fontSize: 9, color: "#888", fontWeight: "600", marginLeft: 4 }}>
-                {Math.round(generationProgress * 100)}%
-              </Text>
-            )}
-          </Pressable>
-          <View className="flex-row items-center gap-2">
-            {projectName && (
-              <Pressable
-                onPress={handleExport}
-                className="w-8 h-8 rounded-lg items-center justify-center"
-                style={{ backgroundColor: "rgba(0,229,255,0.1)", borderWidth: 1, borderColor: "rgba(0,229,255,0.2)" }}
-              >
-                <Download size={13} color="#00E5FF" strokeWidth={1.5} />
-              </Pressable>
-            )}
-            <Pressable
-              onPress={() => setSettingsVisible(true)}
-              className="w-8 h-8 rounded-lg items-center justify-center"
-              style={{ backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}
-            >
-              <Settings size={14} color="#4A4A6A" strokeWidth={1.5} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Progress bar under header */}
-        {generationProgress > 0 && generationProgress < 1 && (
-          <View style={{ height: 2, backgroundColor: "rgba(0,0,0,0.04)" }}>
-            <View
-              style={{
-                height: "100%",
-                width: `${generationProgress * 100}%`,
-                backgroundColor: "#00E5FF",
-                ...(Platform.OS === "web" ? { transition: "width 0.3s ease" } : {}),
-              } as never}
-            />
-          </View>
-        )}
-
-        <WorkspaceLayout
-          activeFile={activeFile}
-          fileTree={fileTree}
-          fileTreeVisible={fileTreeVisible}
-          openFiles={openFiles}
-          projectList={projectList}
-          projectName={projectName}
-          terminalVisible={terminalVisible}
-          onAbort={abortGeneration}
-          onCloseFile={closeFile}
-          onCreateProject={handleCreateNew}
-          onOpenFile={openFile}
-          onRemoveProject={removeProject}
-          onSelectFile={setActiveFile}
-          onSelectProject={handleSelectProject}
-          onSendChat={handleChatSend}
-        />
-
-        <VersionTimeline onRevert={revertVersion} />
-        <SettingsDrawer visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
-        <LotusToast visible={showLotusToast} onHide={() => setShowLotusToast(false)} />
-      </View>
-    </AuroraBackground>
-  );
 }
 
 

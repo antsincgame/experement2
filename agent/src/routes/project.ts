@@ -41,6 +41,26 @@ projectRouter.get("/", (_req, res) => {
   res.json({ data: projects });
 });
 
+// DELETE all projects (wipe workspace)
+projectRouter.delete("/all", (_req, res) => {
+  const wsRoot = getWorkspaceRoot();
+  if (!fs.existsSync(wsRoot)) {
+    res.json({ data: { deleted: 0 } });
+    return;
+  }
+
+  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
+  let deleted = 0;
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name !== "template_cache" && !entry.name.startsWith(".")) {
+      fs.rmSync(path.join(wsRoot, entry.name), { recursive: true, force: true });
+      deleted++;
+    }
+  }
+
+  res.json({ data: { deleted } });
+});
+
 projectRouter.get("/:name/files", (req, res) => {
   const params = parseOrRespond(ProjectParamsSchema, req.params, res);
   if (!params) {
