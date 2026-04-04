@@ -93,7 +93,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                 <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("1234") ? "#00BCD4" : "#888", fontWeight: "600" }}>LM Studio :1234</Text>
               </Pressable>
               <Pressable
-                onPress={() => settings.setLmStudioUrl("http://localhost:11434/v1")}
+                onPress={() => settings.setLmStudioUrl("http://localhost:11434")}
                 className="px-2.5 py-1 rounded-lg"
                 style={{
                   backgroundColor: settings.lmStudioUrl.includes("11434") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
@@ -102,6 +102,22 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                 }}
               >
                 <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("11434") ? "#00BCD4" : "#888", fontWeight: "600" }}>Ollama :11434</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  apiClient.testLlmConnection(settings.lmStudioUrl)
+                    .then((result) => {
+                      if (result.ok) {
+                        alert(`LLM connected! ${result.models} models available.`);
+                      } else {
+                        alert(`LLM connection FAILED: ${result.error}`);
+                      }
+                    });
+                }}
+                className="px-2.5 py-1 rounded-lg"
+                style={{ backgroundColor: "rgba(0,255,136,0.1)", borderWidth: 1, borderColor: "rgba(0,255,136,0.2)" }}
+              >
+                <Text style={{ fontSize: 9, color: "#00CC66", fontWeight: "600" }}>Test LLM</Text>
               </Pressable>
             </View>
           </View>

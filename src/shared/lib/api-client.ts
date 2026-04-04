@@ -190,6 +190,35 @@ class ApiClient {
     return Array.isArray(response.data) ? response.data : [];
   }
 
+  /** List models from any OpenAI-compatible endpoint (LM Studio or Ollama) */
+  async listModelsFromUrl(url: string): Promise<LmModel[]> {
+    try {
+      const response = await this.fetchJson<{ data?: LmModel[] }>(
+        this.buildUrl(normalizeBaseUrl(url), "/v1/models")
+      );
+      return Array.isArray(response.data) ? response.data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Test connection to any LLM server */
+  async testLlmConnection(url: string, timeoutMs = 5000): Promise<{ ok: boolean; models: number; error?: string }> {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const normalizedUrl = normalizeBaseUrl(url);
+      const resp = await fetch(`${normalizedUrl}/v1/models`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) return { ok: false, models: 0, error: `HTTP ${resp.status}` };
+      const data = await resp.json();
+      const models = Array.isArray(data.data) ? data.data.length : 0;
+      return { ok: true, models };
+    } catch (e) {
+      return { ok: false, models: 0, error: e instanceof Error ? e.message : "Connection failed" };
+    }
+  }
+
   async testAgentConnection(timeoutMs = 5000): Promise<void> {
     if (typeof WebSocket === "undefined") {
       throw new Error("WebSocket is not available in this environment");
