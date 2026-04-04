@@ -51,7 +51,7 @@ export const useSettingsStore = create<SettingsState>()(
       enhancerEnabled: true,
       errorLogs: [],
 
-      setLmStudioUrl: (lmStudioUrl) => set({ lmStudioUrl }),
+      setLmStudioUrl: (lmStudioUrl) => set({ lmStudioUrl, model: "" }), // clear model on URL change
       setModel: (model) => set({ model }),
       setTemperature: (temperature) => set({ temperature }),
       setMaxTokens: (maxTokens) => set({ maxTokens }),
