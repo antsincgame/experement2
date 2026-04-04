@@ -1,0 +1,172 @@
+[
+  {
+    "index": 1,
+    "prompt": "Simple counter app with increment and decrement buttons",
+    "projectName": "error",
+    "status": "timeout",
+    "filesCount": 0,
+    "errors": [
+      "Plan validation failed: src/components/CounterComponent.tsx: dependency \"src/types/index.ts\" is missing from plan.files"
+    ],
+    "duration": 300015,
+    "files": {
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
+    }
+  },
+  {
+    "index": 2,
+    "prompt": "Unit converter for length, weight and temperature",
+    "projectName": "unit-converter",
+    "status": "timeout",
+    "filesCount": 9,
+    "errors": [
+      "Typecheck failed:\nsrc/components/UnitConverter.tsx(5,24): error TS2305: Module '\"@/types/index\"' has no exported member 'UnitType'.\r\nsrc/components/UnitConverter.tsx(13,63): error TS2339: Property 'un"
+    ],
+    "duration": 300010,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 9,
+      "usesStack": true
+    }
+  },
+  {
+    "index": 3,
+    "prompt": "Tip calculator with bill split",
+    "projectName": "error",
+    "status": "timeout",
+    "filesCount": 12,
+    "errors": [
+      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
+    ],
+    "duration": 300006,
+    "files": {
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
+    }
+  },
+  {
+    "index": 4,
+    "prompt": "Flashcard quiz app for learning",
+    "projectName": "error",
+    "status": "timeout",
+    "filesCount": 19,
+    "errors": [
+      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
+    ],
+    "duration": 300010,
+    "files": {
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
+    }
+  },
+  {
+    "index": 5,
+    "prompt": "Stopwatch with lap timer",
+    "projectName": "stopwatch-lap-timer",
+    "status": "timeout",
+    "filesCount": 11,
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/history.tsx(3,10): error TS2305: Module '\"@/types/index\"' has no exported member 'LapEntry'.\r\napp/(tabs)/history.tsx(7,17): error TS2339: Property 'clearAllLaps' does not "
+    ],
+    "duration": 300011,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 11,
+      "usesStack": true
+    }
+  },
+  {
+    "index": 6,
+    "prompt": "Color palette generator with copy to clipboard",
+    "projectName": "palette-generator",
+    "status": "timeout",
+    "filesCount": 10,
+    "errors": [
+      "Static validation failed: app/(tabs)/saved.tsx: import \"@/theme\" cannot be resolved from app/(tabs)/saved.tsx"
+    ],
+    "duration": 300007,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 10,
+      "usesStack": true
+    }
+  },
+  {
+    "index": 7,
+    "prompt": "BMI calculator with health tips",
+    "projectName": "bmi-calculator",
+    "status": "timeout",
+    "filesCount": 11,
+    "errors": [
+      "Static validation failed: app/(tabs)/history.tsx: import \"@/components/BMIChart\" cannot be resolved from app/(tabs)/history.tsx"
+    ],
+    "duration": 300003,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 11,
+      "usesStack": true
+    }
+  },
+  {
+    "index": 8,
+    "prompt": "Dice roller for board games",
+    "projectName": "dice-roller",
+    "status": "timeout",
+    "filesCount": 11,
+    "errors": [
+      "Static validation failed: src/components/DiceRoller.tsx: import \"@/theme\" cannot be resolved from src/components/DiceRoller.tsx; src/components/DiceSettings.tsx: import \"@/theme\" cannot be resolved fr"
+    ],
+    "duration": 300004,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 11,
+      "usesStack": true
+    }
+  },
+  {
+    "index": 9,
+    "prompt": "Password generator with strength meter",
+    "projectName": "password-generator",
+    "status": "timeout",
+    "filesCount": 9,
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/settings.tsx(4,10): error TS2305: Module '\"@/types/index\"' has no exported member 'theme'.\r\nsrc/components/PasswordGenerator.tsx(5,10): error TS2305: Module '\"@/types/inde"
+    ],
+    "duration": 300003,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 9,
+      "usesStack": true
+    }
+  },
+  {
+    "index": 10,
+    "prompt": "Coin flip app with animation",
+    "projectName": "error",
+    "status": "timeout",
+    "filesCount": 12,
+    "errors": [
+      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
+    ],
+    "duration": 300006,
+    "files": {
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
+    }
+  }
+]

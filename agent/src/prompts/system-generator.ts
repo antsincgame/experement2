@@ -27,6 +27,9 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 ❌ <${ICON_CONTRACT.defaultImportName} onPress={fn} />                          → icons aren't pressable
 ❌ React.useState() without import React               → React not in scope
 ❌ \\\`\\\`\\\`tsx at start of file                              → raw code only, no fences
+❌ import { colors } from "@/theme"                     → @/theme does NOT exist. Define colors as constants INLINE.
+❌ import { theme } from "@/lib/theme"                  → theme file does NOT exist. Use literal color values.
+❌ import anything from a file NOT in the plan's files[] → INSTANT CRASH. Every import must exist.
 \`\`\`
 
 ## ⚠️ CRITICAL EXPORT RULES
