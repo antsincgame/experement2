@@ -323,10 +323,15 @@ const _createProjectInner = async (
         retries++;
         broadcast({ type: "autofix_start", file: fp, error: `Contract violations: ${violations.length}` });
 
-        await regenerateFileWithContracts(
+        const fixSuccess = await regenerateFileWithContracts(
           projectSlug, projectPath, fp, violations, allContracts,
           { lmStudioUrl, model, maxTokens },
         );
+
+        if (!fixSuccess) {
+          console.warn(`[Pipeline] Contract auto-fix failed for ${fp}, proceeding with original`);
+          break;
+        }
 
         // Re-extract contracts after fix
         const updatedContracts = extractExportContracts(path.join(projectPath, fp));

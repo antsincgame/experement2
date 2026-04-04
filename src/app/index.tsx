@@ -103,7 +103,7 @@ export default function AppFactoryScreen() {
     if (projectName && status !== "idle") {
       router.push(`/project/${encodeURIComponent(projectName)}`);
     }
-  }, [projectName]);
+  }, [projectName, status, router]);
 
   const prevStatus = useRef(status);
   useEffect(() => {
@@ -212,8 +212,6 @@ export default function AppFactoryScreen() {
                   onPress={() => {
                     // Clear all projects from store + disk
                     useProjectStore.getState().reset();
-                    void apiClient.postData("/api/projects/all", {}).catch(() => {});
-                    // Also try DELETE
                     void fetch(`${apiClient.getAgentUrl()}/api/projects/all`, { method: "DELETE" }).catch(() => {});
                     setDiskProjects([]);
                   }}

@@ -29,11 +29,19 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
     } finally {
       setModelsLoading(false);
     }
+  }, []);
+
+  // Debounce URL changes to avoid spamming fetch on each keystroke
+  const [debouncedUrl, setDebouncedUrl] = useState(settings.lmStudioUrl);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedUrl(settings.lmStudioUrl), 500);
+    return () => clearTimeout(timer);
   }, [settings.lmStudioUrl]);
 
   useEffect(() => {
     if (visible) fetchModels();
-  }, [visible, fetchModels]);
+  }, [visible, debouncedUrl, fetchModels]);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -68,7 +76,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
         <View className="flex-row gap-4 px-6 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.04)" }}>
           <StatusBadge icon={isConnected ? Wifi : WifiOff} label="Agent" connected={isConnected} />
-          <StatusBadge icon={Server} label="LM Studio" connected={lmStatus === "connected"} />
+          <StatusBadge icon={Server} label="LLM Server" connected={lmStatus === "connected"} />
           <View className="flex-row items-center gap-1">
             <Text className="text-ink-muted text-[10px]">{models.length} models</Text>
             <Pressable onPress={fetchModels} className="w-4 h-4 items-center justify-center">

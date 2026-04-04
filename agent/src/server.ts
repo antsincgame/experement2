@@ -56,6 +56,7 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 let lmStudioInterval: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
+let currentLlmServerUrl = DEFAULT_LM_STUDIO_URL;
 
 app.use(express.json({ limit: "10mb" }));
 
@@ -196,6 +197,11 @@ wss.on("connection", (ws: WebSocket) => {
 });
 
 const handleWsMessage = (clientId: string, message: WsMessage): void => {
+  // Track active LLM server URL for health checks
+  if ("lmStudioUrl" in message && typeof message.lmStudioUrl === "string" && message.lmStudioUrl) {
+    updateLlmServerUrl(message.lmStudioUrl);
+  }
+
   switch (message.type) {
     case "abort_generation":
       console.log("[WS] Abort requested");
@@ -385,18 +391,22 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
 
 // в”Ђв”Ђ LM Studio Health Check в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
-const checkLmStudio = async (): Promise<void> => {
+export const updateLlmServerUrl = (url: string): void => {
+  currentLlmServerUrl = url.trim() || DEFAULT_LM_STUDIO_URL;
+};
+
+const checkLlmServer = async (): Promise<void> => {
   try {
-    const resp = await fetch(`${DEFAULT_LM_STUDIO_URL}/v1/models`);
+    const resp = await fetch(`${currentLlmServerUrl}/v1/models`);
     if (resp.ok) {
-      broadcast({ type: "lm_studio_status", status: "connected" });
+      broadcast({ type: "llm_server_status", status: "connected" });
     } else {
-      clearModelCache(DEFAULT_LM_STUDIO_URL);
-      broadcast({ type: "lm_studio_status", status: "disconnected" });
+      clearModelCache(currentLlmServerUrl);
+      broadcast({ type: "llm_server_status", status: "disconnected" });
     }
   } catch {
-    clearModelCache(DEFAULT_LM_STUDIO_URL);
-    broadcast({ type: "lm_studio_status", status: "disconnected" });
+    clearModelCache(currentLlmServerUrl);
+    broadcast({ type: "llm_server_status", status: "disconnected" });
   }
 };
 
@@ -436,10 +446,10 @@ server.listen(PORT, async () => {
     console.error("[Agent] Template cache init failed:", err);
   });
 
-  await checkLmStudio();
+  await checkLlmServer();
   clearLmStudioInterval();
   lmStudioInterval = setInterval(() => {
-    void checkLmStudio();
+    void checkLlmServer();
   }, 15000);
 });
 

@@ -44,13 +44,19 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 3. Minimize changes — do NOT rewrite entire files.
 4. For new files, output the full code.
 5. Do NOT wrap SEARCH/REPLACE blocks in markdown code fences.
-6. Use NativeWind className for all styling.
+6. Use StyleSheet.create for ALL styling — NO NativeWind, NO className prop.
 7. TypeScript strict — no \`any\`.
 8. FORBIDDEN: local binary assets. Use @expo/vector-icons or external URLs.
 9. Icons: \`import ${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}"\` (default import ONLY).
    NEVER: \`import { Home } from "${ICON_CONTRACT.packageName}"\` — named exports don't exist!
-   className does NOT work on icons — use style prop. Wrap in Pressable for onPress.
+   Use style prop on icons, NOT className. Wrap in Pressable for onPress.
 10. ${PATH_ALIAS.importPrefix} resolves to ${PATH_ALIAS.resolvedPrefix}; never generate ${PATH_ALIAS.importPrefix}src/... imports.
+
+## FORBIDDEN (instant crash):
+- NativeWind
+- className prop on any React Native component
+- tailwind classes
+- Inline style objects in JSX (extract to StyleSheet.create)
 
 ## Response Format
 
@@ -62,18 +68,18 @@ What changes are needed and why.
 Then, for each file modification:
 filepath: src/components/TodoItem.tsx
 <<<<<<< SEARCH
-  <Text className="text-white text-lg">{title}</Text>
-  <Text className="text-gray-500 text-sm">{subtitle}</Text>
+  <Text style={styles.title}>{title}</Text>
+  <Text style={styles.subtitle}>{subtitle}</Text>
 =======
-  <Text className="text-white text-lg font-bold">{title}</Text>
-  <Text className="text-neon-cyan text-sm">{subtitle}</Text>
-  <Text className="text-gray-600 text-xs">{timestamp}</Text>
+  <Text style={[styles.title, styles.bold]}>{title}</Text>
+  <Text style={styles.accentText}>{subtitle}</Text>
+  <Text style={styles.timestamp}>{timestamp}</Text>
 >>>>>>> REPLACE
 
 For new files:
 filepath: src/components/SearchBar.tsx
 \`\`\`typescript
-import { View, TextInput } from "react-native";
+import { View, TextInput, StyleSheet } from "react-native";
 
 interface SearchBarProps {
   value: string;
@@ -81,16 +87,31 @@ interface SearchBarProps {
 }
 
 const SearchBar = ({ value, onChangeText }: SearchBarProps) => (
-  <View className="px-4 py-2">
+  <View style={styles.container}>
     <TextInput
       value={value}
       onChangeText={onChangeText}
       placeholder="Search..."
       placeholderTextColor="#666"
-      className="bg-gray-900 text-white px-4 py-3 rounded-xl"
+      style={styles.input}
     />
   </View>
 );
+
+const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  input: {
+    backgroundColor: "#1A1A2E",
+    color: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    fontSize: 16,
+  },
+});
 
 export default SearchBar;
 \`\`\`

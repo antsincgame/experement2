@@ -1,31 +1,14 @@
 [
   {
     "index": 1,
-    "prompt": "Simple counter app with increment and decrement buttons",
-    "projectName": "error",
-    "status": "timeout",
-    "filesCount": 0,
-    "errors": [
-      "Plan validation failed: src/components/CounterComponent.tsx: dependency \"src/types/index.ts\" is missing from plan.files"
-    ],
-    "duration": 300015,
-    "files": {
-      "hasLayout": false,
-      "hasIndex": false,
-      "fileCount": 0,
-      "usesStack": false
-    }
-  },
-  {
-    "index": 2,
-    "prompt": "Unit converter for length, weight and temperature",
-    "projectName": "unit-converter",
+    "prompt": "Simple shopping list with add and delete items",
+    "projectName": "simple-shopping-list",
     "status": "timeout",
     "filesCount": 9,
     "errors": [
-      "Typecheck failed:\nsrc/components/UnitConverter.tsx(5,24): error TS2305: Module '\"@/types/index\"' has no exported member 'UnitType'.\r\nsrc/components/UnitConverter.tsx(13,63): error TS2339: Property 'un"
+      "Typecheck failed:\napp/(tabs)/settings.tsx(7,8): error TS2741: Property 'theme' is missing in type '{}' but required in type 'SettingsScreenProps'.\r\nsrc/components/ShoppingListScreen.tsx(21,18): error "
     ],
-    "duration": 300010,
+    "duration": 480027,
     "files": {
       "hasLayout": true,
       "hasIndex": true,
@@ -34,32 +17,49 @@
     }
   },
   {
+    "index": 2,
+    "prompt": "Random quote generator with favorites",
+    "projectName": "quote-generator",
+    "status": "timeout",
+    "filesCount": 10,
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/favorites.tsx(8,22): error TS2339: Property 'removeFavorite' does not exist on type '{ favorites: Quote[]; toggleFavorite: (quote: Quote) => void; isFavorite: (quoteId: st"
+    ],
+    "duration": 480009,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 10,
+      "usesStack": true
+    }
+  },
+  {
     "index": 3,
-    "prompt": "Tip calculator with bill split",
-    "projectName": "error",
+    "prompt": "Simple alarm clock with sound",
+    "projectName": "simple-alarm-clock",
     "status": "timeout",
     "filesCount": 12,
     "errors": [
-      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
+      "Static validation failed: src/components/AlarmItem.tsx: import \"@/theme\" cannot be resolved from src/components/AlarmItem.tsx; src/components/AlarmSoundSelector.tsx: import \"@/theme\" cannot be resolve"
     ],
-    "duration": 300006,
+    "duration": 480010,
     "files": {
-      "hasLayout": false,
-      "hasIndex": false,
-      "fileCount": 0,
-      "usesStack": false
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 12,
+      "usesStack": true
     }
   },
   {
     "index": 4,
-    "prompt": "Flashcard quiz app for learning",
+    "prompt": "Recipe book with categories",
     "projectName": "error",
     "status": "timeout",
-    "filesCount": 19,
+    "filesCount": 26,
     "errors": [
       "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
     ],
-    "duration": 300010,
+    "duration": 480016,
     "files": {
       "hasLayout": false,
       "hasIndex": false,
@@ -69,104 +69,105 @@
   },
   {
     "index": 5,
-    "prompt": "Stopwatch with lap timer",
-    "projectName": "stopwatch-lap-timer",
+    "prompt": "Daily journal with date picker",
+    "projectName": "error",
     "status": "timeout",
-    "filesCount": 11,
+    "filesCount": 15,
     "errors": [
-      "Typecheck failed:\napp/(tabs)/history.tsx(3,10): error TS2305: Module '\"@/types/index\"' has no exported member 'LapEntry'.\r\napp/(tabs)/history.tsx(7,17): error TS2339: Property 'clearAllLaps' does not "
+      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
     ],
-    "duration": 300011,
+    "duration": 480003,
     "files": {
-      "hasLayout": true,
-      "hasIndex": true,
-      "fileCount": 11,
-      "usesStack": true
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
     }
   },
   {
     "index": 6,
-    "prompt": "Color palette generator with copy to clipboard",
-    "projectName": "palette-generator",
+    "prompt": "Simple budget planner with income and expenses",
+    "projectName": "error",
     "status": "timeout",
-    "filesCount": 10,
+    "filesCount": 15,
     "errors": [
-      "Static validation failed: app/(tabs)/saved.tsx: import \"@/theme\" cannot be resolved from app/(tabs)/saved.tsx"
+      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
     ],
-    "duration": 300007,
+    "duration": 480002,
     "files": {
-      "hasLayout": true,
-      "hasIndex": true,
-      "fileCount": 10,
-      "usesStack": true
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
     }
   },
   {
     "index": 7,
-    "prompt": "BMI calculator with health tips",
-    "projectName": "bmi-calculator",
+    "prompt": "Workout timer with rest intervals",
+    "projectName": "error",
     "status": "timeout",
-    "filesCount": 11,
+    "filesCount": 15,
     "errors": [
-      "Static validation failed: app/(tabs)/history.tsx: import \"@/components/BMIChart\" cannot be resolved from app/(tabs)/history.tsx"
+      "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
     ],
-    "duration": 300003,
+    "duration": 480001,
     "files": {
-      "hasLayout": true,
-      "hasIndex": true,
-      "fileCount": 11,
-      "usesStack": true
+      "hasLayout": false,
+      "hasIndex": false,
+      "fileCount": 0,
+      "usesStack": false
     }
   },
   {
     "index": 8,
-    "prompt": "Dice roller for board games",
-    "projectName": "dice-roller",
+    "prompt": "Mood tracker with emoji selection",
+    "projectName": "mood-tracker",
     "status": "timeout",
-    "filesCount": 11,
+    "filesCount": 12,
     "errors": [
-      "Static validation failed: src/components/DiceRoller.tsx: import \"@/theme\" cannot be resolved from src/components/DiceRoller.tsx; src/components/DiceSettings.tsx: import \"@/theme\" cannot be resolved fr"
+      "Static validation failed: app/(tabs)/history.tsx: import \"@/theme\" cannot be resolved from app/(tabs)/history.tsx; app/(tabs)/stats.tsx: import \"@/theme\" cannot be resolved from app/(tabs)/stats.tsx; "
     ],
-    "duration": 300004,
+    "duration": 480008,
     "files": {
       "hasLayout": true,
       "hasIndex": true,
-      "fileCount": 11,
+      "fileCount": 12,
       "usesStack": true
     }
   },
   {
     "index": 9,
-    "prompt": "Password generator with strength meter",
-    "projectName": "password-generator",
-    "status": "timeout",
-    "filesCount": 9,
-    "errors": [
-      "Typecheck failed:\napp/(tabs)/settings.tsx(4,10): error TS2305: Module '\"@/types/index\"' has no exported member 'theme'.\r\nsrc/components/PasswordGenerator.tsx(5,10): error TS2305: Module '\"@/types/inde"
-    ],
-    "duration": 300003,
-    "files": {
-      "hasLayout": true,
-      "hasIndex": true,
-      "fileCount": 9,
-      "usesStack": true
-    }
-  },
-  {
-    "index": 10,
-    "prompt": "Coin flip app with animation",
+    "prompt": "Contact list with search",
     "projectName": "error",
     "status": "timeout",
     "filesCount": 12,
     "errors": [
       "AI server disconnected: LLM_SERVER_DOWN: Cannot connect to http://localhost:1234. Check that LM Studio or Ollama is running."
     ],
-    "duration": 300006,
+    "duration": 480001,
     "files": {
       "hasLayout": false,
       "hasIndex": false,
       "fileCount": 0,
       "usesStack": false
+    }
+  },
+  {
+    "index": 10,
+    "prompt": "Simple drawing pad with colors",
+    "projectName": "simple-drawing-pad",
+    "status": "timeout",
+    "filesCount": 8,
+    "errors": [
+      "Contract violations in app/(tabs)/settings.tsx after 2 retries: 'BrushSettings' imported as default but is a named export",
+      "Static validation failed: src/components/BrushSettings.tsx: import \"@/theme\" cannot be resolved from src/components/BrushSettings.tsx; src/components/DrawingCanvas.tsx: import \"react-native-svg\" requi"
+    ],
+    "duration": 480004,
+    "files": {
+      "hasLayout": true,
+      "hasIndex": true,
+      "fileCount": 8,
+      "usesStack": true
     }
   }
 ]

@@ -248,11 +248,12 @@ export const createWsHandler = (
       log({ level: "info", source: "autofix", message: `Fix applied: ${msg.filepath}` });
       break;
 
-    case "lm_studio_status": {
+    case "lm_studio_status":
+    case "llm_server_status": {
       const lmStatus = msg.status as "connected" | "disconnected" | "checking";
       set({ lmStudioStatus: lmStatus });
-      if (lmStatus === "disconnected") log({ level: "error", source: "lm-studio", message: "LM Studio disconnected" });
-      else if (lmStatus === "connected") log({ level: "info", source: "lm-studio", message: "LM Studio connected" });
+      if (lmStatus === "disconnected") log({ level: "error", source: "llm-server", message: "LLM server disconnected" });
+      else if (lmStatus === "connected") log({ level: "info", source: "llm-server", message: "LLM server connected" });
       break;
     }
 

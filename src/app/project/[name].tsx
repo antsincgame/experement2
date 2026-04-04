@@ -47,13 +47,24 @@ export default function ProjectScreen() {
     prevStatus.current = status;
   }, [status, projectName]);
 
-  // Sync URL param to store on mount
+  // Sync URL param to store on mount, validate project exists
   useEffect(() => {
-    if (name && name !== projectName) {
-      switchProject(name);
-      void fetchProjectFiles(name);
-      startPreview(name);
-    }
+    if (!name) return;
+    if (name === projectName) return;
+
+    switchProject(name);
+    fetchProjectFiles(name)
+      .then((files) => {
+        if (!files || Object.keys(files).length === 0) {
+          // Project doesn't exist on disk — redirect to home
+          router.replace("/");
+          return;
+        }
+        startPreview(name);
+      })
+      .catch(() => {
+        router.replace("/");
+      });
   }, [name]);
 
   const handleChatSend = useCallback(

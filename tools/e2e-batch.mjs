@@ -8,16 +8,16 @@ const WORKSPACE = path.resolve("../workspace");
 const RESULTS_FILE = path.resolve("../tools/e2e-results.json");
 
 const PROMPTS = [
-  "Simple counter app with increment and decrement buttons",
-  "Unit converter for length, weight and temperature",
-  "Tip calculator with bill split",
-  "Flashcard quiz app for learning",
-  "Stopwatch with lap timer",
-  "Color palette generator with copy to clipboard",
-  "BMI calculator with health tips",
-  "Dice roller for board games",
-  "Password generator with strength meter",
-  "Coin flip app with animation",
+  "Grocery checklist app",
+  "Water intake tracker",
+  "Breathing exercise timer",
+  "Flashcard maker for students",
+  "Simple expense log",
+  "Daily step counter display",
+  "Temperature converter",
+  "Age calculator from birthday",
+  "Random number generator",
+  "Simple voting poll app",
 ];
 
 const results = [];
@@ -44,7 +44,8 @@ async function generateProject(prompt, index) {
       ws.send(JSON.stringify({
         type: "create_project",
         description: prompt,
-        lmStudioUrl: "http://localhost:1234",
+        lmStudioUrl: "http://localhost:11434",
+        model: "qwen3-coder-next-q2_k_l",
         maxTokens: 65536,
       }));
     });

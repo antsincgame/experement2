@@ -13,6 +13,7 @@ import {
   getTabsLayout,
 } from "../prompts/templates.js";
 import {
+  AUTO_GENERATED_PLAN_FILES,
   ICON_CONTRACT,
   MAX_DEPENDENCY_CONTEXT_CHARS,
   MAX_DEPENDENCY_CONTEXT_FILES,
@@ -261,7 +262,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
   const totalFiles = plan.files.length;
 
   // Auto-generated layout files — skip if LLM plan includes them
-  const AUTO_LAYOUT_FILES = new Set(["app/_layout.tsx", "app/(tabs)/_layout.tsx"]);
+  const AUTO_LAYOUT_FILES = new Set<string>(AUTO_GENERATED_PLAN_FILES);
 
   for (let i = 0; i < totalFiles; i++) {
     const fileSpec = plan.files[i];

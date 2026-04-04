@@ -400,7 +400,7 @@ export const useProjectStore = create<ProjectState>()(persist((set, get) => ({
   }),
 }));
   // File fetch helper
-export const fetchProjectFiles = async (projectName: string): Promise<void> => {
+export const fetchProjectFiles = async (projectName: string): Promise<Record<string, string> | null> => {
   try {
     const [fileTree, files] = await Promise.all([
       apiClient.getProjectTree<FileNode[]>(projectName),
@@ -412,7 +412,7 @@ export const fetchProjectFiles = async (projectName: string): Promise<void> => {
       try {
         const fileData = await apiClient.getProjectFile(projectName, filePath);
         fileContents[filePath] = fileData.content;
-      } catch (error) {
+      } catch {
         // File load failed — skip silently
       }
     }
@@ -420,8 +420,11 @@ export const fetchProjectFiles = async (projectName: string): Promise<void> => {
     useProjectStore.setState((state) =>
       applyProjectFileSnapshot(state, projectName, fileTree, fileContents)
     );
-  } catch (error) {
+
+    return fileContents;
+  } catch {
     // Project files load failed — agent may be offline
+    return null;
   }
 };
 
