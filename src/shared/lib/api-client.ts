@@ -3,6 +3,10 @@ import {
   AGENT_HTTP_URL,
   LM_STUDIO_DEFAULT_URL,
 } from "@/shared/lib/constants";
+import {
+  DANGEROUS_ACTION_HEADER,
+  DELETE_WORKSPACE_CONFIRMATION,
+} from "@/shared/lib/api-contracts";
 import { useSettingsStore } from "@/stores/settings-store";
 
 export interface ProjectListItem {
@@ -26,6 +30,7 @@ type QueryValue = string | number | boolean | undefined;
 interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
   query?: Record<string, QueryValue>;
+  timeoutMs?: number;
 }
 
 interface DataEnvelope<T> {
@@ -62,6 +67,8 @@ export const toWebSocketUrl = (value: string): string =>
     .replace(/^https:\/\//, "wss://");
 
 class ApiClient {
+  private readonly defaultTimeoutMs = 10_000;
+
   private buildUrl(
     baseUrl: string,
     pathname: string,
@@ -81,27 +88,40 @@ class ApiClient {
     url: string,
     options: RequestOptions = {}
   ): Promise<T> {
-    const { body, headers, ...init } = options;
+    const { body, headers, timeoutMs = this.defaultTimeoutMs, ...init } = options;
     const finalHeaders = new Headers(headers);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     if (body !== undefined && !finalHeaders.has("Content-Type")) {
       finalHeaders.set("Content-Type", "application/json");
     }
 
-    const response = await fetch(url, {
-      ...init,
-      headers: finalHeaders,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw await this.buildError(response);
-    }
-
     try {
-      return await response.json() as T;
-    } catch {
-      throw new Error(`Invalid JSON response from ${url}`);
+      const response = await fetch(url, {
+        ...init,
+        headers: finalHeaders,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw await this.buildError(response);
+      }
+
+      try {
+        return await response.json() as T;
+      } catch {
+        throw new Error(`Invalid JSON response from ${url}`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -119,6 +139,18 @@ class ApiClient {
     const response = await this.fetchJson<DataEnvelope<T>>(url, {
       method: "POST",
       body,
+    });
+    return response.data;
+  }
+
+  async deleteData<T>(
+    pathname: string,
+    headers?: HeadersInit
+  ): Promise<T> {
+    const url = this.buildUrl(this.getAgentUrl(), pathname);
+    const response = await this.fetchJson<DataEnvelope<T>>(url, {
+      method: "DELETE",
+      headers,
     });
     return response.data;
   }
@@ -154,6 +186,12 @@ class ApiClient {
 
   listProjects(): Promise<ProjectListItem[]> {
     return this.getData<ProjectListItem[]>("/api/projects");
+  }
+
+  deleteAllProjects(): Promise<boolean> {
+    return this.deleteData<boolean>("/api/projects/all", {
+      [DANGEROUS_ACTION_HEADER]: DELETE_WORKSPACE_CONFIRMATION,
+    });
   }
 
   enhancePrompt(payload: {

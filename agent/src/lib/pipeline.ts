@@ -208,8 +208,6 @@ const runProjectQualityGates = async (
 export const createProject = async (
   options: CreateOptions
 ): Promise<CreateResult> => {
-  const { description, lmStudioUrl, model, temperature, maxTokens, onProjectNameResolved } = options;
-
   try {
     return await _createProjectInner(options);
   } catch (error) {
@@ -360,7 +358,10 @@ const _createProjectInner = async (
   try {
     const typecheckResult = await runTypecheck(projectPath);
     if (!typecheckResult.success) {
-      broadcast({ type: "system_error", error: `TypeScript errors:\n${typecheckResult.output.slice(0, 1000)}` });
+      broadcast({
+        type: "system_error",
+        error: `TypeScript errors:\n${typecheckResult.combinedOutput.slice(0, 1000)}`,
+      });
       // Don't abort — try to build anyway, Metro may fix some issues
     }
   } catch {

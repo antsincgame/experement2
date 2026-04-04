@@ -1,10 +1,9 @@
 import { useRef, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
-import { MessageSquare, Bot, Cpu, FileCode } from "lucide-react-native";
+import { MessageSquare, Cpu, FileCode } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
-import MarkdownRenderer from "./markdown-renderer";
 
 interface ChatPanelProps {
   onSend: (text: string) => void;

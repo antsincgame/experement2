@@ -8,7 +8,7 @@ import {
   Platform,
 } from "react-native";
 import { FolderOpen, Plus, X } from "lucide-react-native";
-import type { ProjectEntry } from "@/stores/project-store";
+import type { ProjectEntry } from "@/stores/project-store.types";
 
 interface ProjectSidebarProps {
   activeProjectName: string | null;

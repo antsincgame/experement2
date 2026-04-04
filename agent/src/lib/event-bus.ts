@@ -1,10 +1,35 @@
-// Centralizes preview routing and WebSocket broadcasts so server and pipeline stay decoupled.
+// Centralizes preview routing and scope-aware WebSocket delivery so project events do not leak across clients.
 import type { NextFunction, Request, Response } from "express";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { WebSocket } from "ws";
 import { createPreviewProxy } from "../services/preview-proxy.js";
 
 // ── WebSocket clients ──
 const clients = new Map<string, WebSocket>();
+
+interface EventScope {
+  clientId?: string;
+  projectName?: string;
+  requestId?: string;
+}
+
+const eventScopeStorage = new AsyncLocalStorage<EventScope>();
+
+const withScopeMessage = (message: Record<string, unknown>): Record<string, unknown> => {
+  const scope = eventScopeStorage.getStore();
+  if (!scope) {
+    return message;
+  }
+
+  return {
+    ...(scope.projectName && message.projectName === undefined ? { projectName: scope.projectName } : {}),
+    ...(scope.requestId && message.requestId === undefined ? { requestId: scope.requestId } : {}),
+    ...message,
+  };
+};
+
+export const runWithEventScope = <T>(scope: EventScope, task: () => T): T =>
+  eventScopeStorage.run(scope, task);
 
 export const registerClient = (clientId: string, ws: WebSocket): void => {
   clients.set(clientId, ws);
@@ -15,7 +40,14 @@ export const unregisterClient = (clientId: string): void => {
 };
 
 export const broadcast = (message: Record<string, unknown>): void => {
-  const data = JSON.stringify(message);
+  const scopedMessage = withScopeMessage(message);
+  const scope = eventScopeStorage.getStore();
+  if (scope?.clientId) {
+    sendToClient(scope.clientId, scopedMessage);
+    return;
+  }
+
+  const data = JSON.stringify(scopedMessage);
   for (const ws of clients.values()) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(data);
@@ -29,7 +61,7 @@ export const sendToClient = (
 ): void => {
   const ws = clients.get(clientId);
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify(message));
+  ws.send(JSON.stringify(withScopeMessage(message)));
 };
 
 // ── Per-project preview proxy ──
@@ -82,18 +114,7 @@ export const handlePreviewRequest = (
   const projectName = segments[0] ? decodeURIComponent(segments[0]) : undefined;
 
   if (!projectName) {
-    // Legacy fallback: if no project name, try first available
-    const firstProject = projectPorts.keys().next().value as string | undefined;
-    if (!firstProject) {
-      res.status(503).send("No preview available. Start a project first.");
-      return;
-    }
-    const entry = getOrCreateProxy(firstProject);
-    if (!entry) {
-      res.status(503).send("Preview proxy not ready.");
-      return;
-    }
-    entry.proxy(req, res, next);
+    res.status(400).send("Preview requests must include a project name.");
     return;
   }
 

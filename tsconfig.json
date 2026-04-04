@@ -1,3 +1,4 @@
+// Narrows root TypeScript checks to the Expo app so backend and generated workspace code stay isolated.
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
@@ -12,8 +13,14 @@
     }
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "agent",
+    "workspace",
+    "node_modules",
+    ".expo"
   ]
 }

@@ -1,5 +1,5 @@
-﻿// Validates LLM proxy requests and caches model discovery with failure invalidation per LM Studio URL.
-import type { Request, Response } from "express";
+﻿// Separates Express and fetch response types so the LLM proxy remains strict-typecheck safe.
+import type { Request, Response as ExpressResponse } from "express";
 import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
 
@@ -110,6 +110,8 @@ interface CompletionRequest {
   model?: string;
 }
 
+type FetchResponse = globalThis.Response;
+
 const activeControllers = new Map<string, AbortController>();
 const MAX_CONCURRENT_LLM_REQUESTS = 3;
 let activeRequestCount = 0;
@@ -164,7 +166,7 @@ export const streamCompletion = async (
   // Auto-retry with exponential backoff (3 attempts: 2s, 4s, 8s)
   const MAX_RETRIES = 3;
   const BACKOFF_BASE = 2000;
-  let response: Response | undefined;
+  let response: FetchResponse | undefined;
   let lastError = "";
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -247,8 +249,16 @@ export const streamCompletion = async (
     throw new Error("LM Studio returned no body");
   }
 
+  const streamResponse = response;
+  const responseBody = streamResponse.body;
+  if (!responseBody) {
+    activeControllers.delete(taskId);
+    activeRequestCount = Math.max(0, activeRequestCount - 1);
+    throw new Error("LM Studio returned no body");
+  }
+
   async function* parseSSE(): AsyncGenerator<string> {
-    const reader = response.body!.getReader();
+    const reader = responseBody!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -347,7 +357,7 @@ export const abortAll = (): number => {
 
 export const handleLLMProxyRoute = async (
   req: Request,
-  res: Response
+  res: ExpressResponse
 ): Promise<void> => {
   const parsedBody = LlmCompleteBodySchema.safeParse(req.body);
   if (!parsedBody.success) {

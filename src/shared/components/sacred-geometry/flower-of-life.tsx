@@ -15,7 +15,7 @@ const FlowerOfLife = ({
   const cx = size / 2;
   const cy = size / 2;
 
-  const circles: Array<{ x: number; y: number }> = [{ x: cx, y: cy }];
+  const circles: { x: number; y: number }[] = [{ x: cx, y: cy }];
 
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 3) * i;

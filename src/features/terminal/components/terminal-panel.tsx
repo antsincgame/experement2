@@ -6,7 +6,6 @@ import { useProjectStore } from "@/stores/project-store";
 const TerminalPanel = () => {
   const scrollRef = useRef<ScrollView>(null);
   const streamingContent = useProjectStore((s) => s.streamingContent);
-  const status = useProjectStore((s) => s.status);
   const generationProgress = useProjectStore((s) => s.generationProgress);
   const currentFile = useProjectStore((s) => s.currentGeneratingFile);
 

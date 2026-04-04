@@ -1,4 +1,4 @@
-﻿// Orchestrates HTTP, WebSocket, and preview runtime state via a shared event bus to avoid circular imports.
+﻿// Orchestrates HTTP, WebSocket, and preview runtime state with stricter network boundaries for local-only use.
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -7,6 +7,7 @@ import {
   broadcast,
   handlePreviewRequest,
   registerClient,
+  runWithEventScope,
   sendToClient,
   setPreviewPort,
   unregisterClient,
@@ -50,6 +51,7 @@ const waitForMetroReady = async (port: number, maxRetries = 40): Promise<boolean
 };
 
 const PORT = Number(process.env.AGENT_PORT ?? 3100);
+const HOST = process.env.AGENT_HOST?.trim() || "127.0.0.1";
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const app = express();
 const server = createServer(app);
@@ -60,15 +62,26 @@ let currentLlmServerUrl = DEFAULT_LM_STUDIO_URL;
 
 app.use(express.json({ limit: "10mb" }));
 
-const ALLOWED_ORIGINS = ["http://localhost:8081", "http://localhost:8082", "http://127.0.0.1:8081"];
+const ALLOWED_ORIGINS = (
+  process.env.AGENT_ALLOWED_ORIGINS
+    ?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+  ?? ["http://localhost:8081", "http://localhost:8082", "http://127.0.0.1:8081"]
+);
+const ALLOWED_HEADERS = ["Content-Type", "X-App-Factory-Confirm"];
 
 app.use((req, res, next) => {
   const origin = req.headers.origin ?? "";
-  if (ALLOWED_ORIGINS.includes(origin) || origin.startsWith("http://localhost:")) {
+  if (ALLOWED_ORIGINS.includes(origin)) {
     res.header("Access-Control-Allow-Origin", origin);
   }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
   next();
 });
 
@@ -144,18 +157,33 @@ const runQueuedOperation = <T>(
   operationName: string,
   step: string,
   task: () => Promise<T>,
-  onSuccess?: (result: T) => void
+  onSuccess?: (result: T) => void,
+  scope: { projectName?: string; requestId?: string } = {}
 ): void => {
-  enqueueProjectOperation(queueKey, operationName, task)
+  const eventScope = {
+    clientId,
+    projectName: scope.projectName,
+    requestId: scope.requestId,
+  };
+
+  enqueueProjectOperation(
+    queueKey,
+    operationName,
+    () => runWithEventScope(eventScope, task)
+  )
     .then((result) => {
-      onSuccess?.(result);
+      runWithEventScope(eventScope, () => {
+        onSuccess?.(result);
+      });
     })
     .catch((error) => {
-      sendSystemErrorToClient(
-        clientId,
-        error instanceof Error ? error.message : "Unknown error",
-        step
-      );
+      runWithEventScope(eventScope, () => {
+        sendSystemErrorToClient(
+          clientId,
+          error instanceof Error ? error.message : "Unknown error",
+          step
+        );
+      });
     });
 };
 
@@ -205,13 +233,22 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
   switch (message.type) {
     case "abort_generation":
       console.log("[WS] Abort requested");
-      abortAll();
-      broadcast({ type: "generation_aborted" });
+      runWithEventScope(
+        { clientId, requestId: message.requestId },
+        () => {
+          abortAll();
+          sendToClient(clientId, { type: "generation_aborted" });
+        }
+      );
       return;
 
     case "create_project": {
       console.log("[WS] Create project:", message.description);
       let createOperation: Promise<Awaited<ReturnType<typeof createProject>>> | null = null;
+      const eventScope = { requestId: message.requestId } as {
+        projectName?: string;
+        requestId?: string;
+      };
 
       runQueuedOperation(
         clientId,
@@ -226,6 +263,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             temperature: message.temperature,
             maxTokens: message.maxTokens,
             onProjectNameResolved: (projectName) => {
+              eventScope.projectName = projectName;
               if (createOperation) {
                 attachOperationToQueueKey(
                   getProjectOperationQueueKey(projectName),
@@ -239,8 +277,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           return createOperation;
         },
         (result) => {
-          broadcast({ type: "project_created", ...result });
-        }
+          sendToClient(clientId, { type: "project_created", ...result });
+        },
+        eventScope
       );
       return;
     }
@@ -262,8 +301,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           maxTokens: message.maxTokens,
         }),
         (result) => {
-          broadcast({ type: "iteration_result", ...result });
-        }
+          sendToClient(clientId, { type: "iteration_result", ...result });
+        },
+        { projectName: message.projectName, requestId: message.requestId }
       );
       return;
 
@@ -276,13 +316,18 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
       if (existingPort) {
         console.log(`[WS] Project ${pName} running on port ${existingPort}, verifying...`);
         waitForMetroReady(existingPort, 5).then((healthy) => {
-          if (healthy) {
-            setPreviewPort(pName, existingPort);
-            broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
-            broadcast({ type: "status", status: "ready" });
-          } else {
-            console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
-          }
+          runWithEventScope(
+            { clientId, projectName: pName, requestId: message.requestId },
+            () => {
+              if (healthy) {
+                setPreviewPort(pName, existingPort);
+                broadcast({ type: "preview_ready", port: existingPort, projectName: pName, proxyUrl: `/preview/${encodeURIComponent(pName)}/` });
+                broadcast({ type: "status", status: "ready" });
+              } else {
+                console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
+              }
+            }
+          );
         });
         return;
       }
@@ -367,7 +412,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           setPreviewPort(message.projectName as string, port);
           broadcast({ type: "preview_ready", port, projectName: message.projectName, proxyUrl: `/preview/${encodeURIComponent(message.projectName as string)}/` });
           broadcast({ type: "status", status: "ready" });
-        }
+        },
+        undefined,
+        { projectName: message.projectName, requestId: message.requestId }
       );
       return;
     }
@@ -383,7 +430,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           message.projectName,
           message.commitHash,
           message.lmStudioUrl
-        )
+        ),
+        undefined,
+        { projectName: message.projectName, requestId: message.requestId }
       );
       return;
   }
@@ -438,9 +487,9 @@ const shutdown = (): void => {
   setTimeout(() => process.exit(0), 1000).unref();
 };
 
-server.listen(PORT, async () => {
-  console.log(`[Agent] Server: http://localhost:${PORT}`);
-  console.log(`[Agent] WebSocket: ws://localhost:${PORT}`);
+server.listen(PORT, HOST, async () => {
+  console.log(`[Agent] Server: http://${HOST}:${PORT}`);
+  console.log(`[Agent] WebSocket: ws://${HOST}:${PORT}`);
 
   initTemplateCache().catch((err) => {
     console.error("[Agent] Template cache init failed:", err);

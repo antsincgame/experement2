@@ -9,9 +9,16 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e:web": "playwright test -c playwright.e2e.config.ts",
+    "test:agent": "npm --prefix agent run test",
+    "typecheck:agent": "npm --prefix agent run typecheck",
+    "check": "npm run typecheck && npm run typecheck:agent && npm run lint && npm run test && npm run test:agent"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.0.2",
     "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/elements": "^2.9.10",
     "@react-navigation/native": "^7.1.33",
@@ -50,10 +57,14 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/file-saver": "^2.0.7",
     "@types/react": "~19.2.2",
     "@types/react-syntax-highlighter": "^15.5.13",
-    "typescript": "~5.9.2"
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~55.0.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.2"
   },
   "private": true
 }

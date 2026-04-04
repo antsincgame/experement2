@@ -1,6 +1,10 @@
-﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL.
+﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL and scoped request metadata.
 import { useCallback } from "react";
 import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
+import {
+  parseIncomingWsMessage,
+  type OutgoingWsMessage,
+} from "@/shared/schemas/ws-messages";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
@@ -17,6 +21,8 @@ interface WsRuntime {
   reconnectTimer?: ReturnType<typeof setTimeout>;
   socket?: WebSocket;
 }
+
+const createRequestId = (): string => crypto.randomUUID();
 
 const GLOBAL_SCOPE = globalThis as Record<string, unknown>;
 const WS_RUNTIME_KEY = "__af_ws_runtime__";
@@ -87,7 +93,13 @@ const scheduleReconnect = (): void => {
 
 const handleSocketMessage = (payload: string): void => {
   try {
-    useProjectStore.getState().handleWsMessage(JSON.parse(payload));
+    const message = parseIncomingWsMessage(JSON.parse(payload));
+    if (!message) {
+      logWarn("websocket", "Ignored unknown message shape from agent");
+      return;
+    }
+
+    useProjectStore.getState().handleWsMessage(message);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[WS] Failed to parse message", error);
@@ -185,7 +197,7 @@ initializeRuntime();
 export const useWebSocket = () => {
   const isConnected = useProjectStore((state) => state.isConnected);
 
-  const send = useCallback((message: Record<string, unknown>): boolean => {
+  const send = useCallback((message: OutgoingWsMessage): boolean => {
     const runtime = getRuntime();
     const socket = runtime.socket;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -207,6 +219,7 @@ export const useWebSocket = () => {
     const { lmStudioUrl, model, temperature, maxTokens } = useSettingsStore.getState();
     send({
       type: "create_project",
+      requestId: createRequestId(),
       description,
       lmStudioUrl,
       ...(model ? { model } : {}),
@@ -234,6 +247,7 @@ export const useWebSocket = () => {
     const { lmStudioUrl, model, temperature, maxTokens } = useSettingsStore.getState();
     send({
       type: "iterate",
+      requestId: createRequestId(),
       projectName,
       userRequest,
       chatHistory,
@@ -248,6 +262,7 @@ export const useWebSocket = () => {
     const { lmStudioUrl, model } = useSettingsStore.getState();
     send({
       type: "start_preview",
+      requestId: createRequestId(),
       projectName,
       lmStudioUrl,
       ...(model ? { model } : {}),
@@ -255,7 +270,7 @@ export const useWebSocket = () => {
   }, [send]);
 
   const abortGeneration = useCallback(() => {
-    send({ type: "abort_generation" });
+    send({ type: "abort_generation", requestId: createRequestId() });
   }, [send]);
 
   const revertVersion = useCallback((commitHash: string) => {
@@ -267,6 +282,7 @@ export const useWebSocket = () => {
     const { lmStudioUrl, model } = useSettingsStore.getState();
     send({
       type: "revert_version",
+      requestId: createRequestId(),
       projectName,
       commitHash,
       lmStudioUrl,

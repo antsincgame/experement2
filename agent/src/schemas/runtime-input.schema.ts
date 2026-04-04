@@ -67,6 +67,11 @@ export const ProjectFileQuerySchema = z.object({
   path: ProjectFilePathSchema,
 });
 
+const RequestIdSchema = z.string().uuid("requestId must be a UUID");
+const WsRequestMetadataSchema = z.object({
+  requestId: RequestIdSchema.optional(),
+});
+
 const UserAssistantMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: trimmedString("content", 50_000),
@@ -106,7 +111,7 @@ const CommitHashSchema = z.string().trim().regex(
 
 export const WsAbortGenerationSchema = z.object({
   type: z.literal("abort_generation"),
-});
+}).merge(WsRequestMetadataSchema);
 
 export const WsCreateProjectSchema = z.object({
   type: z.literal("create_project"),
@@ -115,7 +120,7 @@ export const WsCreateProjectSchema = z.object({
   model: OptionalModelSchema,
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().max(131_072).optional(),
-});
+}).merge(WsRequestMetadataSchema);
 
 export const WsIterateSchema = z.object({
   type: z.literal("iterate"),
@@ -128,14 +133,14 @@ export const WsIterateSchema = z.object({
   model: OptionalModelSchema,
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().max(131_072).optional(),
-});
+}).merge(WsRequestMetadataSchema);
 
 export const WsStartPreviewSchema = z.object({
   type: z.literal("start_preview"),
   projectName: ProjectNameSchema,
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
-});
+}).merge(WsRequestMetadataSchema);
 
 export const WsRevertVersionSchema = z.object({
   type: z.literal("revert_version"),
@@ -143,7 +148,7 @@ export const WsRevertVersionSchema = z.object({
   commitHash: CommitHashSchema,
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
-});
+}).merge(WsRequestMetadataSchema);
 
 export const WsMessageSchema = z.discriminatedUnion("type", [
   WsAbortGenerationSchema,

@@ -18,7 +18,6 @@ const TEST_PROMPTS = [
   "Water intake tracker with daily goal",
 ];
 
-let currentTest = 0;
 let passed = 0;
 let failed = 0;
 const results = [];

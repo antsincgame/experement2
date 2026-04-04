@@ -1,21 +1,7 @@
-import { View, Text, ScrollView } from "react-native";
-import { Platform } from "react-native";
+import { ScrollView, Text, View } from "react-native";
+import { useWebSyntaxHighlighter } from "@/shared/hooks/use-web-syntax-highlighter";
 import { useProjectStore } from "@/stores/project-store";
 import MatrixRain from "./matrix-rain";
-
-let SyntaxHighlighter: typeof import("react-syntax-highlighter").default | null = null;
-let vscDarkPlus: Record<string, React.CSSProperties> | null = null;
-
-if (Platform.OS === "web") {
-  try {
-    const rsh = require("react-syntax-highlighter");
-    const styles = require("react-syntax-highlighter/dist/esm/styles/prism");
-    SyntaxHighlighter = rsh.Prism;
-    vscDarkPlus = styles.vscDarkPlus;
-  } catch {
-    // fallback to plain text
-  }
-}
 
 interface CodeViewerProps {
   filepath: string | null;
@@ -25,6 +11,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
   const fileContents = useProjectStore((s) => s.fileContents);
   const streamingContent = useProjectStore((s) => s.streamingContent);
   const status = useProjectStore((s) => s.status);
+  const { SyntaxHighlighter, theme } = useWebSyntaxHighlighter("vscDarkPlus");
 
   if (!filepath && status === "generating") {
     return (
@@ -75,20 +62,17 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
   // Safety cap: files > 80 KB or > 1000 lines skip syntax highlighting to avoid OOM
   const lineCount = content.split("\n").length;
   const useSyntaxHighlighter =
-    Platform.OS === "web" &&
     SyntaxHighlighter !== null &&
-    vscDarkPlus !== null &&
+    theme !== null &&
     content.length < 80_000 &&
     lineCount < 1000;
 
   if (useSyntaxHighlighter) {
-    const Highlighter = SyntaxHighlighter!;
-    const theme = vscDarkPlus!;
     return (
       <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
         <MatrixRain />
         <ScrollView className="flex-1" style={{ backgroundColor: "transparent", zIndex: 1 }}>
-          <Highlighter
+          <SyntaxHighlighter
             language={lang}
             style={theme}
             showLineNumbers
@@ -116,7 +100,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
             }}
           >
             {content}
-          </Highlighter>
+          </SyntaxHighlighter>
         </ScrollView>
       </View>
     );

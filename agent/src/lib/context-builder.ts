@@ -1,4 +1,5 @@
-import { Project, Node, SyntaxKind, type SourceFile } from "ts-morph";
+// Fixes contract extraction typing so ts-morph analysis stays compatible with strict builds.
+import { Project, Node, SyntaxKind, type SourceFile, type Type } from "ts-morph";
 import path from "path";
 import fs from "fs";
 
@@ -18,6 +19,15 @@ export interface ExportContract {
   returnObjectKeys: string[];
   propsInterface: string | null;
 }
+
+const unwrapPromiseType = (returnType: Type, sourceNode: Parameters<Type["getText"]>[0]): Type => {
+  const returnTypeText = returnType.getText(sourceNode);
+  if (!returnTypeText.startsWith("Promise<")) {
+    return returnType;
+  }
+
+  return returnType.getTypeArguments()[0] ?? returnType;
+};
 
 /** Extract structured JSON export contracts from a generated file using ts-morph */
 export const extractExportContracts = (filePath: string): ExportContract[] | null => {
@@ -63,7 +73,7 @@ export const extractExportContracts = (filePath: string): ExportContract[] | nul
             type: p.getType().getText(funcNode).slice(0, 100),
           }));
 
-          const baseType = returnType.isPromise() ? (returnType.getTypeArguments()[0] ?? returnType) : returnType;
+          const baseType = unwrapPromiseType(returnType, funcNode);
           if (baseType.isObject() && !baseType.isArray() && !returnTypeStr.includes("Element")) {
             returnObjectKeys = baseType.getProperties().map((p) => p.getName());
           }

@@ -1,0 +1,5 @@
+# Ignores local dependency trees and browser E2E artifacts so CI/test runs do not pollute the repo status.
+node_modules/
+test-results/
+playwright-report/
+workspace/e2e-existing-project/

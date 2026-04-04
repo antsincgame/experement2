@@ -1,10 +1,11 @@
-﻿// Persists configurable frontend endpoints and generation settings with env-backed defaults.
+﻿// Persists configurable frontend endpoints through a cross-platform storage adapter for Expo targets.
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 import {
   AGENT_HTTP_URL,
   LM_STUDIO_DEFAULT_URL,
 } from "@/shared/lib/constants";
+import { createPersistStorage } from "@/shared/lib/storage/persist-storage";
 
 export interface ErrorLogEntry {
   id: string;
@@ -70,7 +71,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "app-factory-settings",
-      storage: createJSONStorage(() => localStorage),
+      storage: createPersistStorage(),
       partialize: (state) => {
         const { errorLogs: _logs, addErrorLog: _add, clearErrorLogs: _clear, ...persisted } = state;
         return persisted;

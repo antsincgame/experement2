@@ -5,7 +5,7 @@ import type { RequestHandler } from "http-proxy-middleware";
 vi.mock("http-proxy-middleware", () => ({
   createProxyMiddleware: vi.fn((options: Record<string, unknown>) => {
     const handler = (() => undefined) as unknown as RequestHandler;
-    (handler as Record<string, unknown>).__proxyOptions = options;
+    ((handler as unknown) as Record<string, unknown>).__proxyOptions = options;
     return handler;
   }),
 }));

@@ -1,7 +1,11 @@
-﻿// Validates project route params and file paths before touching the workspace.
+﻿// Validates project routes and protects destructive workspace operations with explicit confirmation.
 import { Router } from "express";
 import fs from "fs";
 import path from "path";
+import {
+  DELETE_WORKSPACE_CONFIRMATION,
+  requireDangerousAction,
+} from "../lib/route-guards.js";
 import { parseOrRespond } from "../lib/request-validation.js";
 import {
   ProjectFileQuerySchema,
@@ -42,7 +46,11 @@ projectRouter.get("/", (_req, res) => {
 });
 
 // DELETE all projects (wipe workspace)
-projectRouter.delete("/all", (_req, res) => {
+projectRouter.delete("/all", (req, res) => {
+  if (!requireDangerousAction(req, res, DELETE_WORKSPACE_CONFIRMATION, "Workspace deletion")) {
+    return;
+  }
+
   const wsRoot = getWorkspaceRoot();
   if (!fs.existsSync(wsRoot)) {
     res.json({ data: { deleted: 0 } });

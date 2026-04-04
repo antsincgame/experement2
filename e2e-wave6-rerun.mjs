@@ -24,7 +24,6 @@ const runTest = (testIndex) => {
     const startTime = Date.now();
     let planReceived = false;
     let filesGenerated = 0;
-    let previewReady = false;
     let errorMsg = null;
 
     console.log(`\n${"=".repeat(60)}`);
@@ -56,7 +55,6 @@ const runTest = (testIndex) => {
           console.log(`  ✅ Generated: ${msg.filesCount} files`);
           break;
         case "preview_ready":
-          previewReady = true;
           console.log(`  🚀 Preview: port ${msg.port}`);
           break;
         case "system_error":

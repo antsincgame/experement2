@@ -2,7 +2,6 @@
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import {
   ICON_CONTRACT,
-  type SupportedNavigationType,
 } from "../lib/generation-contract.js";
 
 const getScreenRouteName = (routePath: string): string => {
@@ -17,10 +16,8 @@ const getScreenTitle = (screenName: string): string =>
 const getScreenIcon = (icon?: string): string => icon?.trim() || "circle";
 
 export const getRootLayout = (
-  navigation: AppPlan["navigation"]
+  _navigation: AppPlan["navigation"]
 ): string => {
-  const navType: SupportedNavigationType = navigation?.type ?? "stack";
-
   // Both tabs and stack use <Stack> as root — Expo Router auto-discovers (tabs) group
   return `import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";

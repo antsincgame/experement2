@@ -50,19 +50,20 @@ const runWindowsTaskkill = (pid: number): void => {
 };
 
 const killProcess = (cp: ChildProcess): void => {
-  if (!cp.pid) return;
+  const pid = cp.pid;
+  if (!pid) return;
 
   try {
     if (isWindows) {
       // /T kills the process tree (all children)
-      runWindowsTaskkill(cp.pid);
+      runWindowsTaskkill(pid);
       return;
     }
 
     // Kill entire process group on Unix (negative PID = process group)
-    try { process.kill(-cp.pid, "SIGTERM"); } catch { cp.kill("SIGTERM"); }
+    try { process.kill(-pid, "SIGTERM"); } catch { cp.kill("SIGTERM"); }
     setTimeout(() => {
-      try { if (!cp.killed) process.kill(-cp.pid, "SIGKILL"); } catch { /* already dead */ }
+      try { if (!cp.killed) process.kill(-pid, "SIGKILL"); } catch { /* already dead */ }
     }, 5000);
   } catch {
     // The process may have already exited before cleanup completed.

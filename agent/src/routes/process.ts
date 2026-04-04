@@ -1,5 +1,9 @@
-﻿// Validates process route params so preview process control cannot target invalid projects.
+﻿// Validates process routes and protects preview process control with explicit confirmation.
 import { Router } from "express";
+import {
+  KILL_PROCESS_CONFIRMATION,
+  requireDangerousAction,
+} from "../lib/route-guards.js";
 import { parseOrRespond } from "../lib/request-validation.js";
 import { ProjectParamsSchema } from "../schemas/runtime-input.schema.js";
 import {
@@ -29,12 +33,16 @@ processRouter.get("/:name/status", (req, res) => {
     data: {
       running,
       port,
-      previewUrl: port ? "/preview/" : null,
+      previewUrl: port ? `/preview/${encodeURIComponent(params.name)}/` : null,
     },
   });
 });
 
 processRouter.post("/:name/kill", (req, res) => {
+  if (!requireDangerousAction(req, res, KILL_PROCESS_CONFIRMATION, "Preview process kill")) {
+    return;
+  }
+
   const params = parseOrRespond(ProjectParamsSchema, req.params, res);
   if (!params) {
     return;

@@ -64,7 +64,7 @@ const ChatInput = ({
         setText(improvedPrompt);
       }
     } catch (error) {
-      // Enhance failed — silently ignore
+      console.warn("[chat-input] Prompt enhancement failed", error);
     } finally {
       setEnhancing(false);
     }
@@ -102,6 +102,7 @@ const ChatInput = ({
         }}
       >
         <TextInput
+          accessibilityLabel="Chat message input"
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
@@ -114,6 +115,8 @@ const ChatInput = ({
         <View className="flex-row items-center m-1.5 gap-1">
           {enhancerEnabled && hasText && !isGenerating && (
             <Pressable
+              accessibilityLabel="Improve chat prompt"
+              accessibilityRole="button"
               onPress={handleEnhance}
               disabled={enhancing}
               className="w-8 h-8 rounded-lg items-center justify-center"
@@ -129,6 +132,8 @@ const ChatInput = ({
 
           {isGenerating ? (
             <Pressable
+              accessibilityLabel="Stop generation"
+              accessibilityRole="button"
               onPress={onAbort}
               className="w-8 h-8 rounded-lg items-center justify-center"
               style={{ backgroundColor: "rgba(255, 51, 102, 0.15)" }}
@@ -137,6 +142,8 @@ const ChatInput = ({
             </Pressable>
           ) : hasText ? (
             <Pressable
+              accessibilityLabel="Send chat message"
+              accessibilityRole="button"
               onPress={handleSend}
               className="w-8 h-8 rounded-lg items-center justify-center"
               style={{ backgroundColor: "#00E5FF" } as never}

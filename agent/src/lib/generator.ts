@@ -432,7 +432,7 @@ Generate the complete code for: ${fileSpec.path}`;
 
 export const regenerateFileWithContracts = async (
   projectName: string,
-  projectPath: string,
+  _projectPath: string,
   filePath: string,
   violations: ContractViolation[],
   contracts: Record<string, ExportContract[]>,
