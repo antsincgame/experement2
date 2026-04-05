@@ -142,7 +142,7 @@ import { colors, spacing, borderRadius, shadows, typography, theme } from "@/the
 \`\`\`
 
 Available exports:
-- \`colors.background\`, \`colors.surface\`, \`colors.primary\`, \`colors.text\`, \`colors.textSecondary\`, \`colors.success\`, \`colors.error\`
+- \`colors.background\`, \`colors.surface\`, \`colors.primary\`, \`colors.accent\`, \`colors.primaryText\` (alias: \`colors.text\`), \`colors.secondaryText\` (alias: \`colors.textSecondary\`), \`colors.success\`, \`colors.error\`, \`colors.warning\`, \`colors.card\`, \`colors.border\`
 - \`spacing.xs\` (4), \`spacing.sm\` (8), \`spacing.md\` (16), \`spacing.lg\` (24), \`spacing.xl\` (32)
 - \`borderRadius.sm\` (8), \`borderRadius.md\` (12), \`borderRadius.lg\` (20)
 - \`shadows.card\` — full shadow object for cards
