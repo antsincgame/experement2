@@ -2,9 +2,13 @@
 import { Router } from "express";
 import { parseOrRespond } from "../lib/request-validation.js";
 import { LlmEnhanceBodySchema } from "../schemas/runtime-input.schema.js";
-import { handleLLMProxyRoute, completeNonStreaming } from "../services/llm-proxy.js";
+import { handleLLMProxyRoute, completeNonStreaming, getActiveRequestCount } from "../services/llm-proxy.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
+
+// Cache models list to avoid hammering LM Studio during generation
+let modelsCache: { data: unknown; timestamp: number } | null = null;
+const MODELS_CACHE_TTL_MS = 10_000;
 
 export const llmRouter = Router();
 
@@ -69,5 +73,49 @@ llmRouter.get("/health", async (_req, res) => {
     }
   } catch {
     res.json({ status: "disconnected", message: "LM Studio not reachable" });
+  }
+});
+
+llmRouter.get("/models", async (req, res) => {
+  const baseUrl = typeof req.query.url === "string" && req.query.url.trim()
+    ? req.query.url.trim().replace(/\/+$/, "")
+    : DEFAULT_LM_STUDIO_URL;
+
+  // Return cached result during active generation to avoid hammering LM Studio
+  if (
+    getActiveRequestCount() > 0 &&
+    modelsCache &&
+    Date.now() - modelsCache.timestamp < MODELS_CACHE_TTL_MS
+  ) {
+    res.json(modelsCache.data);
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000);
+    const response = await fetch(`${baseUrl}/v1/models`, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const result = { data: { models: [], status: "error", error: `HTTP ${response.status}` } };
+      res.json(result);
+      return;
+    }
+
+    const json = await response.json();
+    const models = Array.isArray(json.data) ? json.data : [];
+    const result = { data: { models, status: "connected" } };
+    modelsCache = { data: result, timestamp: Date.now() };
+    res.json(result);
+  } catch (err) {
+    const result = {
+      data: {
+        models: [],
+        status: "disconnected",
+        error: err instanceof Error ? err.message : "Connection failed",
+      },
+    };
+    res.json(result);
   }
 });

@@ -27,8 +27,8 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 ❌ <${ICON_CONTRACT.defaultImportName} onPress={fn} />                          → icons aren't pressable
 ❌ React.useState() without import React               → React not in scope
 ❌ \\\`\\\`\\\`tsx at start of file                              → raw code only, no fences
-❌ import { colors } from "@/theme"                     → @/theme does NOT exist. Define colors as constants INLINE.
-❌ import { theme } from "@/lib/theme"                  → theme file does NOT exist. Use literal color values.
+✅ import { colors, spacing, shadows, theme } from "@/theme" → CORRECT. @/theme EXISTS with named exports.
+❌ import { theme } from "@/lib/theme"                  → WRONG PATH. Use "@/theme" not "@/lib/theme".
 ❌ import anything from a file NOT in the plan's files[] → INSTANT CRASH. Every import must exist.
 \`\`\`
 
@@ -135,23 +135,27 @@ export default function TabLayout() {
 
 ### UI/UX DESIGN SYSTEM (CRITICAL)
 You MUST use \`StyleSheet.create\` for ALL styling.
-The App Plan contains a "theme" object. Use ONLY these colors:
+You MUST import design tokens from \`@/theme\`:
 
-1. **Read theme from plan:** The plan's \`theme\` field defines ALL colors.
-   - \`theme.background\` → app/screen background color
-   - \`theme.surface\` → card/container background
-   - \`theme.primary\` → buttons, accent elements
-   - \`theme.primaryText\` → main text color
-   - \`theme.secondaryText\` → labels, hints
-   - \`theme.accent\` → borders, highlights
-   - \`theme.isDark\` → if true, use light text on dark backgrounds
+\`\`\`tsx
+import { colors, spacing, borderRadius, shadows, typography, theme } from "@/theme";
+\`\`\`
+
+Available exports:
+- \`colors.background\`, \`colors.surface\`, \`colors.primary\`, \`colors.text\`, \`colors.textSecondary\`, \`colors.success\`, \`colors.error\`
+- \`spacing.xs\` (4), \`spacing.sm\` (8), \`spacing.md\` (16), \`spacing.lg\` (24), \`spacing.xl\` (32)
+- \`borderRadius.sm\` (8), \`borderRadius.md\` (12), \`borderRadius.lg\` (20)
+- \`shadows.card\` — full shadow object for cards
+- \`typography.title\`, \`typography.subtitle\`, \`typography.body\`, \`typography.caption\`
+- \`theme.isDark\` — boolean for dark mode branching
+
+1. **Colors:** Use \`colors.primary\`, \`colors.background\`, etc. NEVER hardcode hex colors — always reference the \`colors\` object.
 
 2. **Cards & Surfaces:**
-   Wrap content in cards: \`backgroundColor: theme.surface, borderRadius: theme.cardRadius || 20, padding: 20, marginHorizontal: 16, marginBottom: 16\`.
-   Shadows: \`shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: theme.isDark ? 0.3 : 0.05, shadowRadius: 12, elevation: 2\`.
+   Wrap content in cards: \`backgroundColor: colors.surface, borderRadius: borderRadius.lg, padding: spacing.lg, marginHorizontal: spacing.md, ...shadows.card\`.
 
 3. **Buttons:**
-   Large and tappable: \`backgroundColor: theme.primary, height: 56, borderRadius: theme.buttonRadius || 28\`.
+   Large and tappable: \`backgroundColor: colors.primary, height: 56, borderRadius: borderRadius.lg\`.
 
 4. **Typography:**
    Titles: \`fontSize: 28, fontWeight: '700', color: theme.primaryText\`.

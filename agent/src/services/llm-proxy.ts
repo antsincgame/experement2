@@ -261,11 +261,23 @@ export const streamCompletion = async (
     const reader = responseBody!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    const IDLE_TIMEOUT_MS = 60_000;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetIdleTimer = (): void => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        console.warn(`[LLM] Idle timeout ${IDLE_TIMEOUT_MS}ms — no chunks received, aborting stream`);
+        controller.abort();
+      }, IDLE_TIMEOUT_MS);
+    };
 
     try {
+      resetIdleTimer();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        resetIdleTimer();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -288,6 +300,7 @@ export const streamCompletion = async (
         }
       }
     } finally {
+      if (idleTimer) clearTimeout(idleTimer);
       reader.releaseLock();
       activeControllers.delete(taskId);
       activeRequestCount = Math.max(0, activeRequestCount - 1);
@@ -296,6 +309,9 @@ export const streamCompletion = async (
 
   return parseSSE();
 };
+
+const NON_STREAMING_TIMEOUT_MS = 30_000;
+const NON_STREAMING_MAX_RETRIES = 1;
 
 export const completeNonStreaming = async (
   messages: ChatMessage[],
@@ -310,32 +326,65 @@ export const completeNonStreaming = async (
   const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
   const resolvedModel = options.model || await getDefaultModel(baseUrl);
 
+  if (!resolvedModel) {
+    throw new Error(
+      "No LLM model available — check that LM Studio is running and has a model loaded"
+    );
+  }
+
   const body: CompletionRequest = {
     messages,
     temperature: options.temperature ?? 0.3,
     max_tokens: options.maxTokens ?? 65536,
     stream: false,
-    ...(resolvedModel ? { model: resolvedModel } : {}),
+    model: resolvedModel,
   };
 
   if (options.responseFormat) {
     body.response_format = options.responseFormat;
   }
 
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`LM Studio error (${response.status}): ${errorText}`);
+  for (let attempt = 0; attempt <= NON_STREAMING_MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), NON_STREAMING_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`LM Studio error (${response.status}): ${errorText}`);
+      }
+
+      const json = await response.json();
+      return json.choices?.[0]?.message?.content ?? "";
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (lastError.name === "AbortError") {
+        throw new Error(`LM Studio request timed out after ${NON_STREAMING_TIMEOUT_MS}ms`);
+      }
+
+      if (attempt < NON_STREAMING_MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        continue;
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  const json = await response.json();
-  return json.choices?.[0]?.message?.content ?? "";
+  throw lastError ?? new Error("completeNonStreaming failed after retries");
 };
+
+export const getActiveRequestCount = (): number => activeRequestCount;
 
 export const abortTask = (taskId: string): boolean => {
   const controller = activeControllers.get(taskId);

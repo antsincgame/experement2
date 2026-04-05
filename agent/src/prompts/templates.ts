@@ -66,22 +66,24 @@ ${tabsScreens}
 `;
 };
 
-/** Static boilerplate remains centralized in template-cache; this stays for prompt-side dynamic layouts only. */
-export const BOILERPLATE_TEMPLATES: Record<string, string> = {
-  "src/theme.ts": `// App theme — design tokens for consistent styling
+/** Generates src/theme.ts from the plan's theme object so colors match the planner's design. */
+export const getThemeFile = (planTheme: AppPlan["theme"]): string => {
+  const t = planTheme;
+  const isDark = t.isDark;
+  return `// App theme — design tokens synced with the plan
 export const colors = {
-  background: "#F8FAFC",
-  surface: "#FFFFFF",
-  primary: "#6366F1",
-  primaryLight: "#818CF8",
-  text: "#0F172A",
-  textSecondary: "#64748B",
-  textMuted: "#94A3B8",
-  border: "#E2E8F0",
+  background: "${t.background}",
+  surface: "${t.surface}",
+  primary: "${t.primary}",
+  primaryLight: "${t.accent}",
+  text: "${t.primaryText}",
+  textSecondary: "${t.secondaryText}",
+  textMuted: "${isDark ? "#6B7280" : "#94A3B8"}",
+  border: "${isDark ? "#374151" : "#E2E8F0"}",
   success: "#10B981",
   warning: "#F59E0B",
   error: "#EF4444",
-  card: "#FFFFFF",
+  card: "${t.surface}",
 };
 
 export const spacing = {
@@ -95,7 +97,7 @@ export const spacing = {
 export const borderRadius = {
   sm: 8,
   md: 12,
-  lg: 20,
+  lg: ${t.cardRadius},
   full: 9999,
 };
 
@@ -103,7 +105,7 @@ export const shadows = {
   card: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: ${isDark ? 0.3 : 0.05},
     shadowRadius: 12,
     elevation: 2,
   },
@@ -115,6 +117,11 @@ export const typography = {
   body: { fontSize: 14, color: colors.text },
   caption: { fontSize: 12, color: colors.textSecondary },
 };
+
+export const theme = { colors, spacing, borderRadius, shadows, typography, isDark: ${isDark} };
 // EOF
-`,
+`;
 };
+
+/** Static boilerplate — no longer includes theme.ts (generated dynamically from plan). */
+export const BOILERPLATE_TEMPLATES: Record<string, string> = {};

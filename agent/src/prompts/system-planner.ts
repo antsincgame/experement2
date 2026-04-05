@@ -56,11 +56,15 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 - any package starting with @react-native-three/
 - If the user asks for 3D — use SVG or 2D Canvas instead
 
-## SAFE extra dependencies (prefer these):
+## SAFE extra dependencies (STRICTLY use ONLY from this list):
 zustand, react-native-svg, expo-linear-gradient, expo-haptics, expo-clipboard,
 expo-image-picker, expo-camera, expo-location, expo-sensors, expo-av,
-date-fns, dayjs, axios, @react-native-async-storage/async-storage,
+expo-notifications, date-fns, dayjs, axios, @react-native-async-storage/async-storage,
 react-native-chart-kit, react-native-calendars, react-native-modal, burnt
+
+You MUST strictly use standard React Native libraries. DO NOT invent npm packages.
+DO NOT use expo-local-notifications (use expo-notifications instead).
+DO NOT use packages not in the safe list above unless absolutely necessary.
 
 ## Output Format
 CRITICAL: Respond with ONLY a single JSON object.
