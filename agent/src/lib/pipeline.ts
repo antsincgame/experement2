@@ -12,6 +12,7 @@ import {
   runNativeSmoke,
   runTypecheck,
   runWebExport,
+  npmInstall,
 } from "../services/process-manager.js";
 import { getProjectPath, readFile as readProjectFile } from "../services/file-manager.js";
 import { parseMetroError } from "../services/log-watcher.js";
@@ -160,12 +161,58 @@ const runProjectQualityGates = async (
   );
 
   if (staticIssues.length > 0) {
-    errors.push(
-      `Static validation failed: ${staticIssues
-        .map((issue) => `${issue.filePath ?? "project"}: ${issue.message}`)
-        .join("; ")}`
-    );
-    return { success: false, errors };
+    // Self-healing: auto-install missing npm packages before failing
+    const missingPkgIssues = staticIssues.filter((i) => i.code === "missing_package_dependency");
+    const otherIssues = staticIssues.filter((i) => i.code !== "missing_package_dependency");
+
+    if (missingPkgIssues.length > 0) {
+      const missingDeps = [...new Set(
+        missingPkgIssues
+          .map((i) => {
+            const match = i.message.match(/requires missing dependency "([^"]+)"/);
+            return match?.[1];
+          })
+          .filter((dep): dep is string => !!dep && !dep.startsWith("."))
+      )];
+
+      if (missingDeps.length > 0) {
+        console.log(`[Pipeline] Auto-installing missing deps: ${missingDeps.join(", ")}`);
+        try {
+          await npmInstall(projectPath, missingDeps);
+
+          // Re-validate after install
+          const revalidated = validateGeneratedProject(projectPath, navigationType ?? undefined);
+          if (revalidated.length === 0) {
+            // All issues resolved — continue to typecheck
+            console.log("[Pipeline] Auto-install resolved all static issues");
+          } else {
+            errors.push(
+              `Static validation failed: ${revalidated
+                .map((issue) => `${issue.filePath ?? "project"}: ${issue.message}`)
+                .join("; ")}`
+            );
+            return { success: false, errors };
+          }
+        } catch (installErr) {
+          console.warn(`[Pipeline] Auto-install failed: ${installErr instanceof Error ? installErr.message : String(installErr)}`);
+          errors.push(
+            `Static validation failed: ${staticIssues
+              .map((issue) => `${issue.filePath ?? "project"}: ${issue.message}`)
+              .join("; ")}`
+          );
+          return { success: false, errors };
+        }
+      }
+    }
+
+    if (otherIssues.length > 0) {
+      errors.push(
+        `Static validation failed: ${otherIssues
+          .map((issue) => `${issue.filePath ?? "project"}: ${issue.message}`)
+          .join("; ")}`
+      );
+      return { success: false, errors };
+    }
   }
 
   const typecheckResult = await runTypecheck(projectPath);

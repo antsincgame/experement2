@@ -392,19 +392,25 @@ Generate the complete code for: ${fileSpec.path}`;
     }
   }
 
-  // Check for truncated files (missing // EOF marker) — retry once
-  const truncated: string[] = [];
-  for (const fp of generatedFiles) {
-    if (AUTO_LAYOUT_FILES.has(fp)) continue;
-    if (fp === "tamagui.config.ts") continue; // boilerplate, already has EOF
-    const content = readFile(projectName, fp);
-    if (content && !content.includes("// EOF") && content.length > 20) {
-      truncated.push(fp);
-    }
-  }
+  // Aggressive truncation retry loop — retries up to 3 times for files missing // EOF
+  const MAX_TRUNCATION_RETRIES = 3;
+  let truncationRetries = 0;
 
-  if (truncated.length > 0 && onChunk) {
-    onChunk(`\n[Truncation detected: ${truncated.length} files missing // EOF — retrying]\n`);
+  while (truncationRetries < MAX_TRUNCATION_RETRIES) {
+    const truncated: string[] = [];
+    for (const fp of generatedFiles) {
+      if (AUTO_LAYOUT_FILES.has(fp)) continue;
+      if (fp === "tamagui.config.ts") continue;
+      const content = readFile(projectName, fp);
+      if (content && !content.includes("// EOF") && content.length > 20) {
+        truncated.push(fp);
+      }
+    }
+
+    if (truncated.length === 0) break;
+
+    truncationRetries++;
+    onChunk?.(`\n[Truncation detected: ${truncated.length} files missing // EOF — retry ${truncationRetries}/${MAX_TRUNCATION_RETRIES}]\n`);
 
     for (const fp of truncated) {
       const fileSpec = plan.files.find((f) => f.path === fp);
@@ -415,7 +421,7 @@ Generate the complete code for: ${fileSpec.path}`;
         { role: "system" as const, content: SYSTEM_GENERATOR },
         {
           role: "user" as const,
-          content: `The following file was TRUNCATED (cut off). Regenerate it COMPLETELY.\nPath: ${fp}\nDescription: ${fileSpec.description}\n\nTruncated content (for reference):\n${currentContent.slice(0, 2000)}\n\nWrite the COMPLETE file. End with // EOF.`,
+          content: `/no_think\nCRITICAL: The previous output for "${fp}" was TRUNCATED because it was too long. Output the ENTIRE file from the very beginning to the very end. Do NOT use placeholders like "// rest of code". You MUST end the file with EXACTLY // EOF on the last line.\n\nPath: ${fp}\nType: ${fileSpec.type}\nDescription: ${fileSpec.description}\n\nTruncated content (first 2000 chars for reference):\n${currentContent.slice(0, 2000)}\n\nWrite the COMPLETE file from start to finish. The LAST line MUST be: // EOF`,
         },
       ];
 
@@ -441,7 +447,7 @@ Generate the complete code for: ${fileSpec.path}`;
 
       if (retryCode.length > 50) {
         writeFile(projectName, fp, sanitizeGeneratedCode(retryCode, fp));
-        onChunk?.(`[Retry OK: ${fp}]\n`);
+        onChunk?.(`[Truncation retry ${truncationRetries} OK: ${fp}]\n`);
       }
     }
   }
