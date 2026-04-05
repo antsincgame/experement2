@@ -45,10 +45,13 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 13. CRITICAL: Every file that is imported by another file MUST be in the plan.
     If screen imports ${PATH_ALIAS.importPrefix}hooks/useCounter, then src/hooks/useCounter.ts MUST be in files[].
     Missing files = "Unable to resolve module" crash.
-14. Icons: use ${ICON_CONTRACT.packageName} with DEFAULT import (${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}")
-15. Supported navigation types only: ${SUPPORTED_NAVIGATION_TYPES.join(", ")}
-16. navigation.screens[].path is REQUIRED and must point to a file in files[]
-17. Do NOT use drawer navigation unless it is explicitly supported by the scaffold. It is currently unsupported.
+14. CRITICAL: If ANY file uses types/interfaces defined in another file (like src/types/index.ts),
+    that types file MUST be listed in the \`dependencies\` array of the file using it.
+    Usually, ALMOST ALL components, hooks, and stores should have "src/types/index.ts" in their dependencies array.
+15. Icons: use ${ICON_CONTRACT.packageName} with DEFAULT import (${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}")
+16. Supported navigation types only: ${SUPPORTED_NAVIGATION_TYPES.join(", ")}
+17. navigation.screens[].path is REQUIRED and must point to a file in files[]
+18. Do NOT use drawer navigation unless it is explicitly supported by the scaffold. It is currently unsupported.
 
 ## FORBIDDEN DEPENDENCIES (DO NOT USE):
 - three, @react-three/fiber, @react-three/drei, @react-native-three/* — WebGL/3D not supported in Expo

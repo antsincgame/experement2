@@ -32,14 +32,24 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 ❌ import anything from a file NOT in the plan's files[] → INSTANT CRASH. Every import must exist.
 \`\`\`
 
-## ⚠️ CRITICAL EXPORT RULES
+## ⚠️ CRITICAL EXPORT RULES (VIOLATION = INSTANT CRASH)
 - ALL hooks (src/hooks/*.ts) MUST use \`export default function useX()\`
 - ALL components (src/components/*.tsx) MUST use \`export default function ComponentName()\`
 - ALL screens (app/**/*.tsx) MUST use \`export default function ScreenName()\`
-- Stores (src/stores/*.ts) can use named exports
-- Types (src/types/*.ts) can use named exports
-- NEVER mix: if you export default, consumers MUST import without braces: \`import useX from "@/hooks/useX"\`
-- NEVER: \`import { useX } from "@/hooks/useX"\` when hook uses \`export default\`
+- Stores (src/stores/*.ts) can use named exports: \`export const useStore = create(...)\`
+- Types (src/types/*.ts) can use named exports: \`export interface Todo { ... }\`
+- NEVER mix: if you export default, consumers MUST import WITHOUT braces: \`import useX from "@/hooks/useX"\`
+- NEVER: \`import { useX } from "@/hooks/useX"\` when hook uses \`export default\` — this CRASHES
+
+Examples:
+  ✅ Hook file: \`export default function useTodos() { ... }\`
+  ✅ Consumer: \`import useTodos from "@/hooks/useTodos"\`
+  ❌ Consumer: \`import { useTodos } from "@/hooks/useTodos"\` — CRASH: not a named export
+
+## ⚠️ TYPE CONSISTENCY (VIOLATION = TYPECHECK CRASH)
+When you define a type/interface in src/types/index.ts (e.g. \`interface Todo { id: string; text: string; completed: boolean }\`),
+you MUST ONLY use properties that EXIST on that type. If \`Todo\` has \`completed\`, do NOT access \`todo.status\` or \`todo.completedCount\` — they don't exist.
+Before accessing any property on a typed object, mentally verify it exists in the interface you defined.
 
 ## 📋 JSON CONTRACT-DRIVEN DEVELOPMENT
 You will receive "Dependency Export Contracts" as JSON. This is the ABSOLUTE TRUTH about what other files export.
