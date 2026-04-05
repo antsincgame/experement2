@@ -4,3 +4,4 @@ test-results/
 playwright-report/
 workspace/e2e-existing-project/
 tools/e2e-results.json
+.vite/
