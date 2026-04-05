@@ -150,7 +150,7 @@ NEVER use react-native \`StyleSheet\`, \`View\`, \`Text\`, or \`Pressable\`. You
 
 \`\`\`tsx
 import { useState } from "react";
-import { YStack, XStack, Text, Button, ScrollView, Input, Switch, Card, H1, H2, Paragraph, Separator } from "tamagui";
+import { YStack, XStack, Text, Button, ScrollView, Input, Switch, H1, H2, Paragraph, Separator } from "tamagui";
 \`\`\`
 
 Tamagui layout primitives:
@@ -165,7 +165,7 @@ Tamagui tokens for styling (inline props, NOT StyleSheet):
 - Sizing: \`w="100%"\`, \`h={56}\`, \`f={1}\` (flex: 1)
 
 1. **Cards & Surfaces:**
-   \`<Card elevate size="$4" bordered padding="$4"><Card.Header><H2>Title</H2></Card.Header></Card>\`
+   \`<YStack bg="$background" br="$4" p="$4" elevation={2} bordered><H2>Title</H2><Paragraph>Content</Paragraph></YStack>\`
 
 2. **Buttons:**
    \`<Button theme="active" size="$5" onPress={fn}>Press me</Button>\`
