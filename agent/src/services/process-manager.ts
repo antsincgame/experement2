@@ -178,7 +178,7 @@ export const killExpo = (projectName: string): void => {
   activeProcesses.delete(projectName);
 };
 
-const NPM_INSTALL_TIMEOUT_MS = 120_000; // 2 minutes
+const NPM_INSTALL_TIMEOUT_MS = 300_000; // 5 minutes (Tamagui is large)
 
 export const npmInstall = async (
   projectPath: string,
