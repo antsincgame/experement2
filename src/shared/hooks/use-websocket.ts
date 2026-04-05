@@ -20,6 +20,7 @@ interface WsRuntime {
   initialized?: boolean;
   reconnectTimer?: ReturnType<typeof setTimeout>;
   socket?: WebSocket;
+  messageQueue?: string[];
 }
 
 const createRequestId = (): string => crypto.randomUUID();
@@ -30,10 +31,11 @@ const WS_RUNTIME_KEY = "__af_ws_runtime__";
 const getRuntime = (): WsRuntime => {
   const existingRuntime = GLOBAL_SCOPE[WS_RUNTIME_KEY] as WsRuntime | undefined;
   if (existingRuntime) {
+    if (!existingRuntime.messageQueue) existingRuntime.messageQueue = [];
     return existingRuntime;
   }
 
-  const nextRuntime: WsRuntime = {};
+  const nextRuntime: WsRuntime = { messageQueue: [] };
   GLOBAL_SCOPE[WS_RUNTIME_KEY] = nextRuntime;
   return nextRuntime;
 };
@@ -141,6 +143,20 @@ const ensureConnected = (): void => {
     clearReconnectTimer();
     useProjectStore.getState().setConnected(true);
     console.log(`[WS] Connected ${nextUrl}`);
+
+    const runtime = getRuntime();
+    if (runtime.messageQueue && runtime.messageQueue.length > 0) {
+      console.log(`[WS] Flushing ${runtime.messageQueue.length} queued messages`);
+      const queue = [...runtime.messageQueue];
+      runtime.messageQueue = [];
+      for (const payload of queue) {
+        try {
+          socket.send(payload);
+        } catch {
+          runtime.messageQueue.push(payload);
+        }
+      }
+    }
   };
 
   socket.onmessage = (event) => {
@@ -200,18 +216,22 @@ export const useWebSocket = () => {
   const send = useCallback((message: OutgoingWsMessage): boolean => {
     const runtime = getRuntime();
     const socket = runtime.socket;
+    const payload = JSON.stringify(message);
+
     if (!socket || socket.readyState !== WebSocket.OPEN) {
+      runtime.messageQueue?.push(payload);
       ensureConnected();
-      return false;
+      return true;
     }
 
     try {
-      socket.send(JSON.stringify(message));
+      socket.send(payload);
       return true;
     } catch {
       // Socket may have closed between readyState check and send
+      runtime.messageQueue?.push(payload);
       ensureConnected();
-      return false;
+      return true;
     }
   }, []);
 

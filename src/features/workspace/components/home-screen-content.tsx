@@ -19,6 +19,7 @@ import type { ProjectEntry } from "@/stores/project-store";
 
 interface HomeScreenContentProps {
   allProjects: ProjectEntry[];
+  creationError: string | null;
   enhancing: boolean;
   enhancerEnabled: boolean;
   handleClearAll: () => void;
@@ -36,6 +37,7 @@ interface HomeScreenContentProps {
 
 export const HomeScreenContent = ({
   allProjects,
+  creationError,
   enhancing,
   enhancerEnabled,
   handleClearAll,
@@ -256,6 +258,26 @@ export const HomeScreenContent = ({
               </View>
             </View>
           </View>
+
+          {creationError && (
+            <View
+              className="w-full max-w-2xl px-6 mt-3"
+              accessibilityRole="alert"
+            >
+              <View
+                className="rounded-xl px-4 py-3"
+                style={{
+                  backgroundColor: "rgba(255, 51, 102, 0.1)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255, 51, 102, 0.3)",
+                }}
+              >
+                <Text style={{ fontSize: 13, color: "#FF3366", fontWeight: "600" }}>
+                  {creationError}
+                </Text>
+              </View>
+            </View>
+          )}
 
           <SuggestionChips onSelect={setWelcomeInput} />
         </View>

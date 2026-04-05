@@ -9,19 +9,11 @@ const PreviewPanel = () => {
   const projectName = useProjectStore((state) => state.projectName);
   const status = useProjectStore((state) => state.status);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [iframeSrc, setIframeSrc] = useState("");
+  const [iframeSrc, setIframeSrc] = useState(() => {
+    const { previewPort: port, projectName: name } = useProjectStore.getState();
+    return port && name ? `${apiClient.getPreviewProxyUrl(name)}?v=${Date.now()}` : "";
+  });
 
-  // Update iframe src when project or port changes — NO key change, reuse same iframe
-  useEffect(() => {
-    if (previewPort && projectName) {
-      const url = `${apiClient.getPreviewProxyUrl(projectName)}?v=${Date.now()}`;
-      setIframeSrc(url);
-    } else {
-      setIframeSrc("");
-    }
-  }, [previewPort, projectName]);
-
-  // Subscribe to store changes for live updates
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout>;
     const unsub = useProjectStore.subscribe((state, prevState) => {

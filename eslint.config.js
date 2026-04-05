@@ -16,6 +16,8 @@ module.exports = defineConfig([
       ".expo/**",
       "dist/**",
       "node_modules/**",
+      "test-results/**",
+      "playwright-report/**",
     ],
   }
 ]);

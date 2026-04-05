@@ -8,6 +8,15 @@ interface MarkdownRendererProps {
 
 const CODE_FONT = '"JetBrains Mono", "Fira Code", monospace';
 
+const isSafeUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 interface ParsedBlock {
   type: 'paragraph' | 'code' | 'heading' | 'list' | 'blockquote' | 'hr';
   content: string;
@@ -179,12 +188,15 @@ const renderInlineMarkdown = (text: string): ReactNode[] => {
         </Text>
       );
     } else if (first.type === "link") {
+      const url = first.m[2];
       parts.push(
         <Text
           key={key++}
-          style={{ color: "#00BCD4", textDecorationLine: "underline" }}
+          style={{ color: isSafeUrl(url) ? "#00BCD4" : "#888", textDecorationLine: "underline" }}
           onPress={() => {
-            void Linking.openURL(first.m[2]);
+            if (isSafeUrl(url)) {
+              void Linking.openURL(url);
+            }
           }}
         >
           {first.m[1]}

@@ -325,6 +325,8 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
                 broadcast({ type: "status", status: "ready" });
               } else {
                 console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
+                sendSystemErrorToClient(clientId, `Metro is not responding on port ${existingPort}`, "start_preview");
+                broadcast({ type: "status", status: "error" });
               }
             }
           );
@@ -409,9 +411,17 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             }
           });
 
+          // Wait for Metro to actually accept requests before announcing preview
+          const healthy = await waitForMetroReady(port, 40);
+
           setPreviewPort(message.projectName as string, port);
-          broadcast({ type: "preview_ready", port, projectName: message.projectName, proxyUrl: `/preview/${encodeURIComponent(message.projectName as string)}/` });
-          broadcast({ type: "status", status: "ready" });
+          if (healthy) {
+            broadcast({ type: "preview_ready", port, projectName: message.projectName, proxyUrl: `/preview/${encodeURIComponent(message.projectName as string)}/` });
+            broadcast({ type: "status", status: "ready" });
+          } else {
+            sendSystemErrorToClient(clientId, `Metro did not become healthy on port ${port}`, "start_preview");
+            broadcast({ type: "status", status: "error" });
+          }
         },
         undefined,
         { projectName: message.projectName, requestId: message.requestId }

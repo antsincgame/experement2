@@ -58,7 +58,7 @@ export const createWsHandler = (
       break;
 
     case "plan_chunk": {
-      // Only append if we're actively planning (not viewing another project)
+      if (!matchesActiveProject(get, msg)) break;
       const planStatus = get().status;
       if (planStatus === "planning" || planStatus === "scaffolding") {
         store.appendStreamingContent(msg.chunk);
@@ -67,6 +67,7 @@ export const createWsHandler = (
     }
 
     case "plan_complete":
+      if (!matchesActiveProject(get, msg)) break;
       set({ plan: msg.plan });
       store.clearStreamingContent();
       store.addMessage(createSystemMessage("Plan created [ok]", false));
@@ -96,6 +97,7 @@ export const createWsHandler = (
     }
 
     case "file_generating":
+      if (!matchesActiveProject(get, msg)) break;
       set({
         generationProgress: msg.progress,
         currentGeneratingFile: msg.filepath,
@@ -103,6 +105,7 @@ export const createWsHandler = (
       break;
 
     case "code_chunk": {
+      if (!matchesActiveProject(get, msg)) break;
       const codeStatus = get().status;
       if (codeStatus === "generating" || codeStatus === "analyzing") {
         store.appendStreamingContent(msg.chunk);
@@ -111,11 +114,13 @@ export const createWsHandler = (
     }
 
     case "file_complete":
+      if (!matchesActiveProject(get, msg)) break;
       store.addMessage(createSystemMessage(`File created: ${msg.filepath}`, true));
       log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
       break;
 
     case "generation_complete":
+      if (!matchesActiveProject(get, msg)) break;
       store.clearStreamingContent();
       store.addMessage(createAssistantMessage(`Generated ${msg.filesCount} files [ok]`));
       log({ level: "info", source: "generator", message: `Generated ${msg.filesCount} files` });
@@ -290,9 +295,6 @@ export const createWsHandler = (
       break;
     }
 
-    case "iteration_result":
-      break;
-
     case "autofix_attempt":
       if (!matchesActiveProject(get, msg)) {
         break;
@@ -319,9 +321,7 @@ export const createWsHandler = (
     }
 
     default:
-      if (type !== "iteration_result") {
-        log({ level: "info", source: "ws", message: `Event: ${type}` });
-      }
+      log({ level: "info", source: "ws", message: `Event: ${type}` });
       break;
   }
 };

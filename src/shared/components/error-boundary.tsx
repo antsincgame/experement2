@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { View, Text, Pressable } from "react-native";
+import { useSettingsStore } from "@/stores/settings-store";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -16,6 +17,15 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    useSettingsStore.getState().addErrorLog({
+      level: "error",
+      source: "error-boundary",
+      message: error.message,
+      details: errorInfo.componentStack?.slice(0, 500),
+    });
   }
 
   handleReset = (): void => {

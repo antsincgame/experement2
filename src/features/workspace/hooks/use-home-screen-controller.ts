@@ -25,10 +25,13 @@ export const useHomeScreenController = () => {
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
   const agentUrl = useSettingsStore((state) => state.agentUrl);
   const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
+  const pendingProjectName = useProjectStore((state) => state.pendingProjectName);
+  const messages = useProjectStore((state) => state.messages);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [welcomeInput, setWelcomeInput] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [creationError, setCreationError] = useState<string | null>(null);
   const [diskProjects, setDiskProjects] = useState<ProjectListItem[]>([]);
 
   useEffect(() => {
@@ -36,6 +39,17 @@ export const useHomeScreenController = () => {
       router.push(`/project/${encodeURIComponent(projectName)}`);
     }
   }, [projectName, router, status]);
+
+  useEffect(() => {
+    if (status === "error" && pendingProjectName === "__creating__" && !projectName) {
+      const lastError = messages.filter(m => m.isError).at(-1);
+      setCreationError(lastError?.content.slice(0, 200) ?? "Project creation failed");
+      setPendingProjectName(null);
+      setStatus("idle");
+    } else if (status !== "error") {
+      setCreationError(null);
+    }
+  }, [status, pendingProjectName, projectName, messages, setPendingProjectName, setStatus]);
 
   useEffect(() => {
     const loadProjects = async (): Promise<void> => {
@@ -115,6 +129,7 @@ export const useHomeScreenController = () => {
 
   return {
     allProjects,
+    creationError,
     enhancing,
     enhancerEnabled,
     handleClearAll,

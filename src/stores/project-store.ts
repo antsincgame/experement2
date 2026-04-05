@@ -60,10 +60,7 @@ export const useProjectStore = create<ProjectState>()(
       ...createProjectChatSlice(set),
       ...createProjectWorkspaceSlice(set),
       ...createProjectRuntimeSlice(set),
-      handleWsMessage: (message) => {
-        const handler = createWsHandler(set, get, fetchProjectFiles);
-        handler(message);
-      },
+      handleWsMessage: createWsHandler(set, get, (name) => fetchProjectFiles(name)),
     }),
     {
       name: "app-factory-projects",

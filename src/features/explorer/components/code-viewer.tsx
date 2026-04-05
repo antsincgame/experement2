@@ -43,9 +43,10 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     );
   }
 
+  const hasContent = filepath in fileContents;
   const content = fileContents[filepath] ?? "";
 
-  if (!content) {
+  if (!hasContent) {
     return (
       <View
         className="flex-1 items-center justify-center"

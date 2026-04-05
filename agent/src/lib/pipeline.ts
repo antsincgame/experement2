@@ -211,18 +211,8 @@ export const createProject = async (
   try {
     return await _createProjectInner(options);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-
-    // Detect LLM server down — stop immediately, don't autofix
-    if (msg.includes("LLM_SERVER_DOWN") || msg.includes("LLM_NETWORK_ERROR")) {
-      broadcast({ type: "system_error", error: `AI server disconnected: ${msg}` });
-      broadcast({ type: "status", status: "error" });
-      return { projectName: "error", port: 0, plan: {} as any };
-    }
-
-    broadcast({ type: "system_error", error: msg });
     broadcast({ type: "status", status: "error" });
-    return { projectName: "error", port: 0, plan: {} as any };
+    throw error;
   }
 };
 
