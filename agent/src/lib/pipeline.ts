@@ -194,12 +194,15 @@ const runProjectQualityGates = async (
     return { success: false, errors };
   }
 
-  const iosSmokeResult = await runNativeSmoke(projectPath, "ios");
-  if (!iosSmokeResult.success) {
-    errors.push(
-      `iOS smoke gate failed:\n${summarizeOutput(iosSmokeResult.combinedOutput)}`
-    );
-    return { success: false, errors };
+  // iOS prebuild requires macOS — skip on other platforms
+  if (process.platform === "darwin") {
+    const iosSmokeResult = await runNativeSmoke(projectPath, "ios");
+    if (!iosSmokeResult.success) {
+      errors.push(
+        `iOS smoke gate failed:\n${summarizeOutput(iosSmokeResult.combinedOutput)}`
+      );
+      return { success: false, errors };
+    }
   }
 
   return { success: true, errors };
