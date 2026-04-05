@@ -320,7 +320,7 @@ export const runNativeSmoke = async (
     return await runProjectCommand(
       projectPath,
       npxCmd,
-      ["expo", "prebuild", "--platform", platform, "--no-install", "--non-interactive"],
+      ["expo", "prebuild", "--platform", platform, "--no-install", "--clean"],
       180000
     );
   } finally {

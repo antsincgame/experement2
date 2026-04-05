@@ -59,12 +59,15 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 - react-native-webgl — not supported
 - any package starting with @react-native-three/
 - If the user asks for 3D — use SVG or 2D Canvas instead
+- DO NOT invent chart or UI libraries! Use ONLY packages from the SAFE list below.
 
 ## SAFE extra dependencies (STRICTLY use ONLY from this list):
-zustand, react-native-svg, expo-linear-gradient, expo-haptics, expo-clipboard,
+zustand, react-native-svg, react-native-svg-charts, victory-native,
+expo-linear-gradient, expo-haptics, expo-clipboard,
 expo-image-picker, expo-camera, expo-location, expo-sensors, expo-av,
 expo-notifications, date-fns, dayjs, axios, @react-native-async-storage/async-storage,
-react-native-chart-kit, react-native-calendars, react-native-modal, burnt
+react-native-chart-kit, react-native-calendars, react-native-modal, burnt,
+@tamagui/lucide-icons
 
 You MUST strictly use standard React Native libraries. DO NOT invent npm packages.
 DO NOT use expo-local-notifications (use expo-notifications instead).
