@@ -41,7 +41,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   }, [settings.lmStudioUrl]);
 
   useEffect(() => {
-    if (visible) fetchModels();
+    if (visible) void fetchModels().catch(() => {});
   }, [visible, debouncedUrl, fetchModels]);
 
   return (

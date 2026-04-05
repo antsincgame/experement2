@@ -222,10 +222,14 @@ class ApiClient {
   }
 
   async listLmStudioModels(): Promise<LmModel[]> {
-    const response = await this.fetchJson<{ data?: LmModel[] }>(
-      this.buildUrl(this.getLmStudioUrl(), "/v1/models")
-    );
-    return Array.isArray(response.data) ? response.data : [];
+    try {
+      const response = await this.fetchJson<{ data?: LmModel[] }>(
+        this.buildUrl(this.getLmStudioUrl(), "/v1/models")
+      );
+      return Array.isArray(response.data) ? response.data : [];
+    } catch {
+      return [];
+    }
   }
 
   /** List models from the configured LM Studio-compatible endpoint. */

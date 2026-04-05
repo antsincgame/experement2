@@ -26,7 +26,6 @@ export const useHomeScreenController = () => {
   const agentUrl = useSettingsStore((state) => state.agentUrl);
   const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
   const pendingProjectName = useProjectStore((state) => state.pendingProjectName);
-  const messages = useProjectStore((state) => state.messages);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [welcomeInput, setWelcomeInput] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -42,14 +41,15 @@ export const useHomeScreenController = () => {
 
   useEffect(() => {
     if (status === "error" && pendingProjectName === "__creating__" && !projectName) {
-      const lastError = messages.filter(m => m.isError).at(-1);
+      const lastError = useProjectStore.getState().messages
+        .filter(m => m.isError).at(-1);
       setCreationError(lastError?.content.slice(0, 200) ?? "Project creation failed");
       setPendingProjectName(null);
       setStatus("idle");
     } else if (status !== "error") {
       setCreationError(null);
     }
-  }, [status, pendingProjectName, projectName, messages, setPendingProjectName, setStatus]);
+  }, [status, pendingProjectName, projectName, setPendingProjectName, setStatus]);
 
   useEffect(() => {
     const loadProjects = async (): Promise<void> => {
