@@ -259,13 +259,30 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     generatedFiles.push("app/(tabs)/_layout.tsx");
   }
 
-  const totalFiles = plan.files.length;
+  // Sort files: types → stores → hooks → components → screens
+  // This ensures dependencies are generated BEFORE consumers,
+  // so extractExportContracts can provide accurate contracts.
+  const FILE_TYPE_ORDER: Record<string, number> = {
+    type: 0,
+    store: 1,
+    hook: 2,
+    component: 3,
+    screen: 4,
+    layout: 5,
+  };
+  const sortedFiles = [...plan.files].sort((a, b) => {
+    const orderA = FILE_TYPE_ORDER[a.type] ?? 3;
+    const orderB = FILE_TYPE_ORDER[b.type] ?? 3;
+    return orderA - orderB;
+  });
+
+  const totalFiles = sortedFiles.length;
 
   // Auto-generated layout files — skip if LLM plan includes them
   const AUTO_LAYOUT_FILES = new Set<string>(AUTO_GENERATED_PLAN_FILES);
 
   for (let i = 0; i < totalFiles; i++) {
-    const fileSpec = plan.files[i];
+    const fileSpec = sortedFiles[i];
 
     // Skip auto-generated layouts — already written above
     if (AUTO_LAYOUT_FILES.has(fileSpec.path)) {
