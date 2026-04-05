@@ -30,6 +30,7 @@ export const useHomeScreenController = () => {
   const [welcomeInput, setWelcomeInput] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [diskProjects, setDiskProjects] = useState<ProjectListItem[]>([]);
 
@@ -83,6 +84,7 @@ export const useHomeScreenController = () => {
     }
 
     setEnhancing(true);
+    setEnhanceError(null);
     try {
       const improvedPrompt = await apiClient.enhancePrompt({
         prompt: trimmed,
@@ -93,7 +95,10 @@ export const useHomeScreenController = () => {
         setWelcomeInput(improvedPrompt);
       }
     } catch (error) {
-      console.warn("[home-screen] Prompt enhancement failed", error);
+      const msg = error instanceof Error ? error.message : "Enhancement failed";
+      setEnhanceError(msg);
+      useSettingsStore.getState().addErrorLog({ level: "error", source: "enhance", message: msg });
+      setTimeout(() => setEnhanceError(null), 4_000);
     } finally {
       setEnhancing(false);
     }
@@ -130,6 +135,7 @@ export const useHomeScreenController = () => {
   return {
     allProjects,
     creationError,
+    enhanceError,
     enhancing,
     enhancerEnabled,
     handleClearAll,

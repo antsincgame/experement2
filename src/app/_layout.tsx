@@ -2,10 +2,12 @@ import "@/global.css";
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { LogBox, View } from "react-native";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { useKeyboardShortcuts } from "@/shared/hooks/use-keyboard-shortcuts";
 import ErrorBoundary from "@/shared/components/error-boundary";
+
+LogBox.ignoreLogs(["Failed to fetch", "Network request failed"]);
 
 const AppShell = () => {
   useWebSocket();

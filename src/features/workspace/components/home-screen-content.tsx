@@ -20,6 +20,7 @@ import type { ProjectEntry } from "@/stores/project-store";
 interface HomeScreenContentProps {
   allProjects: ProjectEntry[];
   creationError: string | null;
+  enhanceError: string | null;
   enhancing: boolean;
   enhancerEnabled: boolean;
   handleClearAll: () => void;
@@ -38,6 +39,7 @@ interface HomeScreenContentProps {
 export const HomeScreenContent = ({
   allProjects,
   creationError,
+  enhanceError,
   enhancing,
   enhancerEnabled,
   handleClearAll,
@@ -259,7 +261,7 @@ export const HomeScreenContent = ({
             </View>
           </View>
 
-          {creationError && (
+          {(creationError || enhanceError) && (
             <View
               className="w-full max-w-2xl px-6 mt-3"
               accessibilityRole="alert"
@@ -273,7 +275,7 @@ export const HomeScreenContent = ({
                 }}
               >
                 <Text style={{ fontSize: 13, color: "#FF3366", fontWeight: "600" }}>
-                  {creationError}
+                  {creationError || enhanceError}
                 </Text>
               </View>
             </View>

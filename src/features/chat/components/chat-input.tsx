@@ -27,6 +27,7 @@ const ChatInput = ({
 }: ChatInputProps) => {
   const [text, setText] = useState("");
   const [enhancing, setEnhancing] = useState(false);
+  const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const handleSendRef = useRef<() => void>(() => undefined);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
@@ -53,6 +54,7 @@ const ChatInput = ({
     }
 
     setEnhancing(true);
+    setEnhanceError(null);
     try {
       const improvedPrompt = await apiClient.enhancePrompt({
         prompt: trimmed,
@@ -64,7 +66,10 @@ const ChatInput = ({
         setText(improvedPrompt);
       }
     } catch (error) {
-      console.warn("[chat-input] Prompt enhancement failed", error);
+      const msg = error instanceof Error ? error.message : "Enhancement failed";
+      setEnhanceError(msg);
+      useSettingsStore.getState().addErrorLog({ level: "error", source: "enhance", message: msg });
+      setTimeout(() => setEnhanceError(null), 4_000);
     } finally {
       setEnhancing(false);
     }
@@ -157,6 +162,11 @@ const ChatInput = ({
       {enhancing && (
         <Text style={{ color: "#7C4DFF", fontSize: 10, marginTop: 4, marginLeft: 8 }}>
           Improving prompt...
+        </Text>
+      )}
+      {enhanceError && (
+        <Text style={{ color: "#FF3366", fontSize: 10, marginTop: 4, marginLeft: 8 }} numberOfLines={2}>
+          {enhanceError}
         </Text>
       )}
     </View>

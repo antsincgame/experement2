@@ -80,8 +80,14 @@ class ApiClient {
   }
 
   private async buildError(response: Response): Promise<Error> {
-    const message = (await response.text()).trim();
-    return new Error(message || `${response.status} ${response.statusText}`);
+    const raw = (await response.text()).trim();
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.error) {
+        return new Error(parsed.error);
+      }
+    } catch { /* not JSON, use raw text */ }
+    return new Error(raw || `${response.status} ${response.statusText}`);
   }
 
   private async fetchJson<T>(
@@ -223,39 +229,39 @@ class ApiClient {
 
   async listLmStudioModels(): Promise<LmModel[]> {
     try {
-      const response = await this.fetchJson<{ data?: LmModel[] }>(
-        this.buildUrl(this.getLmStudioUrl(), "/v1/models")
+      const result = await this.getData<{ models: LmModel[]; status: string }>(
+        "/api/llm/models",
+        { url: this.getLmStudioUrl() }
       );
-      return Array.isArray(response.data) ? response.data : [];
+      return result.models ?? [];
     } catch {
       return [];
     }
   }
 
-  /** List models from the configured LM Studio-compatible endpoint. */
   async listModelsFromUrl(url: string): Promise<LmModel[]> {
     try {
-      const response = await this.fetchJson<{ data?: LmModel[] }>(
-        this.buildUrl(normalizeBaseUrl(url), "/v1/models")
+      const result = await this.getData<{ models: LmModel[]; status: string }>(
+        "/api/llm/models",
+        { url }
       );
-      return Array.isArray(response.data) ? response.data : [];
+      return result.models ?? [];
     } catch {
       return [];
     }
   }
 
-  /** Test connection to the configured LM Studio server. */
-  async testLlmConnection(url: string, timeoutMs = 5000): Promise<{ ok: boolean; models: number; error?: string }> {
+  async testLlmConnection(url: string): Promise<{ ok: boolean; models: number; error?: string }> {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      const normalizedUrl = normalizeBaseUrl(url);
-      const resp = await fetch(`${normalizedUrl}/v1/models`, { signal: controller.signal });
-      clearTimeout(timer);
-      if (!resp.ok) return { ok: false, models: 0, error: `HTTP ${resp.status}` };
-      const data = await resp.json();
-      const models = Array.isArray(data.data) ? data.data.length : 0;
-      return { ok: true, models };
+      const result = await this.getData<{ models: LmModel[]; status: string; error?: string }>(
+        "/api/llm/models",
+        { url }
+      );
+      return {
+        ok: result.status === "connected",
+        models: result.models?.length ?? 0,
+        error: result.error,
+      };
     } catch (e) {
       return { ok: false, models: 0, error: e instanceof Error ? e.message : "Connection failed" };
     }
