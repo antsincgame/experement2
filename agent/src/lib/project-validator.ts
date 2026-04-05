@@ -250,6 +250,10 @@ const validateSourceFileImports = (
 
     if (isLocalProjectImport(specifier)) {
       const resolved = resolveImportPath(filePath, specifier);
+      // Root-level config files (tamagui.config, etc.) are boilerplate — always present
+      if (resolved && !resolved.startsWith("src/") && !resolved.startsWith("app/")) {
+        continue;
+      }
       if (!resolved || !fileExistsInProject(projectPath, resolved)) {
         issues.push({
           code: "missing_local_import",
