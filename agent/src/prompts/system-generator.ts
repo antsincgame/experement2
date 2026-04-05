@@ -20,6 +20,7 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 \`\`\`
 ❌ import { View, Text, Pressable } from "react-native"  → FORBIDDEN! Use YStack, XStack, Text, Button from "tamagui"
 ❌ StyleSheet.create({ ... })                          → FORBIDDEN! Use Tamagui inline props (padding="$4", bg="$background")
+❌ <Card.Header>, <Card.Body>, <Card.Footer>           → Tamagui Card has NO compound sub-components. Use <Card><YStack>...</YStack></Card>
 ❌ import { Home } from "${ICON_CONTRACT.packageName}"         → named icon imports DON'T EXIST
 ❌ import { Ionicons } from "${ICON_CONTRACT.packageName}"     → must be DEFAULT import
 ❌ import { Tabs } from "expo-router/tabs"            → wrong path, use "expo-router"
