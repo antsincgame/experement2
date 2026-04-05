@@ -9,7 +9,6 @@ import type { ContractViolation } from "./project-validator.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import {
   BOILERPLATE_TEMPLATES,
-  getThemeFile,
   getRootLayout,
   getTabsLayout,
 } from "../prompts/templates.js";
@@ -241,10 +240,6 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
   const generatedFiles: string[] = [];
 
-  // Write dynamic theme.ts from plan FIRST so dependency context can pick it up
-  writeFile(projectName, "src/theme.ts", getThemeFile(plan.theme));
-  generatedFiles.push("src/theme.ts");
-
   // Write static boilerplate (config files)
   for (const [templatePath, templateContent] of Object.entries(BOILERPLATE_TEMPLATES)) {
     const alreadyInPlan = plan.files.some((f) => f.path === templatePath);
@@ -384,7 +379,7 @@ Generate the complete code for: ${fileSpec.path}`;
   const truncated: string[] = [];
   for (const fp of generatedFiles) {
     if (AUTO_LAYOUT_FILES.has(fp)) continue;
-    if (fp === "src/theme.ts") continue; // boilerplate, already has EOF
+    if (fp === "tamagui.config.ts") continue; // boilerplate, already has EOF
     const content = readFile(projectName, fp);
     if (content && !content.includes("// EOF") && content.length > 20) {
       truncated.push(fp);
@@ -435,9 +430,7 @@ Generate the complete code for: ${fileSpec.path}`;
   }
 
   // Final check: if zero real files were generated, something is critically wrong
-  const realFiles = generatedFiles.filter((fp) =>
-    fp !== "src/theme.ts" && !AUTO_LAYOUT_FILES.has(fp)
-  );
+  const realFiles = generatedFiles.filter((fp) => !AUTO_LAYOUT_FILES.has(fp));
   if (realFiles.length === 0) {
     throw new Error("No application files were generated — LLM returned empty responses for all files");
   }

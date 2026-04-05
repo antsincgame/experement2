@@ -18,17 +18,22 @@ const getScreenIcon = (icon?: string): string => icon?.trim() || "circle";
 export const getRootLayout = (
   _navigation: AppPlan["navigation"]
 ): string => {
-  // Both tabs and stack use <Stack> as root — Expo Router auto-discovers (tabs) group
   return `import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { TamaguiProvider, Theme } from "tamagui";
+import config from "../tamagui.config";
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </SafeAreaProvider>
+    <TamaguiProvider config={config}>
+      <Theme name="light">
+        <SafeAreaProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }} />
+        </SafeAreaProvider>
+      </Theme>
+    </TamaguiProvider>
   );
 }
 `;
@@ -66,64 +71,5 @@ ${tabsScreens}
 `;
 };
 
-/** Generates src/theme.ts from the plan's theme object so colors match the planner's design. */
-export const getThemeFile = (planTheme: AppPlan["theme"]): string => {
-  const t = planTheme;
-  const isDark = t.isDark;
-  return `// App theme — design tokens synced with the plan
-export const colors = {
-  background: "${t.background}",
-  surface: "${t.surface}",
-  primary: "${t.primary}",
-  primaryText: "${t.primaryText}",
-  text: "${t.primaryText}",
-  secondaryText: "${t.secondaryText}",
-  textSecondary: "${t.secondaryText}",
-  textMuted: "${t.secondaryText}",
-  accent: "${t.accent}",
-  border: "${t.accent}",
-  success: "#10B981",
-  warning: "#F59E0B",
-  error: "#EF4444",
-  card: "${t.surface}",
-};
-
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-};
-
-export const borderRadius = {
-  sm: 8,
-  md: 12,
-  lg: ${t.cardRadius},
-  full: 9999,
-};
-
-export const shadows = {
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: ${isDark ? 0.3 : 0.05},
-    shadowRadius: 12,
-    elevation: 2,
-  },
-};
-
-export const typography = {
-  title: { fontSize: 28, fontWeight: "700" as const, color: colors.text },
-  subtitle: { fontSize: 16, fontWeight: "600" as const, color: colors.text },
-  body: { fontSize: 14, color: colors.text },
-  caption: { fontSize: 12, color: colors.textSecondary },
-};
-
-export const theme = { colors, spacing, borderRadius, shadows, typography, isDark: ${isDark} };
-// EOF
-`;
-};
-
-/** Static boilerplate — no longer includes theme.ts (generated dynamically from plan). */
+/** Static boilerplate — Tamagui handles theming via tamagui.config.ts. */
 export const BOILERPLATE_TEMPLATES: Record<string, string> = {};

@@ -63,9 +63,33 @@ const BOILERPLATE_FILES: Record<string, string> = {
   api.cache(true);
   return {
     presets: ["babel-preset-expo"],
-    plugins: ["react-native-reanimated/plugin"],
+    plugins: [
+      [
+        "@tamagui/babel-plugin",
+        {
+          components: ["tamagui"],
+          config: "./tamagui.config.ts",
+          logTimings: true,
+        },
+      ],
+      "react-native-reanimated/plugin",
+    ],
   };
 };
+`,
+
+  "tamagui.config.ts": `import { config } from '@tamagui/config/v3'
+import { createTamagui } from 'tamagui'
+
+const tamaguiConfig = createTamagui(config)
+
+export type AppConfig = typeof tamaguiConfig
+
+declare module 'tamagui' {
+  interface TamaguiCustomConfig extends AppConfig {}
+}
+
+export default tamaguiConfig
 `,
 
   "metro.config.js": `const { getDefaultConfig } = require("expo/metro-config");

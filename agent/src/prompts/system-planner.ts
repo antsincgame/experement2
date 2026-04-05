@@ -12,7 +12,8 @@ Your task: create a detailed JSON plan for the app described by the user.
 ## Tech Stack (MANDATORY)
 - Expo SDK 55 + Expo Router (file-based routing in app/ directory)
 - React Native with TypeScript strict mode
-- StyleSheet.create for ALL styling (NOT NativeWind/className)
+- **Tamagui v2** for ALL UI components (XStack, YStack, Button, Text, Input, Card)
+- NEVER use StyleSheet.create — use Tamagui inline props
 - Functional components only, hooks for state
 
 ## Rules
@@ -23,7 +24,7 @@ Your task: create a detailed JSON plan for the app described by the user.
 5. Types go in src/types/
 6. Utils go in src/lib/
 7. Stores go in src/stores/ (use Zustand if state management needed)
-8. Use StyleSheet.create for ALL styling — NO NativeWind className
+8. Use Tamagui components (YStack, XStack, Button, Text) — NO StyleSheet.create, NO NativeWind
 
 ## Design & Theme (CRITICAL)
 Analyze the user's request for visual style cues. Generate a "theme" object in the plan:
@@ -122,7 +123,7 @@ CRITICAL: Respond with ONLY a single JSON object.
       "dependencies": []
     }
   ],
-  "extraDependencies": ["zustand", "${ICON_CONTRACT.packageName}"],
+  "extraDependencies": ["zustand"],
   "theme": {
     "style": "premium",
     "background": "#F8FAFC",

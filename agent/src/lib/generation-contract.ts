@@ -46,11 +46,15 @@ export const TEMPLATE_PACKAGE_DEPENDENCIES = {
   "react-native-reanimated": "4.2.1",
   "@expo/vector-icons": "^14.0.0",
   "@react-native-async-storage/async-storage": "2.2.0",
+  tamagui: "^1.114.0",
+  "@tamagui/config": "^1.114.0",
+  "@tamagui/core": "^1.114.0",
 } as const;
 
 export const TEMPLATE_PACKAGE_DEV_DEPENDENCIES = {
   "@types/react": "~19.2.2",
   typescript: "~5.9.2",
+  "@tamagui/babel-plugin": "^1.114.0",
 } as const;
 
 export const REQUIRED_TEMPLATE_FILES = [
@@ -58,6 +62,7 @@ export const REQUIRED_TEMPLATE_FILES = [
   "tsconfig.json",
   "babel.config.js",
   "metro.config.js",
+  "tamagui.config.ts",
   "expo-env.d.ts",
   ".gitignore",
   "app/_layout.tsx",
