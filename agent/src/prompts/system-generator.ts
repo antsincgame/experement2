@@ -148,43 +148,47 @@ export default function TabLayout() {
 4. **NEVER invent API methods.** If a store/hook returns \`{ data, loading }\`, don't call \`data.fetch()\` — \`fetch\` doesn't exist on the data.
 
 ### UI/UX DESIGN SYSTEM — TAMAGUI v2 (CRITICAL)
-NEVER use react-native \`StyleSheet\`, \`View\`, \`Text\`, or \`Pressable\`. You MUST use Tamagui components:
+NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. You MUST use Tamagui components:
 
 \`\`\`tsx
 import { useState } from "react";
 import { YStack, XStack, Text, Button, ScrollView, Input, Switch, H1, H2, Paragraph, Separator } from "tamagui";
+import { Pressable } from "react-native"; // Pressable ONLY from react-native
 \`\`\`
 
-Tamagui layout primitives:
-- \`YStack\` = vertical flex (replaces \`<View style={{flexDirection:'column'}}>\`)
-- \`XStack\` = horizontal flex (replaces \`<View style={{flexDirection:'row'}}>\`)
-- \`ZStack\` = absolute positioning overlay
+## 💅 TAMAGUI V2 API CHEAT SHEET (CRITICAL FOR TYPESCRIPT)
+You MUST strictly follow these prop types to avoid TS2322 errors.
 
-Tamagui tokens for styling (inline props, NOT StyleSheet):
-- Spacing: \`p="$4"\`, \`m="$2"\`, \`gap="$3"\`, \`px="$4"\`, \`py="$2"\`
-- Colors: \`bg="$background"\`, \`color="$color"\`, \`borderColor="$borderColor"\`
-- Border radius: \`br="$4"\`, \`borderRadius="$4"\`
-- Sizing: \`w="100%"\`, \`h={56}\`, \`f={1}\` (flex: 1)
+1. **Layout Components:**
+   - Use \`YStack\` (vertical) and \`XStack\` (horizontal) for EVERYTHING.
+   - DO NOT use \`Card.Body\`, \`Card.Header\`, or any compound components. Build cards with \`YStack\`.
+2. **Spacing & Sizing Props (Strings with $ or Numbers):**
+   - Padding/Margin: \`p="$4"\`, \`px="$2"\`, \`py="$2"\`, \`m="$4"\`, \`mt="$2"\`
+   - Width/Height: \`w="100%"\`, \`w={200}\`, \`h="$4"\`, \`flex={1}\`
+   - Gap: \`gap="$2"\`, \`gap="$4"\`
+3. **Color & Border Props:**
+   - Background: \`backgroundColor="$background"\`, \`backgroundColor="$color4"\`
+   - Text: \`color="$color"\`, \`color="$gray10"\`
+   - Borders: \`borderWidth={1}\` (must be NUMBER), \`borderColor="$borderColor"\`.
+   - NEVER use boolean \`bordered\`. NEVER use \`bc\` or \`bw\` shorthand.
+4. **Typography:**
+   - \`<Text color="$color" fontSize={16} fontWeight="bold">\`
+   - \`<H1>\`, \`<H2>\`, \`<Paragraph>\` for semantic text
+5. **Interactive:**
+   - \`<Button onPress={fn} backgroundColor="$blue10" color="white" borderRadius="$4">Label</Button>\`
+   - For custom tappable areas: \`<Pressable onPress={fn}>\` from react-native (NOT from tamagui)
 
-1. **Cards & Surfaces:**
-   \`<YStack bg="$background" br="$4" p="$4" elevation={2} borderWidth={1} borderColor="$borderColor"><H2>Title</H2><Paragraph>Content</Paragraph></YStack>\`
+**Cards pattern:**
+\`\`\`tsx
+<YStack backgroundColor="$background" borderRadius="$4" padding="$4" elevation={2} borderWidth={1} borderColor="$borderColor">
+  <H2>Title</H2>
+  <Paragraph>Content</Paragraph>
+</YStack>
+\`\`\`
 
-2. **Buttons:**
-   \`<Button theme="active" size="$5" onPress={fn}>Press me</Button>\`
-   Destructive: \`<Button theme="red" size="$4" onPress={fn}>Delete</Button>\`
-
-3. **Inputs:**
-   \`<Input size="$4" placeholder="Enter text..." value={val} onChangeText={setVal} />\`
-
-4. **Text:**
-   \`<H1>Big Title</H1>\`, \`<H2>Section</H2>\`, \`<Paragraph>Body text</Paragraph>\`, \`<Text fontSize="$2" color="$gray10">Small</Text>\`
-
-5. **Scrolling:**
-   \`<ScrollView>\` from tamagui (NOT from react-native).
-
-6. **Navigation:** NEVER build manual bottom tabs. Use expo-router \`<Tabs>\`.
-
-6. **Icons:** Use \`@expo/vector-icons/Feather\`. Import: \`import Feather from "@expo/vector-icons/Feather"\`.
+**Navigation:** NEVER build manual bottom tabs. Use expo-router \`<Tabs>\`.
+**Icons:** \`import Feather from "@expo/vector-icons/Feather"\` — DEFAULT import.
+**Scrolling:** \`<ScrollView>\` from tamagui (NOT from react-native).
 
 7. **Textures (for themed apps):**
    Since you CANNOT load external images/textures, simulate them using:
