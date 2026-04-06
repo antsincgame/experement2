@@ -153,10 +153,11 @@ export default function TabLayout() {
 ## 🧠 STATE & INTERACTIVITY RULES (CRITICAL)
 Your apps MUST be fully functional, not just static mockups.
 1. **Inputs:** EVERY \`<Input>\` MUST have \`value={state}\` and \`onChangeText={setState}\`.
-2. **Buttons:** EVERY \`<Button>\` MUST have an \`onPress\` handler that actually calls a function.
+2. **Buttons:** EVERY \`<Button>\` MUST have an \`onPress\` handler that actually calls a function. For calculators: each digit/operator button MUST call a real function that updates the display state.
 3. **Zustand Wiring:** If a button adds an item, you MUST call the store action and pass the exact values from your local React state. Clear the local state (e.g., \`setText("")\`) after submission.
 4. **Empty States:** Always handle empty arrays gracefully (show a "No items yet" message).
 5. **No dummy alerts:** Do not use \`Alert.alert("Coming soon")\` for core features requested by the user. Implement the actual logic.
+6. **Calculator Logic:** For calculator apps: implement REAL eval logic (use Function constructor or manual parser). Display MUST update on every button press. equals button MUST compute and show result.
 
 ### UI/UX — TAMAGUI v2 (CRITICAL)
 NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. Use Tamagui: \`YStack\`, \`XStack\`, \`Text\`, \`Button\`, \`Input\`, \`Switch\`, \`ScrollView\`, \`H1\`, \`H2\`, \`Paragraph\`.
