@@ -1,19 +1,21 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
-const exclusionList = require("metro-config/src/defaults/exclusionList");
 const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
 // Block workspace/ and agent/ from Metro bundler to prevent OOM with 50+ generated projects
-const workspaceRoot = path.resolve(__dirname, "workspace");
-const agentRoot = path.resolve(__dirname, "agent");
-const escapeRegex = (str) => str.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+const workspaceDir = path.resolve(__dirname, "workspace").replace(/\\/g, "/");
+const agentDir = path.resolve(__dirname, "agent").replace(/\\/g, "/");
 
-config.resolver.blockList = exclusionList([
-  new RegExp(`^${escapeRegex(workspaceRoot)}[/\\\\].*`),
-  new RegExp(`^${escapeRegex(agentRoot)}[/\\\\].*`),
-]);
+const existingBlockList = config.resolver.blockList || [];
+const extraBlockList = [
+  /[/\\]workspace[/\\].*/,
+  /[/\\]agent[/\\].*/,
+];
+config.resolver.blockList = Array.isArray(existingBlockList)
+  ? [...existingBlockList, ...extraBlockList]
+  : extraBlockList;
 
 // Force zustand to resolve to CJS instead of ESM (ESM uses import.meta which crashes Hermes)
 config.resolver.resolveRequest = (context, moduleName, platform) => {
