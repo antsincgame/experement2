@@ -32,6 +32,8 @@ export const WORKSPACE_OPERATION_QUEUE_KEY = "workspace:create";
 export const getProjectOperationQueueKey = (projectName: string): string =>
   `project:${projectName}`;
 
+const OPERATION_TIMEOUT_MS = 600_000; // 10 minutes max per operation
+
 export const enqueueProjectOperation = <T>(
   key: string,
   operationName: string,
@@ -44,7 +46,12 @@ export const enqueueProjectOperation = <T>(
     .catch(() => undefined)
     .then(async () => {
       console.log(`[ProjectQueue] ${operationName} started (${key})`);
-      return task();
+      return Promise.race([
+        task(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Operation ${operationName} timed out after ${OPERATION_TIMEOUT_MS / 1000}s`)), OPERATION_TIMEOUT_MS)
+        ),
+      ]);
     });
 
   entry.tail = run
