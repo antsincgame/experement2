@@ -310,7 +310,7 @@ export const streamCompletion = async (
   return parseSSE();
 };
 
-const NON_STREAMING_TIMEOUT_MS = 30_000;
+const NON_STREAMING_TIMEOUT_MS = 60_000;
 const NON_STREAMING_MAX_RETRIES = 1;
 
 export const completeNonStreaming = async (
