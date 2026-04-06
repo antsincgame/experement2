@@ -392,7 +392,7 @@ Generate the complete code for: ${fileSpec.path}`;
     }
   }
 
-  // Aggressive truncation retry loop — retries up to 3 times for files missing // EOF
+  // Smart Continuation — continues truncated files from where they left off
   const MAX_TRUNCATION_RETRIES = 3;
   let truncationRetries = 0;
 
@@ -410,18 +410,21 @@ Generate the complete code for: ${fileSpec.path}`;
     if (truncated.length === 0) break;
 
     truncationRetries++;
-    onChunk?.(`\n[Truncation detected: ${truncated.length} files missing // EOF — retry ${truncationRetries}/${MAX_TRUNCATION_RETRIES}]\n`);
+    onChunk?.(`\n[Truncation detected: ${truncated.length} files — smart continuation ${truncationRetries}/${MAX_TRUNCATION_RETRIES}]\n`);
 
     for (const fp of truncated) {
       const fileSpec = plan.files.find((f) => f.path === fp);
       if (!fileSpec) continue;
 
-      const currentContent = readFile(projectName, fp) ?? "";
+      let currentContent = readFile(projectName, fp) ?? "";
+      // Strip trailing markdown fences that LLM may have added at cutoff
+      currentContent = currentContent.replace(/\n?```[a-z]*\s*$/, "");
+
       const retryMessages = [
         { role: "system" as const, content: SYSTEM_GENERATOR },
         {
           role: "user" as const,
-          content: `/no_think\nCRITICAL: The previous output for "${fp}" was TRUNCATED because it was too long. Output the ENTIRE file from the very beginning to the very end. Do NOT use placeholders like "// rest of code". You MUST end the file with EXACTLY // EOF on the last line.\n\nPath: ${fp}\nType: ${fileSpec.type}\nDescription: ${fileSpec.description}\n\nTruncated content (first 2000 chars for reference):\n${currentContent.slice(0, 2000)}\n\nWrite the COMPLETE file from start to finish. The LAST line MUST be: // EOF`,
+          content: `/no_think\nYou were generating the file ${fp} but the output was truncated due to length limits.\nHere are the last 200 characters you wrote:\n...${currentContent.slice(-200)}\n\nPlease CONTINUE generating the file EXACTLY from where you left off.\nDO NOT repeat the code that is already written.\nDO NOT wrap your response in markdown code fences.\nJust output the exact next characters to complete the file.\nEnd the file with // EOF.`,
         },
       ];
 
@@ -437,17 +440,16 @@ Generate the complete code for: ${fileSpec.path}`;
         retryCode += chunk;
       }
 
-      retryCode = retryCode.trim()
+      // Strip markdown fences from continuation
+      retryCode = retryCode
         .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
         .replace(/\n?```\s*$/, "")
         .trim();
 
-      const firstImport = retryCode.indexOf("import ");
-      if (firstImport > 0) retryCode = retryCode.slice(firstImport);
-
-      if (retryCode.length > 50) {
-        writeFile(projectName, fp, sanitizeGeneratedCode(retryCode, fp));
-        onChunk?.(`[Truncation retry ${truncationRetries} OK: ${fp}]\n`);
+      if (retryCode.length > 5) {
+        currentContent += "\n" + retryCode;
+        writeFile(projectName, fp, sanitizeGeneratedCode(currentContent, fp));
+        onChunk?.(`[Smart continuation ${truncationRetries} OK: ${fp}]\n`);
       }
     }
   }

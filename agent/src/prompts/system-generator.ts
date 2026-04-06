@@ -167,7 +167,7 @@ Tamagui tokens for styling (inline props, NOT StyleSheet):
 - Sizing: \`w="100%"\`, \`h={56}\`, \`f={1}\` (flex: 1)
 
 1. **Cards & Surfaces:**
-   \`<YStack bg="$background" br="$4" p="$4" elevation={2} bordered><H2>Title</H2><Paragraph>Content</Paragraph></YStack>\`
+   \`<YStack bg="$background" br="$4" p="$4" elevation={2} borderWidth={1} borderColor="$borderColor"><H2>Title</H2><Paragraph>Content</Paragraph></YStack>\`
 
 2. **Buttons:**
    \`<Button theme="active" size="$5" onPress={fn}>Press me</Button>\`
