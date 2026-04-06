@@ -7,7 +7,7 @@ import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { useKeyboardShortcuts } from "@/shared/hooks/use-keyboard-shortcuts";
 import ErrorBoundary from "@/shared/components/error-boundary";
 
-LogBox.ignoreLogs(["Failed to fetch", "Network request failed"]);
+LogBox.ignoreLogs(["Failed to fetch", "Network request failed", "signal is aborted"]);
 
 const AppShell = () => {
   useWebSocket();

@@ -97,7 +97,7 @@ class ApiClient {
     const { body, headers, timeoutMs = this.defaultTimeoutMs, ...init } = options;
     const finalHeaders = new Headers(headers);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
     if (body !== undefined && !finalHeaders.has("Content-Type")) {
       finalHeaders.set("Content-Type", "application/json");
@@ -140,11 +140,12 @@ class ApiClient {
     return response.data;
   }
 
-  async postData<T>(pathname: string, body: unknown): Promise<T> {
+  async postData<T>(pathname: string, body: unknown, timeoutMs?: number): Promise<T> {
     const url = this.buildUrl(this.getAgentUrl(), pathname);
     const response = await this.fetchJson<DataEnvelope<T>>(url, {
       method: "POST",
       body,
+      timeoutMs,
     });
     return response.data;
   }
@@ -205,7 +206,7 @@ class ApiClient {
     model?: string;
     lmStudioUrl?: string;
   }): Promise<string> {
-    return this.postData<string>("/api/llm/enhance", payload);
+    return this.postData<string>("/api/llm/enhance", payload, 60_000);
   }
 
   getProjectTree<T>(projectName: string): Promise<T> {
