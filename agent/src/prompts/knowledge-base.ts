@@ -23,17 +23,17 @@ export const KNOWLEDGE_BASE = {
 5. DATE: NEVER use DatePickerIOS/Android. Use a formatted <Input placeholder="YYYY-MM-DD" />.`,
 
   overlays: `## 📚 RAG DOCS: TAMAGUI OVERLAYS (Sheet, Dialog, Toast)
-1. SHEET (Bottom Sheet):
-   <Sheet modal open={open} onOpenChange={setOpen} snapPoints={[50]} position={0} animation="bouncy" dismissOnSnapToBottom>
-     <Sheet.Overlay animation="lazy" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
+1. SHEET (Bottom Sheet): Import Sheet from "tamagui". Use COMPOUND syntax (Sheet.Overlay, Sheet.Handle, Sheet.Frame). NEVER import SheetHandle/SheetFrame/SheetOverlay separately. Do NOT use animation prop on Sheet (it does not exist). Do NOT use animation on Sheet.Overlay.
+   <Sheet modal open={open} onOpenChange={setOpen} snapPoints={[50]} position={0} dismissOnSnapToBottom>
+     <Sheet.Overlay />
      <Sheet.Handle />
      <Sheet.Frame p="$4"><Text>Content</Text></Sheet.Frame>
    </Sheet>
-2. DIALOG (Modal):
+2. DIALOG (Modal): Import Dialog from "tamagui". Use COMPOUND syntax (Dialog.Portal, Dialog.Overlay, Dialog.Content).
    <Dialog modal open={open} onOpenChange={setOpen}>
      <Dialog.Portal>
-       <Dialog.Overlay key="overlay" animation="quick" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
-       <Dialog.Content key="content" animation="bouncy" enterStyle={{ x: 0, y: -20, opacity: 0 }} exitStyle={{ x: 0, y: 10, opacity: 0 }}>
+       <Dialog.Overlay key="overlay" opacity={0.5} />
+       <Dialog.Content key="content" p="$4" br="$4" bg="$background">
          <Text>Content</Text>
        </Dialog.Content>
      </Dialog.Portal>

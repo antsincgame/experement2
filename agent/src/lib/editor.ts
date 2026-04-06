@@ -71,7 +71,7 @@ export const editProject = async (
     ...recentChat.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     {
       role: "user" as const,
-      content: `Project skeleton:\n${skeleton.summary}\n\nUser request: ${userRequest}`,
+      content: `/no_think\nProject skeleton:\n${skeleton.summary}\n\nUser request: ${userRequest}`,
     },
   ];
 
