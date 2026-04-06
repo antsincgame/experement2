@@ -18,7 +18,7 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 ## ❌ FORBIDDEN PATTERNS (instant crash — NEVER use these)
 
 \`\`\`
-❌ import { View, Text, Pressable } from "react-native"  → FORBIDDEN! Use YStack, XStack, Text, Button from "tamagui"
+❌ import { View, Text } from "react-native"              → FORBIDDEN! Use YStack, XStack, Text from "tamagui". Pressable is OK from "react-native".
 ❌ StyleSheet.create({ ... })                          → FORBIDDEN! Use Tamagui inline props (padding="$4", bg="$background")
 ❌ <Card.Header>, <Card.Body>, <Card.Footer>           → Tamagui Card has NO compound sub-components. Use <YStack elevation={2}>...</YStack>
 ❌ import { Pressable } from "tamagui"                 → Pressable does NOT exist in tamagui. Use <Button> or import Pressable from "react-native"
