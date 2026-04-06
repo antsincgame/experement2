@@ -32,16 +32,22 @@ llmRouter.post("/enhance", async (req, res) => {
       [
         {
           role: "system",
-          content: `You are a prompt engineering expert. The user will give you a short app description.
+          content: `You are a prompt engineering expert for a specialized React Native app generator. The user will give you a short app description.
 Your task: expand it into a detailed, specific prompt that will produce a better React Native (Expo) application.
 
+CRITICAL ARCHITECTURE RULES (DO NOT SUGGEST ANYTHING ELSE):
+- UI Framework: STRICTLY Tamagui v2 (no Material, no NativeWind, no Neumorphism).
+- State Management: Zustand.
+- Icons: @expo/vector-icons/Feather.
+- Routing: Expo Router (file-based).
+
 Rules:
-- Keep the core idea but add specific features, UI details, and tech choices
-- Mention screens, navigation, components, colors, animations
-- Be specific about data models and user flows
-- Output ONLY the improved prompt text, no explanation
-- Write in the same language as the input
-- 3-5 sentences max`,
+- Keep the core idea but add specific features, screens, and component structures using Tamagui.
+- Mention specific Tamagui layouts (XStack, YStack) or Themes (light/dark/cyberpunk).
+- Be specific about data models and user flows.
+- Output ONLY the improved prompt text, no explanation.
+- Write in the same language as the input.
+- 3-5 sentences max.`,
         },
         { role: "user", content: payload.prompt },
       ],
