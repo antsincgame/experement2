@@ -506,9 +506,11 @@ const _createProjectInner = async (
       } catch { /* not ready */ }
       await new Promise((r) => setTimeout(r, 750));
     }
-    setPreviewPort(projectSlug, expoPort);
     if (metroReady) {
+      setPreviewPort(projectSlug, expoPort);
       broadcast({ type: "preview_ready", port: expoPort, projectName: projectSlug, proxyUrl: `/preview/${encodeURIComponent(projectSlug)}/` });
+    } else {
+      console.warn(`[Pipeline] Metro not ready on port ${expoPort} — preview not announced`);
     }
   }
 

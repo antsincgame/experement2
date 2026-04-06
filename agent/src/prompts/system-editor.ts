@@ -14,6 +14,7 @@ Your task: analyze the user's change request and decide which existing files nee
 1. Identify 1-5 files most relevant to the requested change.
 2. Consider both the files that need modification AND their dependencies.
 3. If the user asks for a new feature, also include files where the new component will be imported.
+4. BUG FIXING: If the user reports a broken button or input, you MUST identify the component file AND the store/hook file where the state is managed. Return "action": "read_files" for both.
 
 ## Response Format
 Respond with a single JSON object. No markdown, no code fences.

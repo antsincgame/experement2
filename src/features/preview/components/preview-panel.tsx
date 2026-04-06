@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { View, Text, Pressable, Linking } from "react-native";
 import { Globe, RotateCw, ExternalLink, Loader } from "lucide-react-native";
 import { apiClient } from "@/shared/lib/api-client";
@@ -9,39 +9,18 @@ const PreviewPanel = () => {
   const projectName = useProjectStore((state) => state.projectName);
   const status = useProjectStore((state) => state.status);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [iframeSrc, setIframeSrc] = useState(() => {
-    const { previewPort: port, projectName: name } = useProjectStore.getState();
-    return port && name ? `${apiClient.getPreviewProxyUrl(name)}?v=${Date.now()}` : "";
-  });
 
-  useEffect(() => {
-    let refreshTimer: ReturnType<typeof setTimeout>;
-    const unsub = useProjectStore.subscribe((state, prevState) => {
-      const portChanged = state.previewPort !== prevState.previewPort;
-      const projectChanged = state.projectName !== prevState.projectName;
-
-      // Immediately unload old iframe when switching projects (frees browser RAM)
-      if (projectChanged) {
-        setIframeSrc("");
-      }
-
-      if ((portChanged || projectChanged) && state.previewPort && state.projectName) {
-        clearTimeout(refreshTimer);
-        refreshTimer = setTimeout(() => {
-          const url = `${apiClient.getPreviewProxyUrl(state.projectName!)}?v=${Date.now()}`;
-          setIframeSrc(url);
-        }, 800);
-      }
-    });
-    return () => { unsub(); clearTimeout(refreshTimer); };
-  }, []);
+  // Reactive iframe src: render immediately when port + project are available
+  const iframeSrc = previewPort && projectName && status === "ready"
+    ? `${apiClient.getPreviewProxyUrl(projectName)}?v=${previewPort}`
+    : "";
 
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
   const proxyUrl = projectName ? apiClient.getPreviewProxyUrl(projectName) : "";
 
   const handleRefresh = useCallback(() => {
-    if (proxyUrl) {
-      setIframeSrc(`${proxyUrl}?v=${Date.now()}`);
+    if (iframeRef.current) {
+      (iframeRef.current as HTMLIFrameElement).src = `${proxyUrl}?v=${Date.now()}`;
     }
   }, [proxyUrl]);
 

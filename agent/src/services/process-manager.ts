@@ -23,18 +23,6 @@ export interface CommandResult {
 const activeProcesses = new Map<string, ManagedProcess>();
 
 // Singleton Metro: only 1 bundler at a time to prevent OOM and browser freezes
-const MAX_ACTIVE_EXPO = 1;
-
-const evictOldestIfNeeded = (): void => {
-  if (activeProcesses.size < MAX_ACTIVE_EXPO) return;
-
-  // Kill the oldest process (first inserted into the Map)
-  const [oldestName, oldest] = activeProcesses.entries().next().value as [string, ManagedProcess];
-  // Debug: eviction logged only when needed
-  killProcess(oldest.process);
-  oldest.cleanup();
-  activeProcesses.delete(oldestName);
-};
 
 const isWindows = process.platform === "win32";
 
@@ -42,10 +30,14 @@ const runWindowsTaskkill = (pid: number): void => {
   const result = spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
     stdio: "ignore",
     windowsHide: true,
+    timeout: 10_000,
   });
 
   if (result.error) {
     throw result.error;
+  }
+  if (result.status !== 0 && result.status !== null) {
+    console.warn(`[ProcessManager] taskkill exit code ${result.status} for PID ${pid} — process may already be dead`);
   }
 };
 
@@ -326,8 +318,12 @@ export const isRunning = (projectName: string): boolean =>
 
 export const killAll = (): void => {
   for (const [name, managed] of activeProcesses) {
-    killProcess(managed.process);
-    managed.cleanup();
+    try {
+      killProcess(managed.process);
+      managed.cleanup();
+    } catch (err) {
+      console.warn(`[ProcessManager] Failed to kill ${name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
     activeProcesses.delete(name);
   }
 };

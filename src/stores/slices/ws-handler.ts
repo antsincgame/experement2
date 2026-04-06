@@ -54,6 +54,10 @@ export const createWsHandler = (
         break;
       }
       store.setStatus(msg.status as AppStatus);
+      // Clear preview on error — dead Metro port should not persist
+      if (msg.status === "error") {
+        store.setPreview(null, null);
+      }
       log({ level: "info", source: "status", message: `Status → ${msg.status}` });
       break;
 
