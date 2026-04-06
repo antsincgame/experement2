@@ -43,7 +43,8 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 10. Keep files under 200 lines each
 11. Every component must have typed props interface
 12. CRITICAL: ${PATH_ALIAS.importPrefix} alias resolves to ${PATH_ALIAS.resolvedPrefix}. So ${PATH_ALIAS.importPrefix}components/X = ${PATH_ALIAS.resolvedPrefix}components/X
-13. CRITICAL: Every file that is imported by another file MUST be in the plan.
+13. CRITICAL: If a file is listed in ANY 'dependencies' array, IT MUST EXIST as an object in the 'files' array. DO NOT create "ghost" dependencies.
+    If you use a hook like 'src/hooks/useTheme.ts' in dependencies, you MUST add it to files[] so the Generator creates it.
     If screen imports ${PATH_ALIAS.importPrefix}hooks/useCounter, then src/hooks/useCounter.ts MUST be in files[].
     Missing files = "Unable to resolve module" crash.
 14. CRITICAL: If ANY file uses types/interfaces defined in another file (like src/types/index.ts),

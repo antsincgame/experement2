@@ -61,14 +61,14 @@ const WorkspaceLayout = ({
     </View>
     <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
 
-    <View className="flex-1">
-      <View className="flex-1 flex-row">
+    <View className="flex-1 overflow-hidden">
+      <View className="flex-1 flex-row overflow-hidden">
         {fileTreeVisible && (
           <View style={{ width: 200, backgroundColor: "rgba(255,255,255,0.5)" }}>
             <FileTree nodes={fileTree} activeFile={activeFile} onFilePress={onOpenFile} />
           </View>
         )}
-        <View className="flex-1">
+        <View className="flex-1 overflow-hidden">
           <FileTabBar
             openFiles={openFiles}
             activeFile={activeFile}
