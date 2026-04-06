@@ -10,7 +10,10 @@ export const KNOWLEDGE_BASE = {
 6. Buttons: <Button theme="active" size="$4" onPress={fn}>Text</Button>.
 7. Cards: Build with <YStack backgroundColor="$background" borderRadius="$4" padding="$4" elevation={2} borderWidth={1} borderColor="$borderColor">. NEVER use Card.Body/Header/Footer.
 8. Pressable: Import from "react-native", NOT from "tamagui". Use <Button> when possible.
-9. ScrollView: Import from "tamagui", NOT from "react-native".`,
+9. ScrollView: Import from "tamagui", NOT from "react-native".
+10. COLORS: NEVER use hex strings (like "#FF0000") in Tamagui props like color or backgroundColor. ONLY use tokens: "$background", "$color", "$primary", "$blue10", "$red10", "$green10", "$gray10".
+11. THEME: <Theme name="light"> or <Theme name="dark"> ONLY. NEVER custom names like "active", "default", "primary".
+12. TYPES: If you use a custom type (like Habit, Todo, Expense), you MUST import it: import type { Habit } from "@/types/index".`,
 
   forms: `## 📚 RAG DOCS: TAMAGUI FORMS & INPUTS
 1. Inputs: <Input size="$4" placeholder="Type here" borderWidth={1} borderColor="$borderColor" value={val} onChangeText={setVal} />

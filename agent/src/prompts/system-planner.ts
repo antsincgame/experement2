@@ -52,7 +52,8 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 15. Icons: use ${ICON_CONTRACT.packageName} with DEFAULT import (${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}")
 16. Supported navigation types only: ${SUPPORTED_NAVIGATION_TYPES.join(", ")}
 17. navigation.screens[].path is REQUIRED and must point to a file in files[]
-18. Do NOT use drawer navigation unless it is explicitly supported by the scaffold. It is currently unsupported.
+18. navigation.screens[].name MUST exactly match the filename without extension. For file "app/(tabs)/settings.tsx", name MUST be "settings". Do NOT invent custom names like "SettingsTab" or "Calculator".
+19. Do NOT use drawer navigation unless it is explicitly supported by the scaffold. It is currently unsupported.
 
 ## FORBIDDEN DEPENDENCIES (DO NOT USE):
 - three, @react-three/fiber, @react-three/drei, @react-native-three/* — WebGL/3D not supported in Expo

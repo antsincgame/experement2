@@ -1,0 +1,1612 @@
+[
+  {
+    "index": 1,
+    "name": "Todo list app",
+    "originalPrompt": "Todo list app",
+    "enhancedPrompt": "Todo list app",
+    "status": "error",
+    "filesGenerated": 10,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/todoStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTodos.ts",
+      "src/components/TodoListScreen.tsx",
+      "src/components/SettingsScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/SettingsScreen.tsx(48,13): error TS2322: Type '\"active\" | \"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/SettingsScreen.tsx(55,13): error TS2322: Type "
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 199.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 2,
+    "name": "Simple calculator",
+    "originalPrompt": "Simple calculator",
+    "enhancedPrompt": "Develop a feature-rich React Native Expo calculator app featuring a sleek dark mode interface with Neumorphic design elements and smooth button scale ",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/calculatorStore.ts",
+      "src/stores/historyStore.ts",
+      "src/hooks/useCalculator.ts",
+      "src/hooks/useHistory.ts",
+      "src/components/CalculatorDisplay.tsx",
+      "src/components/KeypadGrid.tsx",
+      "src/components/HistoryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 m"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 148.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 3,
+    "name": "Pomodoro timer",
+    "originalPrompt": "Pomodoro timer",
+    "enhancedPrompt": "Build a minimalist Pomodoro Timer app using React Native (Expo) featuring a circular progress animation driven by `react-native-reanimated`. The appli",
+    "status": "error",
+    "filesGenerated": 16,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timerStore.ts",
+      "src/stores/taskStore.ts",
+      "src/stores/statsStore.ts",
+      "src/hooks/useTimer.ts",
+      "src/hooks/useTasks.ts",
+      "src/hooks/useStats.ts",
+      "src/hooks/useNotification.ts",
+      "src/components/TimerScreen.tsx",
+      "src/components/TaskScreen.tsx",
+      "src/components/StatsScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/tasks.tsx",
+      "app/(tabs)/stats.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nType '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/TimerScreen.tsx(97,11): error TS2322: Type '\"default\" | \"active\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName | null | u"
+    ],
+    "autofixes": 5,
+    "contractViolations": 0,
+    "timeSeconds": 203.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 4,
+    "name": "Counter with increment and decrement",
+    "originalPrompt": "Counter with increment and decrement",
+    "enhancedPrompt": "Counter with increment and decrement",
+    "status": "ready",
+    "filesGenerated": 7,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/counterStore.ts",
+      "src/hooks/useCounter.ts",
+      "src/components/CounterComponent.tsx",
+      "app/(tabs)/index.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 205.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 5,
+    "name": "Note taking app",
+    "originalPrompt": "Note taking app",
+    "enhancedPrompt": "Note taking app",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/noteStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useNotes.ts",
+      "src/hooks/useNote.ts",
+      "src/components/NoteList.tsx",
+      "src/components/NoteEditor.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/notes/[id].tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/stores/noteStore.ts(2,38): error TS1002: Unterminated string literal."
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 117.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 6,
+    "name": "Flashcard quiz app",
+    "originalPrompt": "Flashcard quiz app",
+    "enhancedPrompt": "Flashcard quiz app",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/flashcardStore.ts",
+      "src/stores/studyModeStore.ts",
+      "src/stores/progressStore.ts",
+      "src/hooks/useFlashcards.ts",
+      "src/hooks/useStudyMode.ts",
+      "src/hooks/useProgress.ts",
+      "src/components/FlashcardQuizScreen.tsx",
+      "src/components/StudyModeScreen.tsx",
+      "src/components/ProgressScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/study.tsx",
+      "app/(tabs)/progress.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nType '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/FlashcardQuizScreen.tsx(133,17): error TS2322: Type '\"active\" | \"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName |"
+    ],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 158.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 7,
+    "name": "Unit converter",
+    "originalPrompt": "Unit converter",
+    "enhancedPrompt": "Create a highly polished React Native (Expo) Unit Converter app featuring a clean, modern Material Design interface with support for light and dark mo",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/conversionStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useConversion.ts",
+      "src/hooks/useTheme.ts",
+      "src/components/CategoryCard.tsx",
+      "src/components/UnitSelector.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx",
+      "app/conversion/[category].tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/conversion/[category].tsx(83,19): error TS2304: Cannot find name 'toUnit'.\r\napp/conversion/[category].tsx(84,17): error TS2304: Cannot find name 'fromUnit'.\r\napp/conversion/[category].tsx(85,21): error TS2552: Cannot find name 'resultValue'. Did you mean 'setResultValue'?\r\napp/"
+    ],
+    "autofixes": 5,
+    "contractViolations": 0,
+    "timeSeconds": 210.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 8,
+    "name": "Tip calculator",
+    "originalPrompt": "Tip calculator",
+    "enhancedPrompt": "Tip calculator",
+    "status": "error",
+    "filesGenerated": 8,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTipCalculator.ts",
+      "src/components/TipCalculator.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 m"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 162.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 9,
+    "name": "Color palette generator",
+    "originalPrompt": "Color palette generator",
+    "enhancedPrompt": "Color palette generator",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/paletteStore.ts",
+      "src/stores/savedPalettesStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/usePalette.ts",
+      "src/hooks/useSavedPalettes.ts",
+      "src/components/ColorPaletteGenerator.tsx",
+      "src/components/SavedPalettesList.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/saved.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"palette\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 164.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 10,
+    "name": "Random quote viewer",
+    "originalPrompt": "Random quote viewer",
+    "enhancedPrompt": "Random quote viewer",
+    "status": "ready",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/quoteStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useQuote.ts",
+      "src/components/QuoteCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 281.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 11,
+    "name": "Weather dashboard",
+    "originalPrompt": "Weather dashboard",
+    "enhancedPrompt": "Weather dashboard",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/weatherStore.ts",
+      "src/stores/favoritesStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useWeather.ts",
+      "src/hooks/useLocationSearch.ts",
+      "src/components/WeatherCard.tsx",
+      "src/components/SearchBar.tsx",
+      "src/components/FavoriteCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/search.tsx",
+      "app/(tabs)/favorites.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(110,21): error TS2322: Type 'string' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ..."
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 240.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 12,
+    "name": "Expense tracker",
+    "originalPrompt": "Expense tracker",
+    "enhancedPrompt": "Expense tracker",
+    "status": "error",
+    "filesGenerated": 17,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/expenseStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useExpenses.ts",
+      "src/components/ExpenseSummaryCard.tsx",
+      "src/components/RecentExpensesList.tsx",
+      "src/components/ExpenseTransactionList.tsx",
+      "src/components/ExpenseForm.tsx",
+      "src/components/ExpenseChart.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/transactions.tsx",
+      "app/(tabs)/add.tsx",
+      "app/(tabs)/reports.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nType 'Text' is missing the following properties from type 'Component<any, any, any>': context, setState, forceUpdate, render, and 2 more.\r\nsrc/components/ExpenseChart.tsx(4,37): error TS7016: Could not find a declaration file for module 'react-native-svg-charts'. 'D:/experement2/wo"
+    ],
+    "autofixes": 2,
+    "contractViolations": 0,
+    "timeSeconds": 179.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 13,
+    "name": "Habit tracker with streaks",
+    "originalPrompt": "Habit tracker with streaks",
+    "enhancedPrompt": "Habit tracker with streaks",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/habitStore.ts",
+      "src/hooks/useHabits.ts",
+      "src/components/HabitList.tsx",
+      "src/components/HabitCard.tsx",
+      "src/components/AddHabitForm.tsx",
+      "src/components/StatsView.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/add.tsx",
+      "app/(tabs)/stats.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/add.tsx(10,39): error TS2304: Cannot find name 'Habit'.\r\napp/(tabs)/index.tsx(47,18): error TS2322: Type 'Habit[]' is not assignable to type 'HabitWithStreak[]'.\r\n  Property 'streak' is missing in type 'Habit' but required in type 'HabitWithStreak'.\r\napp/(tabs)/stats.tsx"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 176.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 14,
+    "name": "Recipe book app",
+    "originalPrompt": "Recipe book app",
+    "enhancedPrompt": "Recipe book app",
+    "status": "error",
+    "filesGenerated": 17,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/recipeStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useRecipes.ts",
+      "src/hooks/useRecipe.ts",
+      "src/hooks/useAddRecipe.ts",
+      "src/components/RecipeList.tsx",
+      "src/components/RecipeCard.tsx",
+      "src/components/RecipeDetail.tsx",
+      "src/components/RecipeForm.tsx",
+      "src/components/SettingsPanel.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/recipe/[id].tsx",
+      "app/(tabs)/add-recipe.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/add-recipe.tsx(10,42): error TS2304: Cannot find name 'Recipe'.\r\napp/(tabs)/recipe/[id].tsx(10,21): error TS2339: Property 'query' does not exist on type 'Router'.\r\nsrc/components/RecipeCard.tsx(29,10): error TS2552: Cannot find name 'XStack'. Did you mean 'YStack'?\r\nsrc"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 175.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 15,
+    "name": "Workout log tracker",
+    "originalPrompt": "Workout log tracker",
+    "enhancedPrompt": "Workout log tracker",
+    "status": "error",
+    "filesGenerated": 16,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/workoutStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useWorkouts.ts",
+      "src/hooks/useWorkout.ts",
+      "src/hooks/useAddWorkout.ts",
+      "src/components/WorkoutList.tsx",
+      "src/components/WorkoutDetail.tsx",
+      "src/components/AddWorkoutForm.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/workouts/[id].tsx",
+      "app/(tabs)/add-workout.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/workouts/[id].tsx(9,57): error TS2339: Property 'query' does not exist on type 'Router'.\r\nsrc/components/AddWorkoutForm.tsx(224,47): error TS2322: Type '\"secondary\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/SettingsForm.tsx(47,15): error "
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 141.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 16,
+    "name": "Mood diary with calendar",
+    "originalPrompt": "Mood diary with calendar",
+    "enhancedPrompt": "Mood diary with calendar",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/moodStore.ts",
+      "src/hooks/useMoodEntries.ts",
+      "src/components/MoodCalendar.tsx",
+      "src/components/MoodEntryForm.tsx",
+      "src/components/MoodEntryList.tsx",
+      "src/components/MoodStats.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/stats.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/stats.tsx after 2 retries: 'MoodStats' imported as default but is a named export",
+      "Typecheck failed:\nsrc/components/MoodEntryForm.tsx(47,15): error TS2322: Type '\"active\" | \"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/MoodStats.tsx(163,17): error TS2769: No overloa"
+    ],
+    "autofixes": 2,
+    "contractViolations": 1,
+    "timeSeconds": 185,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 17,
+    "name": "Book reading tracker",
+    "originalPrompt": "Book reading tracker",
+    "enhancedPrompt": "Book reading tracker",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/bookStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useBooks.ts",
+      "src/components/BookList.tsx",
+      "src/components/AddBookForm.tsx",
+      "src/components/ReadingProgressChart.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/add-book.tsx",
+      "app/(tabs)/reading-progress.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nType '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/AddBookForm.tsx(136,15): error TS2322: Type '\"active\" | \"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName | null | "
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 146.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 18,
+    "name": "Password generator",
+    "originalPrompt": "Password generator",
+    "enhancedPrompt": "Password generator",
+    "status": "ready",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/passwordHistoryStore.ts",
+      "src/hooks/usePasswordGenerator.ts",
+      "src/components/PasswordGenerator.tsx",
+      "src/components/PasswordHistory.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 268.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 19,
+    "name": "BMI calculator with history",
+    "originalPrompt": "BMI calculator with history",
+    "enhancedPrompt": "BMI calculator with history",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/bmiStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useBMICalculator.ts",
+      "src/hooks/useBMIHistory.ts",
+      "src/components/BMICalculatorForm.tsx",
+      "src/components/HistoryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 m"
+    ],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 207.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 20,
+    "name": "Water intake tracker",
+    "originalPrompt": "Water intake tracker",
+    "enhancedPrompt": "Water intake tracker",
+    "status": "timeout",
+    "filesGenerated": 0,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/waterIntakeStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useWaterIntake.ts"
+    ],
+    "errors": [],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 300,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating"
+    ]
+  },
+  {
+    "index": 21,
+    "name": "Task manager with kanban board",
+    "originalPrompt": "Task manager with kanban board",
+    "enhancedPrompt": "Task manager with kanban board",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/kanbanStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useKanban.ts",
+      "src/components/KanbanBoard.tsx",
+      "src/components/TaskCard.tsx",
+      "src/components/Column.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(16,34): error TS2339: Property 'tasks' does not exist on type '{ addTask: (task: Omit<Task, \"id\">) => void; updateTask: (id: string, updates: Partial<Task>) => void; deleteTask: (id: string) => void; moveTask: (taskId: string, newStatus: \"todo\" | ... 1 more ..."
+    ],
+    "autofixes": 3,
+    "contractViolations": 0,
+    "timeSeconds": 298.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 22,
+    "name": "Personal finance dashboard",
+    "originalPrompt": "Personal finance dashboard",
+    "enhancedPrompt": "Personal finance dashboard",
+    "status": "error",
+    "filesGenerated": 19,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/transactionStore.ts",
+      "src/stores/budgetStore.ts",
+      "src/stores/goalStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTransactions.ts",
+      "src/hooks/useBudgets.ts",
+      "src/hooks/useGoals.ts",
+      "src/components/FinancialSummary.tsx",
+      "src/components/TransactionList.tsx",
+      "src/components/BudgetList.tsx",
+      "src/components/GoalList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/transactions.tsx",
+      "app/(tabs)/budgets.tsx",
+      "app/(tabs)/goals.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/stores/transactionStore.ts(2,45): error TS1002: Unterminated string literal."
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 172.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 23,
+    "name": "Meditation timer with sounds",
+    "originalPrompt": "Meditation timer with sounds",
+    "enhancedPrompt": "Meditation timer with sounds",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timerStore.ts",
+      "src/stores/soundStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useMeditationTimer.ts",
+      "src/hooks/useSoundLibrary.ts",
+      "src/components/MeditationTimer.tsx",
+      "src/components/SoundLibrary.tsx",
+      "src/components/SettingsPanel.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/sounds.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/MeditationTimer.tsx(12,5): error TS2339: Property 'timer' does not exist on type 'TimerStore'.\r\nsrc/components/MeditationTimer.tsx(112,11): error TS2322: Type '\"active\" | \"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not "
+    ],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 163.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 24,
+    "name": "Language learning flashcards",
+    "originalPrompt": "Language learning flashcards",
+    "enhancedPrompt": "Language learning flashcards",
+    "status": "error",
+    "filesGenerated": 18,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/flashcardStore.ts",
+      "src/stores/studyStore.ts",
+      "src/stores/progressStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useFlashcards.ts",
+      "src/hooks/useStudySession.ts",
+      "src/hooks/useProgress.ts",
+      "src/components/FlashcardStack.tsx",
+      "src/components/StudyScreen.tsx",
+      "src/components/ProgressChart.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/study.tsx",
+      "app/(tabs)/progress.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/SettingsForm.tsx(46,15): error TS2322: Type '\"active\" | \"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/StudyScreen.tsx(178,15): error TS2322: Type '\"se"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 215.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 25,
+    "name": "Grocery shopping list",
+    "originalPrompt": "Grocery shopping list",
+    "enhancedPrompt": "Grocery shopping list",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/groceryStore.ts",
+      "src/stores/categoryStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useGroceryItems.ts",
+      "src/hooks/useCategories.ts",
+      "src/components/GroceryListScreen.tsx",
+      "src/components/CategoriesScreen.tsx",
+      "src/components/SettingsScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/categories.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/CategoriesScreen.tsx(2,59): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'.\r\nsrc/components/GroceryListScreen.tsx(9,3): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'.\r\nsrc/components/SettingsScreen.tsx(86,13): error TS2322: "
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 171,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 26,
+    "name": "Simple chat messenger UI",
+    "originalPrompt": "Simple chat messenger UI",
+    "enhancedPrompt": "Simple chat messenger UI",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/chatStore.ts",
+      "src/stores/userStore.ts",
+      "src/hooks/useChat.ts",
+      "src/components/ChatList.tsx",
+      "src/components/ActiveChat.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/settings.tsx(12,22): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.\r\n  Type 'undefined' is not assignable to type 'string'.\r\nsrc/components/ChatList.tsx(2,40): error TS2305: Module '\"tamagui\"' has no exported member '"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 132.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 27,
+    "name": "Photo gallery viewer",
+    "originalPrompt": "Photo gallery viewer",
+    "enhancedPrompt": "Photo gallery viewer",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/photoStore.ts",
+      "src/stores/favoritesStore.ts",
+      "src/hooks/usePhotos.ts",
+      "src/hooks/useFavorites.ts",
+      "src/hooks/usePhotoDetails.ts",
+      "src/components/PhotoGrid.tsx",
+      "src/components/FavoriteGrid.tsx",
+      "src/components/PhotoDetail.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/favorites.tsx",
+      "app/(tabs)/details.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/hooks/usePhotoDetails.ts(19,13): error TS2740: Type '{ fileSize: number; fileType: string; dimensions: { width: number; height: number; }; location: { latitude: number; longitude: number; } | undefined; cameraInfo: { make: string; model: string; lens: string | undefined; } | un"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 148.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 28,
+    "name": "Music playlist manager",
+    "originalPrompt": "Music playlist manager",
+    "enhancedPrompt": "Music playlist manager",
+    "status": "error",
+    "filesGenerated": 17,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/playlistStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/usePlaylists.ts",
+      "src/hooks/useMusicLibrary.ts",
+      "src/hooks/useCreatePlaylist.ts",
+      "src/components/PlaylistCard.tsx",
+      "src/components/MusicTrackItem.tsx",
+      "src/components/RecentlyPlayedSection.tsx",
+      "src/components/TrackSelector.tsx",
+      "src/components/SettingsSection.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/library.tsx",
+      "app/(tabs)/create-playlist.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/create-playlist.tsx(130,11): error TS2322: Type '(track: MusicTrack) => void' is not assignable to type '(trackId: string) => void'.\r\n  Types of parameters 'track' and 'trackId' are incompatible.\r\n    Type 'string' is not assignable to type 'MusicTrack'.\r\nsrc/components/"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 173.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 29,
+    "name": "Daily journal with tags",
+    "originalPrompt": "Daily journal with tags",
+    "enhancedPrompt": "Daily journal with tags",
+    "status": "ready",
+    "filesGenerated": 16,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/journalStore.ts",
+      "src/stores/tagStore.ts",
+      "src/hooks/useJournalEntries.ts",
+      "src/hooks/useTags.ts",
+      "src/components/JournalList.tsx",
+      "src/components/TagOverview.tsx",
+      "src/components/EntryForm.tsx",
+      "src/components/TagList.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/write.tsx",
+      "app/(tabs)/tags.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 260.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 30,
+    "name": "Countdown events tracker",
+    "originalPrompt": "Countdown events tracker",
+    "enhancedPrompt": "Countdown events tracker",
+    "status": "ready",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/eventStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useEvents.ts",
+      "src/components/EventCard.tsx",
+      "src/components/AddEventForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/add-event.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 281,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 31,
+    "name": "Dark cyberpunk todo app",
+    "originalPrompt": "Dark cyberpunk todo app",
+    "enhancedPrompt": "Dark cyberpunk todo app",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/todoStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useTodos.ts",
+      "src/components/TodoList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/TodoList.tsx(2,59): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'."
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 169.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 32,
+    "name": "Retro pixel art calculator",
+    "originalPrompt": "Retro pixel art calculator",
+    "enhancedPrompt": "Retro pixel art calculator",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/historyStore.ts",
+      "src/hooks/useCalculator.ts",
+      "src/components/CalculatorScreen.tsx",
+      "src/components/HistoryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 m"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 208.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 33,
+    "name": "Minimalist zen timer",
+    "originalPrompt": "Minimalist zen timer",
+    "enhancedPrompt": "Minimalist zen timer",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timerStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTimer.ts",
+      "src/components/TimerDisplay.tsx",
+      "src/components/ControlButtons.tsx",
+      "src/components/DurationSelector.tsx",
+      "src/components/SoundToggle.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(25,59): error TS2353: Object literal may only specify known properties, and 'formattedTime' does not exist in type 'TimerState'.\r\napp/(tabs)/index.tsx(27,11): error TS2739: Type '{ timeLeft: number; isRunning: boolean; mode: \"work\" | \"break\"; }' is missing the "
+    ],
+    "autofixes": 3,
+    "contractViolations": 0,
+    "timeSeconds": 162.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 34,
+    "name": "Neon gaming score tracker",
+    "originalPrompt": "Neon gaming score tracker",
+    "enhancedPrompt": "Neon gaming score tracker",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/scoreStore.ts",
+      "src/stores/gameStore.ts",
+      "src/stores/profileStore.ts",
+      "src/hooks/useScores.ts",
+      "src/hooks/useGames.ts",
+      "src/hooks/useProfile.ts",
+      "src/components/ScoreBoard.tsx",
+      "src/components/GameList.tsx",
+      "src/components/ProfileCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/games.tsx",
+      "app/(tabs)/profile.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(21,22): error TS2322: Type '\"gamepad2\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 mor"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 188.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 35,
+    "name": "Pastel mood board app",
+    "originalPrompt": "Pastel mood board app",
+    "enhancedPrompt": "Pastel mood board app",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/moodBoardStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useMoodBoard.ts",
+      "src/components/MoodBoardGrid.tsx",
+      "src/components/AddItemForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/create.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/create.tsx(11,37): error TS2304: Cannot find name 'MoodBoardItem'.\r\napp/(tabs)/settings.tsx(153,13): error TS2322: Type '\"secondary\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/components/AddItemForm.tsx(83,17): error TS2322: Type '\"active\" | \"default"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 112.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 36,
+    "name": "Gothic dark diary",
+    "originalPrompt": "Gothic dark diary",
+    "enhancedPrompt": "Gothic dark diary",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/diaryStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useDiaryEntries.ts",
+      "src/components/DiaryEntryForm.tsx",
+      "src/components/EntryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/entries.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(10,40): error TS2304: Cannot find name 'DiaryEntry'."
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 164.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 37,
+    "name": "Synthwave music player UI",
+    "originalPrompt": "Synthwave music player UI",
+    "enhancedPrompt": "Synthwave music player UI",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/playerStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useMusicPlayer.ts",
+      "src/hooks/useMusicLibrary.ts",
+      "src/components/PlayerScreen.tsx",
+      "src/components/MusicLibrary.tsx",
+      "src/components/SettingsScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/library.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/hooks/useMusicPlayer.ts(42,32): error TS2304: Cannot find name 'duration'.\r\nsrc/hooks/useMusicPlayer.ts(65,26): error TS2304: Cannot find name 'isShuffleEnabled'.\r\nsrc/hooks/useMusicPlayer.ts(66,7): error TS2552: Cannot find name 'isShuffleEnabled'. Did you mean 'setIsShuffleEn"
+    ],
+    "autofixes": 2,
+    "contractViolations": 0,
+    "timeSeconds": 197.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 38,
+    "name": "Nature themed weather app",
+    "originalPrompt": "Nature themed weather app",
+    "enhancedPrompt": "Nature themed weather app",
+    "status": "error",
+    "filesGenerated": 18,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/weatherStore.ts",
+      "src/stores/forecastStore.ts",
+      "src/stores/natureStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useWeather.ts",
+      "src/hooks/useForecast.ts",
+      "src/hooks/useNatureTips.ts",
+      "src/components/WeatherCard.tsx",
+      "src/components/ForecastCard.tsx",
+      "src/components/NatureInsights.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/forecast.tsx",
+      "app/(tabs)/nature.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(30,22): error TS2322: Type '\"leaf\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"sun\" | \"cloud-rain\" | \"cloud\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | ... 268 m"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 169.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 39,
+    "name": "Space themed countdown timer",
+    "originalPrompt": "Space themed countdown timer",
+    "enhancedPrompt": "Space themed countdown timer",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timerStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useCountdown.ts",
+      "src/components/CountdownTimer.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/settings.tsx(34,17): error TS2322: Type '\"default\" | \"active\"' is not assignable to type 'ThemeName | null | undefined'.\r\n  Type '\"default\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/hooks/useCountdown.ts(22,21): error TS2345: Argument of type '(prev"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 107.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 40,
+    "name": "Steampunk inventory tracker",
+    "originalPrompt": "Steampunk inventory tracker",
+    "enhancedPrompt": "Develop a React Native Expo application for a \"Steampunk Inventory Tracker\" featuring a visually immersive aesthetic of brass, copper, and weathered p",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/inventoryStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useInventory.ts",
+      "src/components/DashboardCard.tsx",
+      "src/components/ItemCard.tsx",
+      "src/components/ItemDetailView.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/catalog.tsx",
+      "app/(tabs)/settings.tsx",
+      "app/item/[id].tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/ItemCard.tsx(33,22): error TS2322: Type '\"weight\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 "
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 152.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 41,
+    "name": "App with tabs and settings",
+    "originalPrompt": "App with tabs and settings",
+    "enhancedPrompt": "App with tabs and settings",
+    "status": "ready",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/featureStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useCounter.ts",
+      "src/components/MainComponent.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 231.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 42,
+    "name": "App with search and filter list",
+    "originalPrompt": "App with search and filter list",
+    "enhancedPrompt": "App with search and filter list",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/filterStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useSearchFilter.ts",
+      "src/components/SearchFilterList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/SearchFilterList.tsx(106,61): error TS2304: Cannot find name 'showPending'.\r\nsrc/components/SearchFilterList.tsx(109,11): error TS2322: Type '\"secondary\"' is not assignable to type 'ThemeName | null | undefined'.\r\nsrc/hooks/useSearchFilter.ts(18,43): error TS2552: Ca"
+    ],
+    "autofixes": 3,
+    "contractViolations": 0,
+    "timeSeconds": 108.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 43,
+    "name": "App with form validation",
+    "originalPrompt": "App with form validation",
+    "enhancedPrompt": "App with form validation",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/validationStore.ts",
+      "src/hooks/useFormValidation.ts",
+      "src/components/UserForm.tsx",
+      "src/components/ValidationSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/settings.tsx after 2 retries: 'ValidationSettings' imported as default but is a named export",
+      "Typecheck failed:\nsrc/components/ValidationSettings.tsx(2,59): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'.\r\nsrc/components/ValidationSettings.tsx(61,23): error TS2488: Type 'ValidationRule[] | undefined' must have a '[Symbol.iterator]()' method that returns an iterator.\r\nsrc"
+    ],
+    "autofixes": 4,
+    "contractViolations": 1,
+    "timeSeconds": 144.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 44,
+    "name": "App with dark mode toggle",
+    "originalPrompt": "App with dark mode toggle",
+    "enhancedPrompt": "App with dark mode toggle",
+    "status": "ready",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/darkModeStore.ts",
+      "src/hooks/useDarkMode.ts",
+      "src/components/MainComponent.tsx",
+      "src/components/SettingsScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 242.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 45,
+    "name": "App with animated transitions",
+    "originalPrompt": "App with animated transitions",
+    "enhancedPrompt": "App with animated transitions",
+    "status": "timeout",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 300,
+    "events": [
+      "planning",
+      "scaffolding"
+    ]
+  },
+  {
+    "index": 46,
+    "name": "App with local storage persistence",
+    "originalPrompt": "App with local storage persistence",
+    "enhancedPrompt": "App with local storage persistence",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [
+      "Plan validation failed: app/_layout.tsx: app/_layout.tsx is auto-generated and must not be included in plan.files"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 2.8,
+    "events": [
+      "planning",
+      "error"
+    ]
+  },
+  {
+    "index": 47,
+    "name": "App with swipe to delete list",
+    "originalPrompt": "App with swipe to delete list",
+    "enhancedPrompt": "Develop a premium Task Management app using Expo and React Native Reanimated featuring a minimalist dark-mode interface with smooth gesture-driven int",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/taskStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useTasks.ts",
+      "src/components/TaskList.tsx",
+      "src/components/FAB.tsx",
+      "src/components/AddTaskModal.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Static validation failed: src/components/TaskList.tsx: import \"react-native-fast-image\" requires missing dependency \"react-native-fast-image\""
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 71.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 48,
+    "name": "App with bottom sheet modal",
+    "originalPrompt": "App with bottom sheet modal",
+    "enhancedPrompt": "App with bottom sheet modal",
+    "status": "ready",
+    "filesGenerated": 8,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/hooks/useBottomSheet.ts",
+      "src/components/BottomSheetTriggerButton.tsx",
+      "src/components/BottomSheetModal.tsx",
+      "app/_layout.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 175.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "ready"
+    ]
+  },
+  {
+    "index": 49,
+    "name": "App with progress indicators",
+    "originalPrompt": "App with progress indicators",
+    "enhancedPrompt": "Build a high-performance React Native Expo habit tracker called 'Stride' featuring a minimalist Soft UI design with pastel blue and deep slate accents",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/habitStore.ts",
+      "src/stores/taskStore.ts",
+      "src/hooks/useHabitData.ts",
+      "src/hooks/useTaskData.ts",
+      "src/components/DashboardScreen.tsx",
+      "src/components/TaskDetailScreen.tsx",
+      "src/components/HabitCard.tsx",
+      "src/components/TaskProgressTracker.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/task-detail.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/DashboardScreen.tsx(69,17): error TS2322: Type '{ key: string; habit: Habit; onPress: () => void; onToggle: () => void; }' is not assignable to type 'IntrinsicAttributes & HabitCardProps'.\r\n  Property 'onToggle' does not exist on type 'IntrinsicAttributes & HabitCard"
+    ],
+    "autofixes": 1,
+    "contractViolations": 0,
+    "timeSeconds": 94.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 50,
+    "name": "App with onboarding screens",
+    "originalPrompt": "App with onboarding screens",
+    "enhancedPrompt": "Create a high-quality React Native Expo application featuring a multi-step onboarding flow using React Navigation Stack and Reanimated for smooth hori",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [
+      "Plan validation failed: app/_layout.tsx: app/_layout.tsx is auto-generated and must not be included in plan.files"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 5.2,
+    "events": [
+      "planning",
+      "error"
+    ]
+  }
+]

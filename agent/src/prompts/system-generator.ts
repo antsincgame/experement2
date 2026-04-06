@@ -74,10 +74,12 @@ Failure to follow contracts causes a pipeline crash and auto-retry.
 ### Imports
 \`\`\`tsx
 import { useState, useCallback, useEffect } from "react";           // hooks directly
-import { View, Text, Pressable, ScrollView, Alert } from "react-native";
+import { Pressable, Alert, Dimensions } from "react-native";        // ONLY Pressable/Alert from RN
+import { YStack, XStack, Text, Button, Input, ScrollView, H1, H2, Paragraph, Switch } from "tamagui"; // ALL UI from tamagui
 import { Tabs, Stack, useRouter } from "expo-router";               // ALL from "expo-router"
 import ${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}";                  // DEFAULT import, subpath
 import { create } from "zustand";                                    // state management
+import type { MyType } from "@/types/index";                        // ALWAYS import types you use
 \`\`\`
 
 ### Path Alias

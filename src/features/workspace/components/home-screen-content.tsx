@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { FolderOpen, Settings, Sparkles, Wifi, WifiOff, Zap } from "lucide-react-native";
+import { Bot, Code2, FolderOpen, Settings, Sparkles, Wifi, WifiOff, Zap } from "lucide-react-native";
+import { useSettingsStore } from "@/stores/settings-store";
 import SuggestionChips from "@/features/chat/components/suggestion-chips";
 import SettingsDrawer from "@/features/settings/components/settings-drawer";
 import AuroraBackground from "@/shared/components/effects/aurora-background";
@@ -199,12 +200,7 @@ export const HomeScreenContent = ({
                 className="flex-row items-center justify-between px-4 py-3"
                 style={{ borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.04)" }}
               >
-                <View className="flex-row items-center gap-1.5">
-                  <Sparkles size={12} color="#7C4DFF" strokeWidth={1.5} />
-                  <Text className="text-ink-light text-[10px] font-medium">
-                    Powered by local LLM
-                  </Text>
-                </View>
+                <MoEIndicator />
                 <View className="flex-row items-center gap-2">
                   {enhancerEnabled && (
                     <Pressable
@@ -289,3 +285,27 @@ export const HomeScreenContent = ({
     </SafeAreaView>
   </AuroraBackground>
 );
+
+const MoEIndicator = () => {
+  const model = useSettingsStore((s) => s.model);
+  const plannerModel = useSettingsStore((s) => s.plannerModel);
+  const shortName = (m: string) => m.split("/").pop()?.slice(0, 18) || "Auto";
+
+  return (
+    <View className="flex-row items-center gap-2">
+      <View className="flex-row items-center gap-1">
+        <Bot size={10} color="#7C4DFF" strokeWidth={1.5} />
+        <Text style={{ fontSize: 8, color: "#7C4DFF", fontWeight: "600" }}>
+          {shortName(plannerModel || model)}
+        </Text>
+      </View>
+      <View style={{ width: 1, height: 10, backgroundColor: "rgba(0,0,0,0.1)" }} />
+      <View className="flex-row items-center gap-1">
+        <Code2 size={10} color="#00BCD4" strokeWidth={1.5} />
+        <Text style={{ fontSize: 8, color: "#00BCD4", fontWeight: "600" }}>
+          {shortName(model)}
+        </Text>
+      </View>
+    </View>
+  );
+};
