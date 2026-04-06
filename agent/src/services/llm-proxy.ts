@@ -73,10 +73,7 @@ const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
 
       const data = await resp.json();
       const models = data.data ?? [];
-      const preferred = models.find((model: { id: string }) =>
-        model.id.includes("qwen3-coder")
-      );
-      const resolvedModel = preferred?.id ?? models[0]?.id ?? null;
+      const resolvedModel = models[0]?.id ?? null;
       setCachedModelId(
         baseUrl,
         resolvedModel,

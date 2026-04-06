@@ -369,6 +369,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
                       raw: parsed.raw,
                     },
                     lmStudioUrl: message.lmStudioUrl,
+                    model: message.model,
                     maxAttempts: 3,
                     onAttempt: (attempt, max) => broadcast({
                       type: "autofix_attempt",
