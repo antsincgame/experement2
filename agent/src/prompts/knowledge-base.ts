@@ -12,7 +12,7 @@ export const KNOWLEDGE_BASE = {
 8. Pressable: NEVER import Pressable from "tamagui" (it does NOT exist there). Import from "react-native": import { Pressable } from "react-native". Or better: use <Button> from tamagui instead.
 9. ScrollView: Import from "tamagui", NOT from "react-native".
 10. COLORS: NEVER use hex strings (like "#FF0000") in Tamagui props like color or backgroundColor. ONLY use tokens: "$background", "$color", "$primary", "$blue10", "$red10", "$green10", "$gray10".
-11. THEME: <Theme name="light"> or <Theme name="dark"> ONLY. NEVER custom names like "active", "default", "primary".
+11. THEME: <Theme name="light"> or <Theme name="dark"> ONLY. NEVER custom names like "active", "default", "primary". For conditional styling, use inline props: backgroundColor={isActive ? "$blue5" : "$gray3"}, NOT theme="active".
 12. TYPES: If you use a custom type (like Habit, Todo, Expense), you MUST import it: import type { Habit } from "@/types/index".`,
 
   forms: `## 📚 RAG DOCS: TAMAGUI FORMS & INPUTS
