@@ -53,6 +53,36 @@ PieChart example:
   accessor="amount"
   backgroundColor="transparent"
 />`,
+
+  advancedUI: `## 📚 RAG DOCS: TAMAGUI ADVANCED UI & ANIMATIONS
+1. **Animations & Interactions**: Use \`animation="bouncy"\` (or "lazy") on YStack/XStack/Button.
+   Use \`pressStyle={{ scale: 0.97, opacity: 0.8 }}\` and \`hoverStyle={{ opacity: 0.9 }}\` for tactile feedback.
+   Use \`enterStyle={{ opacity: 0, y: 10 }}\` and \`exitStyle={{ opacity: 0, y: -10 }}\` for smooth mounting.
+2. **ToggleGroup**:
+   <ToggleGroup type="single" value={val} onValueChange={setVal} orientation="horizontal" disableDeactivation>
+     <ToggleGroup.Item value="a"><Text>Option A</Text></ToggleGroup.Item>
+     <ToggleGroup.Item value="b"><Text>Option B</Text></ToggleGroup.Item>
+   </ToggleGroup>
+3. **ThemeInverse**: Wrap contrasting sections in \`<ThemeInverse>\` to automatically invert light/dark tokens.`,
+
+  overlays: `## 📚 RAG DOCS: TAMAGUI OVERLAYS (Sheet & Dialog)
+1. **Sheet (Bottom Sheet)**: MUST include Overlay, Handle, and Frame.
+   <Sheet modal open={isOpen} onOpenChange={setIsOpen} snapPoints={[50, 25]} dismissOnSnapToBottom position={0} animation="bouncy">
+     <Sheet.Overlay animation="lazy" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
+     <Sheet.Handle />
+     <Sheet.Frame padding="$4" alignItems="center" justifyContent="center">
+       <Text>Sheet Content</Text>
+     </Sheet.Frame>
+   </Sheet>
+2. **Dialog**: MUST include Portal, Overlay, and Content.
+   <Dialog modal open={isOpen} onOpenChange={setIsOpen}>
+     <Dialog.Portal>
+       <Dialog.Overlay key="overlay" animation="quick" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
+       <Dialog.Content key="content" animation="bouncy" enterStyle={{ x: 0, y: -20, opacity: 0 }} exitStyle={{ x: 0, y: 10, opacity: 0 }}>
+         <Text>Dialog Content</Text>
+       </Dialog.Content>
+     </Dialog.Portal>
+   </Dialog>`,
 };
 
 export const getRelevantDocs = (description: string, dependencies: string[]): string => {
@@ -64,6 +94,12 @@ export const getRelevantDocs = (description: string, dependencies: string[]): st
   }
   if (text.includes("chart") || text.includes("stat") || text.includes("analytic") || text.includes("graph") || text.includes("pie") || text.includes("bar") || text.includes("line")) {
     docs.push(KNOWLEDGE_BASE.charts);
+  }
+  if (text.includes("animat") || text.includes("bouncy") || text.includes("toggle") || text.includes("interactive") || text.includes("pressstyle") || text.includes("themeinverse")) {
+    docs.push(KNOWLEDGE_BASE.advancedUI);
+  }
+  if (text.includes("sheet") || text.includes("bottom sheet") || text.includes("dialog") || text.includes("modal") || text.includes("overlay")) {
+    docs.push(KNOWLEDGE_BASE.overlays);
   }
 
   return docs.join("\n\n");
