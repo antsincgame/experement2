@@ -20,6 +20,11 @@ const PreviewPanel = () => {
       const portChanged = state.previewPort !== prevState.previewPort;
       const projectChanged = state.projectName !== prevState.projectName;
 
+      // Immediately unload old iframe when switching projects (frees browser RAM)
+      if (projectChanged) {
+        setIframeSrc("");
+      }
+
       if ((portChanged || projectChanged) && state.previewPort && state.projectName) {
         clearTimeout(refreshTimer);
         refreshTimer = setTimeout(() => {

@@ -22,8 +22,8 @@ export interface CommandResult {
 
 const activeProcesses = new Map<string, ManagedProcess>();
 
-// Max concurrent expo processes to prevent OOM
-const MAX_ACTIVE_EXPO = 5;
+// Singleton Metro: only 1 bundler at a time to prevent OOM and browser freezes
+const MAX_ACTIVE_EXPO = 1;
 
 const evictOldestIfNeeded = (): void => {
   if (activeProcesses.size < MAX_ACTIVE_EXPO) return;
@@ -76,14 +76,8 @@ export const startExpo = async (
   onLog: LogCallback,
   clearCache = false,
 ): Promise<{ port: number; process: ChildProcess }> => {
-  const existing = activeProcesses.get(projectName);
-  if (existing) {
-    killProcess(existing.process);
-    existing.cleanup();
-    activeProcesses.delete(projectName);
-  }
-
-  evictOldestIfNeeded();
+  // Singleton: kill ALL running bundlers before starting a new one
+  killAll();
 
   const port = await findFreePort();
 
@@ -126,14 +120,8 @@ export const startExpoClearCache = async (
   port: number,
   onLog: LogCallback
 ): Promise<{ port: number; process: ChildProcess }> => {
-  const existing = activeProcesses.get(projectName);
-  if (existing) {
-    killProcess(existing.process);
-    existing.cleanup();
-    activeProcesses.delete(projectName);
-  }
-
-  evictOldestIfNeeded();
+  // Singleton: kill ALL running bundlers before starting a new one
+  killAll();
 
   const npxCmd = isWindows ? "npx.cmd" : "npx";
   const child = spawn(
