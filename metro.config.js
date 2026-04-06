@@ -8,10 +8,13 @@ const config = getDefaultConfig(__dirname);
 const workspaceDir = path.resolve(__dirname, "workspace").replace(/\\/g, "/");
 const agentDir = path.resolve(__dirname, "agent").replace(/\\/g, "/");
 
+// Use absolute paths to avoid matching src/features/workspace/
 const existingBlockList = config.resolver.blockList || [];
+const wsEscaped = workspaceDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const agEscaped = agentDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const extraBlockList = [
-  /[/\\]workspace[/\\].*/,
-  /[/\\]agent[/\\].*/,
+  new RegExp(`^${wsEscaped}[\\\\/].*`),
+  new RegExp(`^${agEscaped}[\\\\/].*`),
 ];
 config.resolver.blockList = Array.isArray(existingBlockList)
   ? [...existingBlockList, ...extraBlockList]
