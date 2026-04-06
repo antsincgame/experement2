@@ -56,10 +56,11 @@ const TerminalPanel = () => {
               const isError = (lower.includes("error:") || lower.includes("error ") || lower.startsWith("error")) && !lower.includes("0 error");
               const isRag = line.includes("🧠 RAG");
               const isHealing = line.includes("🔄 Auto-Healing");
+              const isMoe = line.includes("[MoE]");
               const isRetryOk = lower.includes("retry") && lower.includes("ok");
-              const lineColor = isError ? "#FF3366" : isRag ? "#B388FF" : isHealing ? "#00E676" : isRetryOk ? "#00E5FF" : undefined;
+              const lineColor = isError ? "#FF3366" : isMoe ? "#FFD700" : isRag ? "#B388FF" : isHealing ? "#00E676" : isRetryOk ? "#00E5FF" : undefined;
               return (
-                <Text key={i} style={{ color: lineColor, fontWeight: isRag || isHealing ? "700" : undefined }}>
+                <Text key={i} style={{ color: lineColor, fontWeight: isRag || isHealing || isMoe ? "700" : undefined }}>
                   {line}{"\n"}
                 </Text>
               );

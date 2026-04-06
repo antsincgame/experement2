@@ -274,6 +274,7 @@ const _createProjectInner = async (
 
   // ── Step 1: Plan ──────────────────────────────────────
   broadcast({ type: "status", status: "planning" });
+  broadcast({ type: "build_event", eventType: "moe_swap", message: `🧠 [MoE] Loading Planner Model (${plannerModel || model || "Auto"})...` });
 
   const plan = await planApp({
     description,
@@ -309,6 +310,7 @@ const _createProjectInner = async (
 
   // ── Step 3: Generate files ────────────────────────────
   broadcast({ type: "status", status: "generating" });
+  broadcast({ type: "build_event", eventType: "moe_swap", message: `💻 [MoE] Swapping to Generation Model (${model || "Auto"})...` });
 
   const files = await generateFiles({
     projectName: projectSlug,

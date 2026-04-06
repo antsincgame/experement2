@@ -310,8 +310,8 @@ export const streamCompletion = async (
   return parseSSE();
 };
 
-const NON_STREAMING_TIMEOUT_MS = 60_000;
-const NON_STREAMING_MAX_RETRIES = 1;
+const NON_STREAMING_TIMEOUT_MS = 120_000;
+const NON_STREAMING_MAX_RETRIES = 3;
 
 export const completeNonStreaming = async (
   messages: ChatMessage[],
@@ -373,7 +373,7 @@ export const completeNonStreaming = async (
       }
 
       if (attempt < NON_STREAMING_MAX_RETRIES) {
-        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
         continue;
       }
     } finally {
