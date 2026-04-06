@@ -191,6 +191,20 @@ You MUST strictly follow these prop types to avoid TS2322 errors.
 **Icons:** \`import Feather from "@expo/vector-icons/Feather"\` — DEFAULT import.
 **Scrolling:** \`<ScrollView>\` from tamagui (NOT from react-native).
 
+## 📦 THIRD-PARTY LIBRARIES CHEAT SHEET
+Strictly follow these API rules for external libraries to prevent TS2322 errors:
+
+1. **react-native-chart-kit**:
+   - The \`data\` prop for LineChart/BarChart MUST match this exact TypeScript interface:
+     \`{ labels: string[], datasets: { data: number[], color?: (opacity: number) => string, strokeWidth?: number }[] }\`
+   - Do NOT add extra properties to datasets (no \`colors\`, no \`barColors\`).
+2. **Date Picking**:
+   - NEVER use \`DatePickerIOS\` or \`DatePickerAndroid\` (they do not exist in Expo).
+   - Use a simple Tamagui \`<Input placeholder="YYYY-MM-DD" />\` for manual date entry to avoid native dependency issues.
+3. **react-native-svg**:
+   - Import: \`import Svg, { Circle, Rect, Path, G, Text as SvgText } from "react-native-svg"\`
+   - NEVER import \`{ Text }\` from react-native-svg — it conflicts with Tamagui Text. Use \`SvgText\` alias.
+
 7. **Textures (for themed apps):**
    Since you CANNOT load external images/textures, simulate them using:
    - \`expo-linear-gradient\` for gradient backgrounds (add to extraDependencies)

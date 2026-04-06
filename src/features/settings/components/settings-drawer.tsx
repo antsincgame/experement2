@@ -19,6 +19,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const [models, setModels] = useState<LmModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [plannerDropdownOpen, setPlannerDropdownOpen] = useState(false);
   const [enhancerDropdownOpen, setEnhancerDropdownOpen] = useState(false);
 
   const fetchModels = useCallback(async () => {
@@ -138,15 +139,24 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             </Pressable>
           </View>
 
-          {/* Model Selector */}
+          {/* Model Selectors */}
           <ModelSelector
-            label="Generation Model"
+            label="Generation Model (Code)"
             models={models}
             loading={modelsLoading}
             open={modelDropdownOpen}
-            onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setEnhancerDropdownOpen(false); }}
+            onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); }}
             onSelect={(id) => { settings.setModel(id); setModelDropdownOpen(false); }}
             currentModel={settings.model || models[0]?.id || "auto (first loaded)"}
+          />
+          <ModelSelector
+            label="Planner Model (Architecture)"
+            models={models}
+            loading={modelsLoading}
+            open={plannerDropdownOpen}
+            onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEnhancerDropdownOpen(false); }}
+            onSelect={(id) => { settings.setPlannerModel(id); setPlannerDropdownOpen(false); }}
+            currentModel={settings.plannerModel || "same as generation"}
           />
 
           <View className="flex-row gap-4">

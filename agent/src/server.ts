@@ -260,6 +260,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             description: message.description,
             lmStudioUrl: message.lmStudioUrl,
             model: message.model,
+            plannerModel: message.plannerModel,
             temperature: message.temperature,
             maxTokens: message.maxTokens,
             onProjectNameResolved: (projectName) => {

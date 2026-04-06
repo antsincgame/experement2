@@ -236,13 +236,14 @@ export const useWebSocket = () => {
   }, []);
 
   const createProject = useCallback((description: string) => {
-    const { lmStudioUrl, model, temperature, maxTokens } = useSettingsStore.getState();
+    const { lmStudioUrl, model, plannerModel, temperature, maxTokens } = useSettingsStore.getState();
     send({
       type: "create_project",
       requestId: createRequestId(),
       description,
       lmStudioUrl,
       ...(model ? { model } : {}),
+      ...(plannerModel ? { plannerModel } : {}),
       temperature,
       maxTokens,
     });

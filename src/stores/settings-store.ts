@@ -23,6 +23,7 @@ interface SettingsState {
   maxTokens: number;
   maxContextTokens: number;
   agentUrl: string;
+  plannerModel: string;
   enhancerModel: string;
   enhancerEnabled: boolean;
   errorLogs: ErrorLogEntry[];
@@ -33,6 +34,7 @@ interface SettingsState {
   setMaxTokens: (tokens: number) => void;
   setMaxContextTokens: (tokens: number) => void;
   setAgentUrl: (url: string) => void;
+  setPlannerModel: (model: string) => void;
   setEnhancerModel: (model: string) => void;
   setEnhancerEnabled: (enabled: boolean) => void;
   addErrorLog: (entry: Omit<ErrorLogEntry, "id" | "timestamp">) => void;
@@ -48,6 +50,7 @@ export const useSettingsStore = create<SettingsState>()(
       maxTokens: 65536,
       maxContextTokens: 65536,
       agentUrl: AGENT_HTTP_URL,
+      plannerModel: "",
       enhancerModel: "",
       enhancerEnabled: true,
       errorLogs: [],
@@ -58,6 +61,7 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxTokens: (maxTokens) => set({ maxTokens }),
       setMaxContextTokens: (maxContextTokens) => set({ maxContextTokens }),
       setAgentUrl: (agentUrl) => set({ agentUrl }),
+      setPlannerModel: (plannerModel) => set({ plannerModel }),
       setEnhancerModel: (enhancerModel) => set({ enhancerModel }),
       setEnhancerEnabled: (enhancerEnabled) => set({ enhancerEnabled }),
       addErrorLog: (entry) =>

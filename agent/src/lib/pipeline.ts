@@ -29,6 +29,7 @@ interface CreateOptions {
   description: string;
   lmStudioUrl?: string;
   model?: string;
+  plannerModel?: string;
   temperature?: number;
   maxTokens?: number;
   onProjectNameResolved?: (projectName: string) => void;
@@ -269,7 +270,7 @@ export const createProject = async (
 const _createProjectInner = async (
   options: CreateOptions
 ): Promise<CreateResult> => {
-  const { description, lmStudioUrl, model, temperature, maxTokens, onProjectNameResolved } = options;
+  const { description, lmStudioUrl, model, plannerModel, temperature, maxTokens, onProjectNameResolved } = options;
 
   // ── Step 1: Plan ──────────────────────────────────────
   broadcast({ type: "status", status: "planning" });
@@ -277,7 +278,7 @@ const _createProjectInner = async (
   const plan = await planApp({
     description,
     lmStudioUrl,
-    model,
+    model: plannerModel || model,
     temperature,
     maxTokens,
     onChunk: (chunk) => broadcast({ type: "plan_chunk", chunk }),

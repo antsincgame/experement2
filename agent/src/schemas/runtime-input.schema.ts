@@ -118,6 +118,7 @@ export const WsCreateProjectSchema = z.object({
   description: trimmedString("description", 20_000),
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
+  plannerModel: OptionalModelSchema,
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().positive().max(131_072).optional(),
 }).merge(WsRequestMetadataSchema);
