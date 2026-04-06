@@ -9,7 +9,7 @@ export const KNOWLEDGE_BASE = {
 5. Borders: borderWidth={1} (NUMBER, not boolean), borderRadius="$4". NEVER use "bordered" prop.
 6. Buttons: <Button theme="active" size="$4" onPress={fn}>Text</Button>.
 7. Cards: Build with <YStack backgroundColor="$background" borderRadius="$4" padding="$4" elevation={2} borderWidth={1} borderColor="$borderColor">. NEVER use Card.Body/Header/Footer.
-8. Pressable: Import from "react-native", NOT from "tamagui". Use <Button> when possible.
+8. Pressable: NEVER import Pressable from "tamagui" (it does NOT exist there). Import from "react-native": import { Pressable } from "react-native". Or better: use <Button> from tamagui instead.
 9. ScrollView: Import from "tamagui", NOT from "react-native".
 10. COLORS: NEVER use hex strings (like "#FF0000") in Tamagui props like color or backgroundColor. ONLY use tokens: "$background", "$color", "$primary", "$blue10", "$red10", "$green10", "$gray10".
 11. THEME: <Theme name="light"> or <Theme name="dark"> ONLY. NEVER custom names like "active", "default", "primary".

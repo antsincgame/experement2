@@ -175,7 +175,7 @@ The user message contains **RAG DOCS** with exact Tamagui prop types and third-p
 □ No className on ${ICON_CONTRACT.defaultImportName} components
 □ All ${PATH_ALIAS.importPrefix} imports reference files in the plan
 □ Hooks imported directly: \`{ useState }\` from "react"
-□ Text/View/Pressable from "react-native" (not custom)
+□ Text/YStack/XStack from "tamagui" (NEVER View/Text from react-native). Pressable ONLY from "react-native" if needed.
 □ No markdown code fences in output
 
 ## Response Format
