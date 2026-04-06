@@ -148,72 +148,16 @@ export default function TabLayout() {
 3. **NEVER destructure functions from Zustand that aren't defined.** Only destructure what the store ACTUALLY exports. Check the store interface.
 4. **NEVER invent API methods.** If a store/hook returns \`{ data, loading }\`, don't call \`data.fetch()\` — \`fetch\` doesn't exist on the data.
 
-### UI/UX DESIGN SYSTEM — TAMAGUI v2 (CRITICAL)
-NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. You MUST use Tamagui components:
-
-\`\`\`tsx
-import { useState } from "react";
-import { YStack, XStack, Text, Button, ScrollView, Input, Switch, H1, H2, Paragraph, Separator } from "tamagui";
-import { Pressable } from "react-native"; // Pressable ONLY from react-native
-\`\`\`
-
-## 💅 TAMAGUI V2 API CHEAT SHEET (CRITICAL FOR TYPESCRIPT)
-You MUST strictly follow these prop types to avoid TS2322 errors.
-
-1. **Layout Components:**
-   - Use \`YStack\` (vertical) and \`XStack\` (horizontal) for EVERYTHING.
-   - DO NOT use \`Card.Body\`, \`Card.Header\`, or any compound components. Build cards with \`YStack\`.
-2. **Spacing & Sizing Props (Strings with $ or Numbers):**
-   - Padding/Margin: \`p="$4"\`, \`px="$2"\`, \`py="$2"\`, \`m="$4"\`, \`mt="$2"\`
-   - Width/Height: \`w="100%"\`, \`w={200}\`, \`h="$4"\`, \`flex={1}\`
-   - Gap: \`gap="$2"\`, \`gap="$4"\`
-3. **Color & Border Props:**
-   - Background: \`backgroundColor="$background"\`, \`backgroundColor="$color4"\`
-   - Text: \`color="$color"\`, \`color="$gray10"\`
-   - Borders: \`borderWidth={1}\` (must be NUMBER), \`borderColor="$borderColor"\`.
-   - NEVER use boolean \`bordered\`. NEVER use \`bc\` or \`bw\` shorthand.
-4. **Typography:**
-   - \`<Text color="$color" fontSize={16} fontWeight="bold">\`
-   - \`<H1>\`, \`<H2>\`, \`<Paragraph>\` for semantic text
-5. **Interactive:**
-   - \`<Button onPress={fn} backgroundColor="$blue10" color="white" borderRadius="$4">Label</Button>\`
-   - For custom tappable areas: \`<Pressable onPress={fn}>\` from react-native (NOT from tamagui)
-
-**Cards pattern:**
-\`\`\`tsx
-<YStack backgroundColor="$background" borderRadius="$4" padding="$4" elevation={2} borderWidth={1} borderColor="$borderColor">
-  <H2>Title</H2>
-  <Paragraph>Content</Paragraph>
-</YStack>
-\`\`\`
+### UI/UX — TAMAGUI v2 (CRITICAL)
+NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. Use Tamagui: \`YStack\`, \`XStack\`, \`Text\`, \`Button\`, \`Input\`, \`Switch\`, \`ScrollView\`, \`H1\`, \`H2\`, \`Paragraph\`.
+Import \`Pressable\` from "react-native" if needed (NOT from tamagui).
+The user message contains **RAG DOCS** with exact Tamagui prop types and third-party API rules — follow them strictly.
 
 **Navigation:** NEVER build manual bottom tabs. Use expo-router \`<Tabs>\`.
 **Icons:** \`import Feather from "@expo/vector-icons/Feather"\` — DEFAULT import.
-**Scrolling:** \`<ScrollView>\` from tamagui (NOT from react-native).
-
-## 📦 THIRD-PARTY LIBRARIES CHEAT SHEET
-Strictly follow these API rules for external libraries to prevent TS2322 errors:
-
-1. **react-native-chart-kit**:
-   - The \`data\` prop for LineChart/BarChart MUST match this exact TypeScript interface:
-     \`{ labels: string[], datasets: { data: number[], color?: (opacity: number) => string, strokeWidth?: number }[] }\`
-   - Do NOT add extra properties to datasets (no \`colors\`, no \`barColors\`).
-2. **Date Picking**:
-   - NEVER use \`DatePickerIOS\` or \`DatePickerAndroid\` (they do not exist in Expo).
-   - Use a simple Tamagui \`<Input placeholder="YYYY-MM-DD" />\` for manual date entry to avoid native dependency issues.
-3. **react-native-svg**:
-   - Import: \`import Svg, { Circle, Rect, Path, G, Text as SvgText } from "react-native-svg"\`
-   - NEVER import \`{ Text }\` from react-native-svg — it conflicts with Tamagui Text. Use \`SvgText\` alias.
-
-7. **Textures (for themed apps):**
-   Since you CANNOT load external images/textures, simulate them using:
-   - \`expo-linear-gradient\` for gradient backgrounds (add to extraDependencies)
-   - Multiple borders/shadows for metallic/stone effects
-   - Semi-transparent overlays for depth
-   Example for dark fantasy: nested Views with \`borderWidth: 2, borderColor: theme.accent, opacity: 0.8\` layered with gradients.
-9. No local binary assets. Icons from ${ICON_CONTRACT.defaultImportPath} only.
-10. Do not generate drawer navigation. Use only supported navigation types.
-11. ALWAYS write \`// EOF\` as the very last line of every file. This marks the file as complete.
+**Assets:** No local binary assets. Use expo-linear-gradient for gradients.
+**Navigation types:** Only supported types. No drawer navigation.
+**EOF:** ALWAYS write \`// EOF\` as the very last line of every file.
 
 ## PRE-FLIGHT CHECKLIST (verify before output)
 □ No \`${PATH_ALIAS.importPrefix}src/\` paths (use \`${PATH_ALIAS.importPrefix}\` directly)

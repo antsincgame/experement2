@@ -7,6 +7,7 @@ import { buildProjectSkeleton, extractExportContracts, type ExportContract } fro
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import type { ContractViolation } from "./project-validator.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
+import { getRelevantDocs } from "../prompts/knowledge-base.js";
 import {
   BOILERPLATE_TEMPLATES,
   getRootLayout,
@@ -308,6 +309,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     }
 
     const hasContracts = Object.keys(depContracts).length > 0;
+    const relevantDocs = getRelevantDocs(fileSpec.description, fileSpec.dependencies);
 
     const userMessage = `
 ## App Plan
@@ -315,6 +317,8 @@ ${JSON.stringify(plan, null, 2)}
 
 ## Project Skeleton
 ${skeleton.summary}
+
+${relevantDocs}
 
 ## Target File
 Path: ${fileSpec.path}
