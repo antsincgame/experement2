@@ -68,7 +68,7 @@ const WorkspaceLayout = ({
             <FileTree nodes={fileTree} activeFile={activeFile} onFilePress={onOpenFile} />
           </View>
         )}
-        <View className="flex-1 overflow-hidden">
+        <View className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
           <FileTabBar
             openFiles={openFiles}
             activeFile={activeFile}

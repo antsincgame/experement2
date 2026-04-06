@@ -9,7 +9,8 @@ export const KNOWLEDGE_BASE = {
 5. BORDERS: borderWidth={1} (or bw={1}). NEVER use boolean 'bordered'.
 6. THEMING: Use <ThemeInverse> to automatically invert colors for a section.
 7. COMPONENTS: <Button backgroundColor="$primary" size="$4">Text</Button>. NEVER use the 'theme' prop on ANY component (it causes TS2322 errors). Use direct color props instead.
-8. ICONS: Use @expo/vector-icons/Feather. Pass color and size. NEVER wrap icons in <ThemeInverse>.
+8. ICONS: Use @expo/vector-icons/Feather. Pass color and size. NEVER wrap icons in <ThemeInverse>. NEVER use non-existent icon names.
+9. NEVER invent props like 'onSwipeEnd', 'onSwipeLeft', 'onDismiss'. Use standard 'onPress' or 'onLongPress' from Pressable (react-native).
 9. PRESSABLE: NEVER import Pressable from "tamagui". Import from "react-native" or use <Button>.
 10. TYPES: If you use a custom type (like Todo), you MUST import it: import type { Todo } from "@/types/index".
 11. THEME NAME: <Theme name="light"> or <Theme name="dark"> ONLY. For conditional styling use inline props: bg={isActive ? "$blue5" : "$gray3"}.`,
