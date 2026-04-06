@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Animated } from "react-native";
 import { CheckCircle2 } from "lucide-react-native";
 import Lotus from "../sacred-geometry/lotus";
@@ -10,6 +10,8 @@ interface LotusToastProps {
 
 const LotusToast = ({ visible, onHide }: LotusToastProps) => {
   const [opacity] = useState(new Animated.Value(0));
+  const onHideRef = useRef(onHide);
+  onHideRef.current = onHide;
 
   useEffect(() => {
     if (!visible) return;
@@ -18,8 +20,8 @@ const LotusToast = ({ visible, onHide }: LotusToastProps) => {
       Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.delay(2500),
       Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start(() => onHide());
-  }, [visible, opacity, onHide]);
+    ]).start(() => onHideRef.current());
+  }, [visible, opacity]);
 
   if (!visible) return null;
 
