@@ -30,6 +30,7 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
   const previousStatus = useRef(status);
+  const activeProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (previousStatus.current !== "ready" && status === "ready" && projectName) {
@@ -38,22 +39,28 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
     previousStatus.current = status;
   }, [projectName, status]);
 
+  // Open project workspace — fires ONLY when route changes, NOT when store updates.
+  // Uses ref to prevent infinite loop: switchProject updates store.projectName,
+  // which would re-trigger this effect if projectName were in the dependency array.
   useEffect(() => {
-    if (!routeProjectName) {
+    if (!routeProjectName || routeProjectName === activeProjectRef.current) {
       return;
     }
 
+    activeProjectRef.current = routeProjectName;
+
     void openProjectWorkspace({
-      currentProjectName: projectName,
+      currentProjectName: useProjectStore.getState().projectName,
       projectName: routeProjectName,
-      switchProject,
+      switchProject: useProjectStore.getState().switchProject,
       fetchProjectFiles,
       startPreview,
       onMissingProject: () => {
+        activeProjectRef.current = null;
         router.replace("/");
       },
     });
-  }, [projectName, routeProjectName, router, startPreview, switchProject]);
+  }, [routeProjectName, router, startPreview]);
 
   const handleChatSend = useCallback((text: string) => {
     addMessage(createUserMessage(text));
