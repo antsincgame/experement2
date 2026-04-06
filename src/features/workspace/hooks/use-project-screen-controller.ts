@@ -72,7 +72,7 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   }, [router]);
 
   const handleCreateNew = useCallback(() => {
-    router.push("/");
+    router.replace("/");
   }, [router]);
 
   const handleExport = useCallback(() => {
