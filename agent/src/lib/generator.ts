@@ -312,6 +312,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     const hasContracts = Object.keys(depContracts).length > 0;
     const relevantDocs = getRelevantDocs(fileSpec.description, fileSpec.dependencies);
     broadcast({ type: "build_event", eventType: "rag_injected", message: `🧠 RAG Context loaded for ${fileSpec.path}` });
+    onChunk?.(`\n[🧠 RAG Context injected: ${relevantDocs.slice(0, 40).replace(/\n/g, " ")}...]\n`);
 
     const userMessage = `
 ## App Plan
@@ -419,6 +420,7 @@ Generate the complete code for: ${fileSpec.path}`;
     onChunk?.(`\n[Truncation detected: ${truncated.length} files — smart continuation ${truncationRetries}/${MAX_TRUNCATION_RETRIES}]\n`);
     for (const tfp of truncated) {
       broadcast({ type: "build_event", eventType: "self_healing", message: `🔄 Auto-Healing: Continuing truncated file ${tfp}` });
+      onChunk?.(`\n[🔄 Auto-Healing: Resuming truncated file ${tfp}]\n`);
     }
 
     for (const fp of truncated) {
