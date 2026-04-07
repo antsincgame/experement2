@@ -14,14 +14,14 @@ import {
   runWebExport,
   npmInstall,
 } from "../services/process-manager.js";
-import { getProjectPath, readFile as readProjectFile } from "../services/file-manager.js";
+import { getProjectPath, readFile as readProjectFile, writeFile as writeProjectFile } from "../services/file-manager.js";
 import { parseMetroError } from "../services/log-watcher.js";
 import { planApp } from "./planner.js";
 import { generateFiles, regenerateFileWithContracts } from "./generator.js";
 import { editProject } from "./editor.js";
 import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
-import { validateGeneratedProject, validateFileContracts } from "./project-validator.js";
+import { validateGeneratedProject, validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
 
@@ -386,8 +386,15 @@ const _createProjectInner = async (
       let retries = 0;
 
       while (retries <= MAX_CONTRACT_RETRIES) {
-        const content = readProjectFile(projectSlug, fp);
+        let content = readProjectFile(projectSlug, fp);
         if (!content) break;
+
+        // Auto-heal import mismatches with regex before LLM retry
+        const healed = autoHealImportContracts(content, allContracts);
+        if (healed !== content) {
+          writeProjectFile(projectSlug, fp, healed);
+          content = healed;
+        }
 
         const violations = validateFileContracts(content, fp, allContracts);
         if (violations.length === 0) break;
