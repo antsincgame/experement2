@@ -59,7 +59,7 @@ const applyErrorState = (
     buildId?: string | null;
   } = {}
 ): void => {
-  if (options.clearPreview ?? true) {
+  if (options.clearPreview !== false) {
     store.setPreview(null, null);
   }
   store.setPreviewStatus("error", {

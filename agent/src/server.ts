@@ -240,7 +240,8 @@ const runQueuedOperation = <T>(
         sendSystemErrorToClient(
           clientId,
           error instanceof Error ? error.message : "Unknown error",
-          step
+          step,
+          eventScope
         );
       });
     });
@@ -398,7 +399,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           previewStatus: "starting",
         });
         waitForMetroReady(existingPort, 5)
-          .then((healthy) => {
+          .then((healthy) => runWithEventScope(previewEventScope, () => {
             if (healthy) {
               setPreviewPort(pName, existingPort);
               emitBuildScopedEvent({
@@ -435,8 +436,8 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
                 previewStatus: "error",
               });
             }
-          })
-          .catch((error) => {
+          }))
+          .catch((error) => runWithEventScope(previewEventScope, () => {
             const errorMessage = error instanceof Error
               ? error.message
               : "Failed to verify preview health";
@@ -457,7 +458,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
               status: "error",
               previewStatus: "error",
             });
-          });
+          }));
         return;
       }
 

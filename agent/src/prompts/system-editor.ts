@@ -45,7 +45,7 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 3. Minimize changes — do NOT rewrite entire files.
 4. For new files, output the full code.
 5. Do NOT wrap SEARCH/REPLACE blocks in markdown code fences.
-6. Use StyleSheet.create for styling in Expo runtime files unless the target file is clearly web-only HTML/CSS/JSX outside React Native.
+6. Use Tamagui inline props for ALL styling in Expo runtime files (app/**/*.tsx, src/**/*.tsx). Do NOT use StyleSheet.create.
 7. TypeScript strict — no \`any\`.
 8. FORBIDDEN: local binary assets. Use @expo/vector-icons or external URLs.
 9. Icons: \`import ${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}"\` (default import ONLY).
