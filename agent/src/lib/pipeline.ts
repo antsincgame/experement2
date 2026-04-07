@@ -318,6 +318,28 @@ const _createProjectInner = async (
     onChunk: (chunk) => emitOperation({ type: "plan_chunk", chunk }),
   });
 
+  // Auto-heal plan: add missing dependency files that are referenced but not in files[]
+  const planFilePaths = new Set(plan.files.map((f) => f.path));
+  for (const file of [...plan.files]) {
+    for (const dep of file.dependencies) {
+      if (!dep.startsWith("src/") && !dep.startsWith("app/")) continue;
+      if (planFilePaths.has(dep)) continue;
+      const inferredType = dep.includes("/hooks/") ? "hook"
+        : dep.includes("/stores/") ? "store"
+        : dep.includes("/types/") ? "type"
+        : dep.includes("/components/") ? "component"
+        : dep.includes("/lib/") ? "type"
+        : "component";
+      plan.files.push({
+        path: dep,
+        type: inferredType as "hook" | "store" | "type" | "component" | "screen",
+        description: `Auto-added: referenced by ${file.path}`,
+        dependencies: inferredType === "type" ? [] : ["src/types/index.ts"].filter((t) => planFilePaths.has(t) || dep !== t),
+      });
+      planFilePaths.add(dep);
+    }
+  }
+
   // Deduplicate project name
   projectSlug = plan.name;
   let suffix = 0;

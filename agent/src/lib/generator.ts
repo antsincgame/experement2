@@ -263,6 +263,65 @@ const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   result = result.replace(/import\s+.*from\s*["']solito[^"']*["'];?\n?/g, "");
   result = result.replace(/import\s+.*from\s*["']@motionone[^"']*["'];?\n?/g, "");
   result = result.replace(/import\s+.*from\s*["']react-native-reanimated["'];?\n?/g, "");
+  result = result.replace(/import\s+.*from\s*["']react-native-svg-charts["'];?\n?/g, "");
+
+  // 6. Replace MotiView/MotiText → Tamagui equivalents (moti removed above)
+  result = result.replace(/<MotiView\b/g, "<YStack animation=\"quick\"");
+  result = result.replace(/<\/MotiView>/g, "</YStack>");
+  result = result.replace(/<MotiText\b/g, "<Text animation=\"quick\"");
+  result = result.replace(/<\/MotiText>/g, "</Text>");
+  result = result.replace(/<AnimatePresence\b[^>]*>/g, "");
+  result = result.replace(/<\/AnimatePresence>/g, "");
+
+  // 7. Fix Haptics enum usage: string literal → enum member
+  result = result.replace(
+    /Haptics\.(impact|notification|selection)Async\(\s*["'](light|medium|heavy|success|warning|error)["']\s*\)/g,
+    (_match, method: string, style: string) => {
+      if (method === "impact") {
+        const enumMap: Record<string, string> = { light: "Light", medium: "Medium", heavy: "Heavy" };
+        return `Haptics.impactAsync(Haptics.ImpactFeedbackStyle.${enumMap[style] ?? "Medium"})`;
+      }
+      if (method === "notification") {
+        const enumMap: Record<string, string> = { success: "Success", warning: "Warning", error: "Error" };
+        return `Haptics.notificationAsync(Haptics.NotificationFeedbackType.${enumMap[style] ?? "Success"})`;
+      }
+      return `Haptics.selectionAsync()`;
+    }
+  );
+
+  // 8. Auto-add missing Tamagui imports (XStack, YStack, Text, etc. used in JSX but not imported)
+  const tamaguiComponents = ["XStack", "YStack", "ZStack", "Text", "Button", "Input", "ScrollView", "H1", "H2", "H3", "Paragraph", "Card", "Separator", "Switch", "Slider", "Sheet", "Dialog", "Image", "TextArea", "Select", "Label", "Spinner"];
+  const usedTamaguiComponents = tamaguiComponents.filter((comp) =>
+    new RegExp(`<${comp}[\\s>/]`).test(result)
+  );
+  if (usedTamaguiComponents.length > 0) {
+    const tamaguiImportMatch = result.match(/import\s*\{([^}]*)\}\s*from\s*["']tamagui["']/);
+    if (tamaguiImportMatch) {
+      const existing = tamaguiImportMatch[1].split(",").map((s: string) => s.trim()).filter(Boolean);
+      const missing = usedTamaguiComponents.filter((c) => !existing.includes(c));
+      if (missing.length > 0) {
+        const merged = [...new Set([...existing, ...missing])].sort();
+        result = result.replace(
+          /import\s*\{[^}]*\}\s*from\s*["']tamagui["']/,
+          `import { ${merged.join(", ")} } from "tamagui"`
+        );
+      }
+    } else if (usedTamaguiComponents.length > 0) {
+      result = `import { ${usedTamaguiComponents.join(", ")} } from "tamagui";\n` + result;
+    }
+  }
+
+  // 9. Cast Feather icon name variables to `as any` to prevent TS2322 on string types
+  // Pattern: name={someVariable} where someVariable is a string → name={someVariable as any}
+  result = result.replace(
+    /(<Feather[^>]*\bname=\{)([a-zA-Z_]\w*(?:\s*\?\s*"[^"]*"\s*:\s*"[^"]*")?)(\})/g,
+    (_match, prefix, expr, suffix) => {
+      // Skip if already cast or if it's a simple string literal
+      if (expr.includes(" as ")) return `${prefix}${expr}${suffix}`;
+      if (/^["']/.test(expr.trim())) return `${prefix}${expr}${suffix}`;
+      return `${prefix}${expr} as any${suffix}`;
+    }
+  );
 
   // ── End Silver Bullet ──
 
