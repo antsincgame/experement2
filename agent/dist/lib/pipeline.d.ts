@@ -3,8 +3,10 @@ interface CreateOptions {
     description: string;
     lmStudioUrl?: string;
     model?: string;
+    plannerModel?: string;
     temperature?: number;
     maxTokens?: number;
+    requestId?: string;
     onProjectNameResolved?: (projectName: string) => void;
 }
 interface CreateResult {
@@ -23,6 +25,7 @@ interface IterateOptions {
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    requestId?: string;
 }
 interface IterateResult {
     appliedBlocks: number;
@@ -31,6 +34,6 @@ interface IterateResult {
 }
 export declare const createProject: (options: CreateOptions) => Promise<CreateResult>;
 export declare const iterateProject: (options: IterateOptions) => Promise<IterateResult>;
-export declare const revertVersion: (projectName: string, commitHash: string, _lmStudioUrl?: string) => Promise<void>;
+export declare const revertVersion: (projectName: string, commitHash: string, _lmStudioUrl?: string, requestId?: string) => Promise<void>;
 export {};
 //# sourceMappingURL=pipeline.d.ts.map

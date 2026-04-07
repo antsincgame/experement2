@@ -13,7 +13,44 @@ const getScreenRouteName = (routePath: string): string => {
 const getScreenTitle = (screenName: string): string =>
   screenName.trim().length > 0 ? screenName.trim() : "Screen";
 
-const getScreenIcon = (icon?: string): string => icon?.trim() || "circle";
+const ALLOWED_ICONS = new Set([
+  "home", "settings", "user", "search", "plus", "minus", "x", "check",
+  "chevron-left", "chevron-right", "chevron-up", "chevron-down", "menu",
+  "star", "heart", "clock", "calendar", "list", "edit", "trash-2", "save",
+  "folder", "file-text", "image", "camera", "bell", "message-square", "mail",
+  "phone", "map-pin", "link", "external-link", "share-2", "download", "upload",
+  "cloud", "sun", "moon", "zap", "activity", "bar-chart-2", "pie-chart",
+  "trending-up", "dollar-sign", "credit-card", "shopping-cart", "tag",
+  "bookmark", "flag", "award", "gift", "music", "video", "play", "pause",
+  "square", "circle", "info", "alert-circle", "eye", "lock", "unlock",
+  "refresh-cw", "log-out", "globe", "hash", "grid", "layers", "filter",
+  "sliders", "tool", "target", "compass", "package", "coffee", "droplet",
+  "wind", "thermometer", "umbrella", "delete", "copy", "clipboard",
+]);
+
+const ICON_FALLBACKS: Record<string, string> = {
+  "calculator": "hash", "palette": "droplet", "heart-outline": "heart",
+  "home-outline": "home", "settings-outline": "settings", "trash-outline": "trash-2",
+  "add": "plus", "remove": "minus", "close": "x", "done": "check",
+  "money": "dollar-sign", "wallet": "credit-card", "clock-outline": "clock",
+  "timer": "clock", "stopwatch": "clock", "fitness": "activity",
+  "dumbbell": "activity", "weight": "activity", "water": "droplet",
+  "food": "coffee", "restaurant": "coffee", "document": "file-text",
+  "note": "file-text", "chart": "bar-chart-2", "graph": "trending-up",
+  "analytics": "bar-chart-2", "notification": "bell", "alarm": "bell",
+  "person": "user", "people": "user", "profile": "user", "account": "user",
+  "category": "grid", "history": "clock", "refresh": "refresh-cw",
+  "share": "share-2", "favorite": "star", "weather": "cloud",
+  "temp": "thermometer", "temperature": "thermometer", "pill": "heart",
+  "chef-hat": "coffee", "dice": "square", "leaf": "wind",
+  "book": "file-text", "brain": "zap", "pen": "edit",
+};
+
+const getScreenIcon = (icon?: string): string => {
+  const raw = icon?.trim() || "circle";
+  if (ALLOWED_ICONS.has(raw)) return raw;
+  return ICON_FALLBACKS[raw] ?? "circle";
+};
 
 export const getRootLayout = (
   _navigation: AppPlan["navigation"]

@@ -1,4 +1,4 @@
-// Defines strict Zod schemas for every HTTP and WebSocket payload, including model/runtime overrides.
+// Defines strict Zod schemas for every HTTP and WebSocket payload, including required request scoping.
 import path from "path";
 import { z } from "zod";
 const HTTP_PROTOCOLS = new Set(["http:", "https:"]);
@@ -37,6 +37,10 @@ export const ProjectFilePathSchema = trimmedString("path", 500)
 export const ProjectFileQuerySchema = z.object({
     path: ProjectFilePathSchema,
 });
+const RequestIdSchema = z.string().uuid("requestId must be a UUID");
+const WsRequestMetadataSchema = z.object({
+    requestId: RequestIdSchema,
+});
 const UserAssistantMessageSchema = z.object({
     role: z.enum(["user", "assistant"]),
     content: trimmedString("content", 50_000),
@@ -64,18 +68,19 @@ export const LlmCompleteBodySchema = z.object({
     model: OptionalModelSchema,
     lmStudioUrl: OptionalHttpUrlSchema,
 });
-const CommitHashSchema = z.string().trim().regex(/^[a-f0-9]{4,64}$/i, "commitHash must be a short git hash");
+const CommitHashSchema = z.string().trim().regex(/^[a-f0-9]{7,64}$/i, "commitHash must be a git hash (7-64 hex chars)");
 export const WsAbortGenerationSchema = z.object({
     type: z.literal("abort_generation"),
-});
+}).merge(WsRequestMetadataSchema);
 export const WsCreateProjectSchema = z.object({
     type: z.literal("create_project"),
     description: trimmedString("description", 20_000),
     lmStudioUrl: OptionalHttpUrlSchema,
     model: OptionalModelSchema,
+    plannerModel: OptionalModelSchema,
     temperature: z.number().min(0).max(2).optional(),
     maxTokens: z.number().int().positive().max(131_072).optional(),
-});
+}).merge(WsRequestMetadataSchema);
 export const WsIterateSchema = z.object({
     type: z.literal("iterate"),
     projectName: ProjectNameSchema,
@@ -87,20 +92,20 @@ export const WsIterateSchema = z.object({
     model: OptionalModelSchema,
     temperature: z.number().min(0).max(2).optional(),
     maxTokens: z.number().int().positive().max(131_072).optional(),
-});
+}).merge(WsRequestMetadataSchema);
 export const WsStartPreviewSchema = z.object({
     type: z.literal("start_preview"),
     projectName: ProjectNameSchema,
     lmStudioUrl: OptionalHttpUrlSchema,
     model: OptionalModelSchema,
-});
+}).merge(WsRequestMetadataSchema);
 export const WsRevertVersionSchema = z.object({
     type: z.literal("revert_version"),
     projectName: ProjectNameSchema,
     commitHash: CommitHashSchema,
     lmStudioUrl: OptionalHttpUrlSchema,
     model: OptionalModelSchema,
-});
+}).merge(WsRequestMetadataSchema);
 export const WsMessageSchema = z.discriminatedUnion("type", [
     WsAbortGenerationSchema,
     WsCreateProjectSchema,

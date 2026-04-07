@@ -59,6 +59,8 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
     that types file MUST be listed in the \`dependencies\` array of the file using it.
     Usually, ALMOST ALL components, hooks, and stores should have "src/types/index.ts" in their dependencies array.
 15. Icons: use ${ICON_CONTRACT.packageName} with DEFAULT import (${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}")
+    ICON NAMES MUST BE ONE OF: home, settings, user, search, plus, star, heart, clock, calendar, list, edit, trash-2, file-text, image, bell, mail, map-pin, cloud, zap, activity, bar-chart-2, pie-chart, dollar-sign, shopping-cart, tag, bookmark, award, music, play, square, circle, hash, grid, layers, filter, coffee, droplet, thermometer, eye, lock, globe, compass, gift, flag.
+    DO NOT invent icon names like "calculator", "chef-hat", "palette", "pill", "dice", "leaf", "brain". Use the closest match from the list above.
 16. Supported navigation types only: ${SUPPORTED_NAVIGATION_TYPES.join(", ")}
 17. navigation.screens[].path is REQUIRED and must point to a file in files[]
 18. navigation.screens[].name is the HUMAN-READABLE screen title. navigation.screens[].path defines the actual route segment and must match the generated file path. For file "app/(tabs)/settings.tsx", path stays "app/(tabs)/settings.tsx" while name can be "Settings".

@@ -1,1 +1,1 @@
-{"version":3,"file":"preview-proxy.d.ts","sourceRoot":"","sources":["../../src/services/preview-proxy.ts"],"names":[],"mappings":"AAAA,OAAO,EAAyB,KAAK,cAAc,EAAE,MAAM,uBAAuB,CAAC;AAEnF,eAAO,MAAM,kBAAkB,GAAI,YAAY,MAAM,KAAG,cA4BpD,CAAC"}
+{"version":3,"file":"preview-proxy.d.ts","sourceRoot":"","sources":["../../src/services/preview-proxy.ts"],"names":[],"mappings":"AAAA,OAAO,EAAyB,KAAK,cAAc,EAAE,MAAM,uBAAuB,CAAC;AAEnF,eAAO,MAAM,kBAAkB,GAAI,YAAY,MAAM,EAAE,cAAc,MAAM,KAAG,cA4B1E,CAAC"}

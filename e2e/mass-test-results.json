@@ -523,5 +523,186 @@
         ]
       }
     ]
+  },
+  {
+    "index": 13,
+    "name": "Habit tracker with streaks",
+    "originalPrompt": "Habit tracker with streaks",
+    "enhancedPrompt": "Build a high-performance Habit Tracker focused on streak retention and visual momentum using Expo Router and Zustand for real-time state synchronization. Utilize Tamagui v2's `YStack` and `XStack` with `Separator` to create a clean, tiered dashboard featuring habit cards that use `pressStyle={{ scale: 0.97 }}` for tactile satisfaction. Implement `Progress` bars for daily completion rates and a `Tabs` interface to toggle between \"Today,\" \"Weekly Trends,\" and \"Achievements.\" Integrate `BottomSheet` with snap points for quick habit logging, complemented by `Toast` notifications for streak milestones and `expo-haptics` for physical feedback on every completion. Ensure all new habits enter the list using Moti-style declarative animations (`enterStyle={{ opacity: 0, y: 10 }}`) and use `ThemeInverse` sections to highlight high-priority streaks.",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/habitStore.ts",
+      "src/hooks/useHabits.ts",
+      "src/components/HabitCard.tsx",
+      "src/components/ProgressIndicator.tsx",
+      "src/components/TrendChart.tsx",
+      "src/components/AchievementCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/trends.tsx",
+      "app/(tabs)/achievements.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/TrendChart.tsx(44,7): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) =>"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 108.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ],
+    "requestId": "0488b811-5cdb-4231-bddb-baeca4f57a4b",
+    "errorRecords": [
+      {
+        "category": "typescript_ts2769",
+        "signature": "TS2769:src/components/TrendChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>, '(props: AbstractChartProps & LineChartProps): LineChart', gave the follo",
+        "sample": "Typecheck failed:\nsrc/components/TrendChart.tsx(44,7): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) =>",
+        "sanitized": "Typecheck failed: src/components/TrendChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error. Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) =>",
+        "tsCodes": [
+          "TS2769"
+        ]
+      }
+    ]
+  },
+  {
+    "index": 14,
+    "name": "Recipe book app",
+    "originalPrompt": "Recipe book app",
+    "enhancedPrompt": "Build a premium, tactile Recipe Book app using Tamagui v2, featuring a high-performance feed of recipe cards built with YStack/XStack and ZStack depth effects for visual hierarchy. Implement a seamless \"Cooking Mode\" utilizing a full-screen overlay with ThemeInverse, featuring a Progress component for step tracking and Moti-driven enterStyle animations for ingredient lists. Use a Bottom Sheet with snap points for detailed nutritional breakdowns and an interactive Select component for category filtering. Integrate Zustand for real-time shopping list synchronization and apply pressStyle={{ scale: 0.97 }} combined with expo-haptics on all actionable elements to ensure physical, responsive feedback. The navigation must use Expo Router with fluid transitions between a Tabbed dashboard (Recipes, Planner, Groceries) and detailed recipe views.",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [
+      "Plan validation failed: app/(tabs)/planner.tsx: dependency \"src/components/MealPlanner.tsx\" is missing from plan.files"
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 17.3,
+    "events": [
+      "planning",
+      "error"
+    ],
+    "requestId": "6dcf1808-cd40-4798-888a-3d8bad74c8df",
+    "errorRecords": []
+  },
+  {
+    "index": 15,
+    "name": "Workout log tracker",
+    "originalPrompt": "Workout log tracker",
+    "enhancedPrompt": "Workout log tracker",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/workoutStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useWorkouts.ts",
+      "src/components/WorkoutCard.tsx",
+      "src/components/WorkoutList.tsx",
+      "src/components/AddWorkoutForm.tsx",
+      "src/components/SettingsCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/workouts.tsx",
+      "app/(tabs)/add-workout.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/stores/workoutStore.ts(104,9): error TS2349: This expression is not callable.\r\n  Type 'Omit<Set, \"id\">' has no call signatures.\r\nsrc/stores/workoutStore.ts(104,14): error TS7006: Parameter 'state' implicitly has an 'any' type.\r\nsrc/stores/workoutStore.ts(105,41): error TS7006: "
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 120.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ],
+    "requestId": "ae96d600-bf42-4b31-b3b8-1b899a917e86",
+    "errorRecords": [
+      {
+        "category": "typescript_ts2349",
+        "signature": "TS2349:src/stores/workoutStore.ts(line,col): error TS2349: This expression is not callable. Type 'Omit<Set, \"id\">' has no call signatures. src/stores/workoutStore.ts(line,col): error TS70",
+        "sample": "Typecheck failed:\nsrc/stores/workoutStore.ts(104,9): error TS2349: This expression is not callable.\r\n  Type 'Omit<Set, \"id\">' has no call signatures.\r\nsrc/stores/workoutStore.ts(104,14): error TS7006: Parameter 'state' implicitly has an 'any' type.\r\nsrc/stores/workoutStore.ts(105,41): error TS7006: ",
+        "sanitized": "Typecheck failed: src/stores/workoutStore.ts(line,col): error TS2349: This expression is not callable. Type 'Omit<Set, \"id\">' has no call signatures. src/stores/workoutStore.ts(line,col): error TS7006: Parameter 'state' implicitly has an 'any' type. src/stores/workoutStore.ts(line,col): error TS7006:",
+        "tsCodes": [
+          "TS2349",
+          "TS7006"
+        ]
+      }
+    ]
+  },
+  {
+    "index": 16,
+    "name": "Mood diary with calendar",
+    "originalPrompt": "Mood diary with calendar",
+    "enhancedPrompt": "Build \"Sentience,\" a high-fidelity emotional tracking ecosystem featuring seamless Expo Router navigation between a panoramic Monthly Calendar and detailed Daily Logs. Implement the daily entry interface using Tamagui YStack layouts with Slider components for mood intensity, utilizing pressStyle={{ scale: 0.97 }} and expo-haptics to create deeply tactile interaction loops. Use a BottomSheet with defined snap points for rapid emoji-based logging, paired with declarative",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/logsStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useCalendar.ts",
+      "src/hooks/useLogs.ts",
+      "src/components/CalendarView.tsx",
+      "src/components/DailyLogs.tsx",
+      "src/components/EmotionEntryForm.tsx",
+      "src/components/QuickLogBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/logs.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/DailyLogs.tsx(19,6): error TS2554: Expected 0-1 arguments, but got 2.\r\nsrc/components/QuickLogBottomSheet.tsx(2,40): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'."
+    ],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 116.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ],
+    "requestId": "5c25f018-0261-46fc-8cb6-78bc8819e6e2",
+    "errorRecords": [
+      {
+        "category": "typescript_ts2554",
+        "signature": "TS2554:src/components/DailyLogs.tsx(line,col): error TS2554: Expected <n>-<n> arguments, but got <n>. src/components/QuickLogBottomSheet.tsx(line,col): error TS2305: Module '\"tamagui\"' ha",
+        "sample": "Typecheck failed:\nsrc/components/DailyLogs.tsx(19,6): error TS2554: Expected 0-1 arguments, but got 2.\r\nsrc/components/QuickLogBottomSheet.tsx(2,40): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'.",
+        "sanitized": "Typecheck failed: src/components/DailyLogs.tsx(line,col): error TS2554: Expected <n>-<n> arguments, but got <n>. src/components/QuickLogBottomSheet.tsx(line,col): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'.",
+        "tsCodes": [
+          "TS2554",
+          "TS2305"
+        ]
+      }
+    ]
+  },
+  {
+    "index": 17,
+    "name": "Book reading tracker",
+    "originalPrompt": "Book reading tracker",
+    "enhancedPrompt": "Book reading tracker",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [],
+    "autofixes": 0,
+    "contractViolations": 0,
+    "timeSeconds": 17.9,
+    "events": [
+      "planning",
+      "error"
+    ],
+    "requestId": "3b99d50b-fe73-4554-8268-1de6b64965dd",
+    "errorRecords": []
   }
 ]

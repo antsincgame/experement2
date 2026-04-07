@@ -1,7 +1,7 @@
 import { z } from "zod";
 export declare const EditActionSchema: z.ZodObject<{
     thinking: z.ZodString;
-    action: z.ZodEnum<["read_files", "no_changes_needed"]>;
+    action: z.ZodEnum<["read_files", "no_changes_needed", "install_package"]>;
     files: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
     newFiles: z.ZodDefault<z.ZodArray<z.ZodObject<{
         path: z.ZodString;
@@ -18,7 +18,7 @@ export declare const EditActionSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     files: string[];
     thinking: string;
-    action: "read_files" | "no_changes_needed";
+    action: "read_files" | "no_changes_needed" | "install_package";
     newFiles: {
         path: string;
         description: string;
@@ -27,7 +27,7 @@ export declare const EditActionSchema: z.ZodObject<{
     newDependencies: string[];
 }, {
     thinking: string;
-    action: "read_files" | "no_changes_needed";
+    action: "read_files" | "no_changes_needed" | "install_package";
     files?: string[] | undefined;
     newFiles?: {
         path: string;

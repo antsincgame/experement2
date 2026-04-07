@@ -1,0 +1,1625 @@
+[
+  {
+    "index": 1,
+    "name": "Simple calculator with history",
+    "description": "Create a premium, tactile calculator application leveraging Tamagui v2's advanced layout engine with YStack and XStack structures for a structured keypad. Implement highly responsive buttons using pressStyle={{ scale: 0.95 }} combined with `expo-haptics` to provide physical feedback on every interaction. Use a ZStack-driven Bottom Sheet to reveal a persistent calculation history managed via Zustand, allowing users to swipe up for detailed logs. Integrate Moti animations with `enterStyle={{ opacity: 0, y: 10 }}` so that new results and historical entries appear with fluid, bouncy transitions. Enhance the interface with Tamagui Select for toggling between basic and scientific modes and use Toast components for error notifications and history management feedback.",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/calculatorStore.ts",
+      "src/stores/historyStore.ts",
+      "src/hooks/useCalculator.ts",
+      "src/hooks/useHistory.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/CalculatorDisplay.tsx",
+      "src/components/Keypad.tsx",
+      "src/components/ModeToggle.tsx",
+      "src/components/HistoryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [
+      "Contract violations in src/hooks/useCalculator.ts after 2 retries: Hook 'useCalculatorStore' does not return key 'displayValue'. Available: [setInputValue, setDisplayValue, setOperator, setPreviousValue, setIsCalculated, setMode, clear, clearEntry, toggleSign, percentage, calculate, handleNumberInput, handleOperatorInput, handleEquals, handleDecimal]; Hook 'useCalculatorStore' does not return key 'inputValue'. Available: [setInputValue, setDisplayValue, setOperator, setPreviousValue, setIsCalcul",
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/components/HistoryList.tsx(70,15): error TS2322: Type '{ children: Element[]; backgroundColor: \"$surface\"; borderRadius: \"$4\"; padding: \"$4\"; onPress: () => void | undefined"
+    ],
+    "autofixAttempts": 3,
+    "autofixSuccesses": 0,
+    "timeSeconds": 105.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 2,
+    "name": "Todo list with categories and priority",
+    "description": "Create a high-performance task management ecosystem featuring hierarchical categorization and multi-level priority weighting using Zustand for lightning-fast state synchronization. The interface will utilize Tamagui `YStack` layouts with `Separator` components, employing `ThemeInverse` on high-priority cards to create immediate visual urgency. Implement a tactile `BottomSheet` for task creation, integrating a Tamagui `Select` for category assignment and a `Slider` for granular priority levels (1-5), all featuring `pressStyle={{ scale: 0.96 }}` for physical responsiveness. Use Expo Router for fluid navigation between dashboard views, paired with `animation=\"bouncy\"` and `enterStyle={{ opacity: 0, y: 10 }}` for smooth task mounting/unmounting. Every interaction must be reinforced with `expo-haptics` and `Toast` notifications to ensure a premium,",
+    "status": "error",
+    "filesGenerated": 19,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/taskStore.ts",
+      "src/stores/categoryStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTasks.ts",
+      "src/hooks/useCategories.ts",
+      "src/hooks/useSettings.ts",
+      "src/hooks/useHaptics.ts",
+      "src/hooks/useToast.ts",
+      "src/components/TaskCard.tsx",
+      "src/components/CategoryTree.tsx",
+      "src/components/CategoryFilter.tsx",
+      "src/components/TaskBottomSheet.tsx",
+      "src/components/ThemeSelector.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/categories.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/categories.tsx(73,17): error TS2322: Type '{ children: string; flex: number; fontSize: \"$3\"; color: \"$primaryText\"; onChangeText: Dispatch<SetStateAction<string>>; value: string; }' is not assignable to type 'IntrinsicAttributes & Omit<RNTamaguiTextNonStyleProps, keyof TextStylePropsBase | \"unstyled\"> & ... 5 more ... & RefAttributes<...>'.\r\n  Property 'onChangeText' does not exist on type 'IntrinsicAttributes & Omit<RNTamaguiTextNonStyleProps, keyof TextStylePropsBa"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 142.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 3,
+    "name": "Pomodoro timer with session tracking",
+    "description": "Pomodoro timer with session tracking",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timerStore.ts",
+      "src/stores/sessionStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/usePomodoroTimer.ts",
+      "src/hooks/useSessionHistory.ts",
+      "src/components/PomodoroTimer.tsx",
+      "src/components/SessionHistory.tsx",
+      "src/components/TimerSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/settings.tsx after 2 retries: 'TimerSettings' imported as default but is a named export",
+      "Typecheck failed:\nsrc/hooks/usePomodoroTimer.ts(64,34): error TS2304: Cannot find name 'isRunning'.\r\nsrc/hooks/usePomodoroTimer.ts(74,7): error TS2304: Cannot find name 'isRunning'.\r\nsrc/hooks/usePomodoroTimer.ts(74,18): error TS2304: Cannot find name 'timeLeft'.\r\nsrc/hooks/usePomodoroTimer.ts(77,31): error TS2304: Cannot find name 'timeLeft'.\r\nsrc/stores/timerStore.ts(48,13): error TS2339: Property 'workDuration' does not exist on type 'TimerStore'.\r\nsrc/stores/timerStore.ts(48,27): error TS233"
+    ],
+    "autofixAttempts": 5,
+    "autofixSuccesses": 0,
+    "timeSeconds": 115.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 4,
+    "name": "Note taking app with search",
+    "description": "ZenNotes: A high-performance, tactile note-taking ecosystem featuring a fluid dashboard built with Tamagui `YStack` and `Separator` components for clean content hierarchy. Implement a lightning-fast search experience using an `Expo Router` modal with `ThemeInverse` for deep focus, utilizing `BottomSheet` snap points for advanced tag filtering via `ToggleGroup`. Every interaction—from note selection to deletion—must leverage `pressStyle={{ scale: 0.97 }}` and `expo-haptics` for physical resonance. Ensure smooth list transitions using declarative `enterStyle={{ opacity: 0, y: 10 }}` animations and use `Zustand` for instantaneous state synchronization across the app. Deliver a polished UI with `Toast` feedback for all CRUD operations and an `Accordion` interface for organized folder management.",
+    "status": "error",
+    "filesGenerated": 21,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/noteStore.ts",
+      "src/stores/searchStore.ts",
+      "src/stores/folderStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useNotes.ts",
+      "src/hooks/useSearch.ts",
+      "src/hooks/useFolders.ts",
+      "src/hooks/useHaptics.ts",
+      "src/hooks/useToast.ts",
+      "src/components/Dashboard.tsx",
+      "src/components/SearchModal.tsx",
+      "src/components/NoteCard.tsx",
+      "src/components/TagFilter.tsx",
+      "src/components/FolderAccordion.tsx",
+      "src/components/SettingsPanel.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx",
+      "app/modal/search.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nProperty 'onTagToggle' does not exist on type 'IntrinsicAttributes & TagFilterProps'.\r\napp/modal/search.tsx(115,29): error TS7006: Parameter 'tag' implicitly has an 'any' type.\r\nsrc/components/Dashboard.tsx(82,17): error TS2322: Type '{ key: string; folder: Folder; onPress: () => void; }' is not assignable to type 'IntrinsicAttributes & FolderAccordionProps'.\r\n  Property 'folder' does not exist on type 'IntrinsicAttributes & FolderAccordionProps'. Did you mean 'folders'?\r\nsrc/c"
+    ],
+    "autofixAttempts": 2,
+    "autofixSuccesses": 0,
+    "timeSeconds": 163.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 5,
+    "name": "Unit converter for length, weight, temperature",
+    "description": "Unit converter for length, weight, temperature",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/converterStore.ts",
+      "src/hooks/useConverter.ts",
+      "src/components/ConverterCard.tsx",
+      "src/lib/conversionUtils.ts",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/components/ConverterCard.tsx(61,13): error TS2322: Type '{ children: Element[]; value: string; onValueChange: (value: string) => void; width: number; }' is not assignable to"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 68,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 6,
+    "name": "Tip calculator with split bill",
+    "description": "Tip calculator with split bill",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useBillCalculator.ts",
+      "src/components/BillInputSection.tsx",
+      "src/components/TipCalculationCard.tsx",
+      "src/components/SplitBillSection.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\napp/(tabs)/index.tsx(23,47): error TS2554: Expected 0 arguments, but got 2.\r\napp/(tabs)/index.tsx(39,29): error TS2739: Type '{ billData: BillData; tipSettings: TipSettings; cal"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 77.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 7,
+    "name": "Expense tracker with pie chart",
+    "description": "Build a high-fidelity Expense Tracker utilizing Tamagui v2 and Zustand to manage real-time financial flows via Expo Router. The dashboard must feature an interactive, layered ZStack pie chart with integrated Progress components for granular category breakdowns. Implement a tactile transaction entry system using Bottom Sheets with snap points, leveraging pressStyle={{ scale: 0.97 }} and expo-haptics for physical feedback on every interaction. Use XStack layouts with Separators for the transaction feed, applying animation=\"bouncy\" with enterStyles to all new list entries for fluid motion. Deliver a premium experience using ThemeInverse sections for budget alerts and Toast notifications for real-time overspending warnings.",
+    "status": "error",
+    "filesGenerated": 19,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/transactionStore.ts",
+      "src/stores/budgetStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTransactions.ts",
+      "src/hooks/useBudgets.ts",
+      "src/components/DashboardHeader.tsx",
+      "src/components/CategoryPieChart.tsx",
+      "src/components/TransactionFeed.tsx",
+      "src/components/TransactionList.tsx",
+      "src/components/BudgetOverview.tsx",
+      "src/components/SettingsForm.tsx",
+      "src/components/AddTransactionBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/transactions.tsx",
+      "app/(tabs)/budgets.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(16,55): error TS2552: Cannot find name 'Transaction'. Did you mean 'IDBTransaction'?\r\napp/(tabs)/index.tsx(43,9): error TS2322: Type '{ open: boolean; setOpen: Dispatch<SetStateAction<boolean>>; onSubmit: (transactionData: Omit<Transaction, \"id\">) => void; }' is not assignable to type 'IntrinsicAttributes & AddTransactionBottomSheetProps'.\r\n  Property 'onSubmit' does not exist on type 'IntrinsicAttributes & AddTransactionBottomSheetProps'.\r\nsrc/components/C"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 133.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 8,
+    "name": "Habit tracker with daily streaks",
+    "description": "Habit tracker with daily streaks",
+    "status": "error",
+    "filesGenerated": 16,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/habitStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useHabits.ts",
+      "src/hooks/useStats.ts",
+      "src/components/HabitList.tsx",
+      "src/components/HabitItem.tsx",
+      "src/components/HabitForm.tsx",
+      "src/components/StatsChart.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/stats.tsx",
+      "app/(tabs)/add.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/settings.tsx(13,40): error TS2304: Cannot find name 'SettingsState'.\r\nsrc/components/SettingsForm.tsx(2,15): error TS2459: Module '\"@/stores/settingsStore\"' declares 'SettingsState' locally, but it is not exported.\r\nsrc/components/StatsChart.tsx(116,9): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; "
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 102.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 9,
+    "name": "Water intake tracker with daily goal",
+    "description": "Water intake tracker with daily goal",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/waterStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useWaterIntake.ts",
+      "src/hooks/useSettings.ts",
+      "src/components/ProgressCard.tsx",
+      "src/components/WaterLogList.tsx",
+      "src/components/GoalSettings.tsx",
+      "src/components/ReminderSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 197,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "error"
+    ]
+  },
+  {
+    "index": 10,
+    "name": "BMI calculator with result history",
+    "description": "BMI calculator with result history",
+    "status": "error",
+    "filesGenerated": 10,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/bmiStore.ts",
+      "src/hooks/useBMICalculator.ts",
+      "src/hooks/useBMIHistory.ts",
+      "src/components/BMICalculatorForm.tsx",
+      "src/components/HistoryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [
+      "Contract violations in src/hooks/useBMIHistory.ts after 2 retries: Hook 'useBMIStore' does not return key 'history'. Available: [setWeight, setHeight, calculateBMI, clearCalculation, addHistoryItem, clearHistory]",
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'."
+    ],
+    "autofixAttempts": 3,
+    "autofixSuccesses": 0,
+    "timeSeconds": 75.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 11,
+    "name": "Workout log with exercise sets and reps",
+    "description": "Build a high-performance, tactile workout logger using Tamagui v2 and Zustand to manage real-time session state. The UI must feature an elegant `YStack` dashboard with `ThemeInverse` cards for active sessions, utilizing `XStack` rows with `Separator` components to list exercises, reps, and weight. Implement a fluid `BottomSheet` with snap points for rapid exercise selection and a `Dialog` for managing workout history. Leverage `pressStyle={{ scale: 0.97 }}` on all set-completion toggles and integrate `expo-haptics` for physical feedback upon finishing a set. Use Moti-driven `enterStyle={{ opacity: 0, y: 10 }}` animations for adding new sets to create a premium, responsive feel.",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/workoutStore.ts",
+      "src/stores/historyStore.ts",
+      "src/hooks/useWorkoutSession.ts",
+      "src/hooks/useWorkoutHistory.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/DashboardScreen.tsx",
+      "src/components/HistoryScreen.tsx",
+      "src/components/ExerciseCard.tsx",
+      "src/components/BottomSheetSelector.tsx",
+      "src/components/WorkoutHistoryDialog.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/DashboardScreen.tsx(123,19): error TS2322: Type '{ key: string; exercise: Exercise; onRemove: () => void; onAddSet: (set: any) => void; onToggleSetCompletion: (setId: string) => void; onUpdateExerciseName: (name: string) => void; onUpdateSetReps: (setId: string, reps: string) => void; onUpdateSetWeight: (setId: string, weight: string) => void; }' is not assignable to type 'IntrinsicAttributes & ExerciseCardProps'.\r\n  Property 'onRemove' does not exist on type 'In"
+    ],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 119.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 12,
+    "name": "Meal calorie counter",
+    "description": "Meal calorie counter",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/calorieStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useCalorieTracker.ts",
+      "src/components/CalorieSummaryCard.tsx",
+      "src/components/MealLogForm.tsx",
+      "src/components/MealHistoryList.tsx",
+      "src/components/UserGoalForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(62,20): error TS2552: Cannot find name 'XStack'. Did you mean 'YStack'?\r\napp/(tabs)/index.tsx(65,21): error TS2552: Cannot find name 'XStack'. Did you mean 'YStack'?\r\nsrc/components/MealLogForm.tsx(26,7): error TS2353: Object literal may only specify known properties, and 'timestamp' does not exist in type 'Omit<Meal, \"id\" | \"timestamp\">'.\r\nsrc/components/MealLogForm.tsx(33,9): error TS1345: An expression of type 'void' cannot be tested for truthiness.\r\nsrc"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 87.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 13,
+    "name": "Sleep quality tracker with weekly chart",
+    "description": "Sleep quality tracker with weekly chart",
+    "status": "error",
+    "filesGenerated": 10,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/sleepDataStore.ts",
+      "src/stores/sleepSettingsStore.ts",
+      "src/hooks/useSleepData.ts",
+      "src/components/SleepTrackerCard.tsx",
+      "src/components/WeeklyChart.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/SleepTrackerCard.tsx(123,11): error TS2322: Type '\"date\"' is not assignable to type 'KeyboardTypeOptions | undefined'.\r\nsrc/components/SleepTrackerCard.tsx(134,11): error TS2322: Type '\"time\"' is not assignable to type 'KeyboardTypeOptions | undefined'.\r\nsrc/components/SleepTrackerCard.tsx(145,11): error TS2322: Type '\"time\"' is not assignable to type 'KeyboardTypeOptions | undefined'.\r\nsrc/components/SleepTrackerCard.tsx(154,11): error TS2322: Type 'number' is n"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 82.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 14,
+    "name": "Mood diary with emoji ratings",
+    "description": "Mood diary with emoji ratings",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/moodStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useMoodEntries.ts",
+      "src/components/MoodTracker.tsx",
+      "src/components/RecentEntries.tsx",
+      "src/components/CalendarView.tsx",
+      "src/components/MoodChart.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/entries.tsx",
+      "app/(tabs)/stats.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/MoodChart.tsx(3,37): error TS7016: Could not find a declaration file for module 'react-native-svg-charts'. 'D:/experement2/workspace/mood-diary/node_modules/react-native-svg-charts/lib/module/index.js' implicitly has an 'any' type.\r\n  Try `npm i --save-dev @types/react-native-svg-charts` if it exists or add a new declaration (.d.ts) file containing `declare module 'react-native-svg-charts';`\r\nsrc/components/MoodChart.tsx(4,24): error TS7016: Could not find a decl"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 107.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 15,
+    "name": "Step counter dashboard",
+    "description": "Build a high-performance, tactile Step Counter Dashboard using Tamagui v2 and Zustand for real-time activity syncing. The UI must feature a central, animated Progress ring with Moti-driven enterStyle={{ opacity: 0, scale: 0.8 }} and an XStack of metric cards utilizing pressStyle={{ scale: 0.97 }} for physical depth. Implement a file-based Expo Router structure featuring a detailed analytics screen with Tabs and an Accordion for weekly breakdowns. Use a Tamagui Bottom Sheet with snap points to house a Goal Configuration interface, integrating a Slider for precise target adjustments and expo-haptics for every incremental change. Deliver a premium experience using ThemeInverse sections for high-contrast daily summaries and Toast notifications for milestone celebrations.",
+    "status": "error",
+    "filesGenerated": 17,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/stepStore.ts",
+      "src/stores/analyticsStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useStepCounter.ts",
+      "src/hooks/useAnalytics.ts",
+      "src/hooks/useSettings.ts",
+      "src/components/ProgressRing.tsx",
+      "src/components/MetricCard.tsx",
+      "src/components/AnalyticsTabs.tsx",
+      "src/components/WeeklyBreakdown.tsx",
+      "src/components/GoalConfigSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/analytics.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/MetricCard.tsx(65,18): error TS2322: Type 'string' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/components/ProgressRing.tsx(23,28): error TS2304: Cannot find name 'useDerivedValue'.\r\nsrc/components/ProgressRing.tsx(27,25): error TS2552: Cannot find name 'useAnimatedPr"
+    ],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 114.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 16,
+    "name": "Meditation timer with bell sound",
+    "description": "Design a high-end, minimalist meditation app called \"Aura\" powered by Tamagui v2 and Zustand for seamless state management. The central interface must feature a breathing-sync timer using YStack layouts, with interactive buttons utilizing pressStyle={{ scale: 0.97 }} and expo-haptics for deep tactile engagement during bell triggers. Implement an advanced configuration layer via a BottomSheet with snap points to adjust interval bells and ambient soundscapes, alongside a ThemeInverse section for high-contrast session summaries. Use Moti-style declarative animations (enterStyle={{ opacity: 0, y: 10 }}) for all screen transitions and utilize Tamagui Progress and Tabs components to visualize meditation streaks and historical data.",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timerStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/stores/streakStore.ts",
+      "src/hooks/useBreathingTimer.ts",
+      "src/hooks/useHaptics.ts",
+      "src/hooks/useStreakData.ts",
+      "src/components/BreathingTimer.tsx",
+      "src/components/BottomSheetConfig.tsx",
+      "src/components/MediationHistoryTabs.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/BreathingTimer.tsx(43,21): error TS2345: Argument of type '\"medium\"' is not assignable to parameter of type 'ImpactFeedbackStyle'.\r\nsrc/components/BreathingTimer.tsx(57,21): error TS2345: Argument of type '\"light\"' is not assignable to parameter of type 'ImpactFeedbackStyle'.\r\nsrc/components/BreathingTimer.tsx(66,19): error TS2345: Argument of type '\"light\"' is not assignable to parameter of type 'ImpactFeedbackStyle'.\r\nsrc/components/BreathingTimer.tsx(126,8): e"
+    ],
+    "autofixAttempts": 4,
+    "autofixSuccesses": 0,
+    "timeSeconds": 134.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 17,
+    "name": "Daily gratitude journal",
+    "description": "Build a premium daily gratitude journal app using Tamagui v2 and Zustand, featuring a fluid, meditative feed built with YStack/XStack layouts and smooth Moti-style entry animations (enterStyle={{ opacity: 0, y: 10 }}). Implement a highly tactile interface where journal cards use pressStyle={{ scale: 0.97 }} and interactive mood tracking via a custom Slider component. Use a Bottom Sheet with snap points for the \"New Entry\" workflow, incorporating a Select dropdown for daily themes and an Accordion for viewing past reflections. Integrate Expo Router for seamless navigation between the Daily Feed, Mood Analytics, and Settings screens, ensuring every interaction triggers subtle expo-haptics and Toast feedback upon saving entries.",
+    "status": "error",
+    "filesGenerated": 16,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/gratitudeStore.ts",
+      "src/stores/moodStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useGratitudeEntries.ts",
+      "src/hooks/useMoodData.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/GratitudeCard.tsx",
+      "src/components/MoodTracker.tsx",
+      "src/components/NewEntryBottomSheet.tsx",
+      "src/components/MoodChart.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/analytics.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nOverload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) => string; strokeWidth: number; }[]; }; width: number; height: number; chartConfig: { backgroundColor: string; backgroundGradientFrom: string; ... 5 more ...; propsForDots: { ...; }; }; ... 5 more ...; style: { ...; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAt"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 132.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 18,
+    "name": "Blood pressure log with trend chart",
+    "description": "Develop a high-fidelity Blood Pressure Tracker using Expo Router and Zustand for real-time metric synchronization. The dashboard must feature a sophisticated trend chart housed within a Tamagui YStack, utilizing <ThemeInverse> to highlight hypertensive alerts. Implement a highly tactile entry system via a Bottom Sheet with snap points, leveraging Tamagui Select and Slider components with pressStyle={{ scale: 0.97 }} for",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/bloodPressureStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useBloodPressureData.ts",
+      "src/components/DashboardCard.tsx",
+      "src/components/TrendChart.tsx",
+      "src/components/BottomSheetEntry.tsx",
+      "src/components/SettingsForm.tsx",
+      "src/components/HistoryList.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(45,9): error TS2322: Type '{ open: boolean; setOpen: Dispatch<SetStateAction<boolean>>; onSave: (reading: Omit<BloodPressureReading, \"id\" | \"timestamp\">) => void; }' is not assignable to type 'IntrinsicAttributes & BottomSheetEntryProps'.\r\n  Property 'onSave' does not exist on type 'IntrinsicAttributes & BottomSheetEntryProps'.\r\nsrc/components/SettingsForm.tsx(59,13): error TS2322: Type '(unit: \"mmHg\" | \"kPa\") => void' is not assignable to type '(checked: b"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 114.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 19,
+    "name": "Pill reminder with schedule list",
+    "description": "Build a premium medication management system featuring a high-fidelity dashboard with a YStack schedule, utilizing Separator components to distinguish between upcoming and completed doses. Implement interactive dose cards using Tamagui's pressStyle={{ scale: 0.97 }} and expo-haptics for tactile confirmation upon marking medication as taken. Use an advanced BottomSheet with snap points to house a sophisticated medication creation flow, integrating Select dropdowns and Slider components for dosage adjustments. Incorporate fluid motion via enterStyle={{ opacity: 0, y: 10 }} for all list items and a Progress bar at the top to visualize daily adherence levels. Leverage Zustand for real-time state synchronization of pill inventory and schedule updates, paired with Toast alerts for critical dose reminders.",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/medicationStore.ts",
+      "src/hooks/useMedicationSchedule.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/DashboardHeader.tsx",
+      "src/components/ScheduleList.tsx",
+      "src/components/DoseCard.tsx",
+      "src/components/ProgressCard.tsx",
+      "src/components/MedicationInventory.tsx",
+      "src/components/ProgressBar.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(21,22): error TS2322: Type '\"pill\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/components/DashboardHeader.tsx(22,22): error TS2322: Type 'number' is not assignable to type 'ProgressData'.\r\nsrc/components/ProgressCard.tsx(22,20): error TS2322: Type 'number' i"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 93.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 20,
+    "name": "Yoga pose library with favorites",
+    "description": "Create \"AsanaFlow,\" a premium yoga pose encyclopedia featuring a categorized library and personalized favorites system managed by Zustand. Utilize Tamagui `Tabs` for seamless category switching and `XStack` layouts with `Separator` components to delineate elegant, high-contrast pose cards. Implement highly tactile card interactions using `pressStyle={{ scale: 0.97 }}` and `expo-haptics` to provide physical feedback when toggling favorites. Integrate a `BottomSheet` with snap points for deep-dive pose details (benefits/instructions) and a `Select` component for filtering by difficulty",
+    "status": "error",
+    "filesGenerated": 14,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/poseStore.ts",
+      "src/stores/favoritesStore.ts",
+      "src/hooks/usePoseLibrary.ts",
+      "src/hooks/useFavoritePoses.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/PoseCard.tsx",
+      "src/components/CategoryTabs.tsx",
+      "src/components/FilterSelect.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/favorites.tsx",
+      "app/(tabs)/library.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/PoseCard.tsx(68,15): error TS2322: Type '\"heart\" | \"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"activity\" | \"circle\" | \"moon\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"image\" | \"layout\" | \"key\" | ... 268 more ... | undefined'.\r\n  Type '\"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"activity\" | \"circle\" | \"moon\" | \"search\" | \"repeat\""
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 96.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 21,
+    "name": "Personal budget planner with bar chart",
+    "description": "A high-fidelity personal finance orchestrator built with Tamagui v2 and Zustand, featuring a centralized dashboard with animated Bar Charts using Moti's 'bouncy' enterStyle for dynamic data visualization. Utilize a Bottom Sheet with snap points for seamless transaction entry, integrating expo-haptics and pressStyle={{ scale: 0.97 }} on all interactive elements to create a deeply tactile user experience. Organize expense categories within an Accordion and Progress components inside a YStack/XStack architecture, using <Separator /> and theme='alt1' for distinct visual hierarchy. Implement real-time budget tracking with Toast notifications for limit breaches and a Slide-up Drawer for advanced filtering of historical spending patterns.",
+    "status": "error",
+    "filesGenerated": 23,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/budgetStore.ts",
+      "src/stores/transactionStore.ts",
+      "src/stores/filterStore.ts",
+      "src/stores/categoryStore.ts",
+      "src/hooks/useBudget.ts",
+      "src/hooks/useTransactions.ts",
+      "src/hooks/useFilter.ts",
+      "src/hooks/useCategories.ts",
+      "src/hooks/useChartData.ts",
+      "src/hooks/useSettings.ts",
+      "src/components/AnimatedBarChart.tsx",
+      "src/components/ExpenseAccordion.tsx",
+      "src/components/BudgetTracker.tsx",
+      "src/components/TransactionList.tsx",
+      "src/components/SlideUpDrawer.tsx",
+      "src/components/SettingsForm.tsx",
+      "src/lib/toastService.ts",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/transactions.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nOverload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) => string; strokeWidth: number; }[]; }; width: number; height: number; chartConfig: { backgroundColor: string; backgroundGradientFrom: string; ... 6 more ...; useShadowColorFromDataset: boolean; }; ... 6 more ...; showValuesOnTopOfBars...' is not assignable to type 'IntrinsicAttributes "
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 161.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 22,
+    "name": "Countdown events tracker",
+    "description": "Create a premium countdown event tracker featuring a high-fidelity dashboard built with YStack and XStack layouts, utilizing Separator components to cleanly divide event cards. Each card must leverage pressStyle={{ scale: 0.97 }} and expo-haptics for tactile feedback, displaying real-time time remaining via Tamagui Progress bars that visually deplete as the deadline approaches. Use a BottomSheet with defined snap points for the 'Add Event' flow, incorporating Select for category tagging and ToggleGroup for setting event priority levels. Implement fluid motion using enterStyle={{ opacity: 0, y: 20 }} for list transitions and provide instant user feedback via Tamagui Toast notifications for all successful event creations or deletions.",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/eventStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useEvents.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/EventCard.tsx",
+      "src/components/EventList.tsx",
+      "src/components/AddEventBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/AddEventBottomSheet.tsx(3,10): error TS2614: Module '\"@expo/vector-icons/Feather\"' has no exported member 'Calendar'. Did you mean to use 'import Calendar from \"@expo/vector-icons/Feather\"' instead?\r\nsrc/components/AddEventBottomSheet.tsx(3,20): error TS2614: Module '\"@expo/vector-icons/Feather\"' has no exported member 'Clock'. Did you mean to use 'import Clock from \"@expo/vector-icons/Feather\"' instead?\r\nsrc/components/AddEventBottomSheet.tsx(3,27): error TS2614"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 90.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 23,
+    "name": "Flashcard quiz app with spaced repetition",
+    "description": "Flashcard quiz app with spaced repetition",
+    "status": "error",
+    "filesGenerated": 17,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/flashcardStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useCardFlip.ts",
+      "src/hooks/useStudySession.ts",
+      "src/hooks/useDeckEditor.ts",
+      "src/components/FlashcardDeck.tsx",
+      "src/components/StudySession.tsx",
+      "src/components/DeckList.tsx",
+      "src/components/DeckEditor.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/study.tsx",
+      "app/(tabs)/library.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/index.tsx after 2 retries: 'StudySession' imported as default but is a named export",
+      "Contract violations in app/(tabs)/study.tsx after 2 retries: 'StudySession' imported as default but is a named export",
+      "Typecheck failed:\napp/(tabs)/index.tsx(156,17): error TS17001: JSX elements cannot have multiple attributes with the same name.\r\napp/(tabs)/library.tsx(79,9): error TS2322: Type 'Icon<\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 267 more ... | \"zoom-out\", \"feather\">' is not assignable to type 'IconProp | undefined'.\r\nsrc/components/DeckList.tsx(71,21): error"
+    ],
+    "autofixAttempts": 5,
+    "autofixSuccesses": 0,
+    "timeSeconds": 143.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 24,
+    "name": "Shopping list with checkboxes",
+    "description": "Build a high-end, tactile shopping list application using Tamagui v2 and Zustand for real-time state synchronization across Expo Router screens. Implement an interactive list interface using YStack and XStack with Separator components, where each item features a custom checkbox that triggers expo-haptics and a pressStyle={{ scale: 0.96 }} for physical feedback. Utilize a BottomSheet with snap points to handle item creation and quantity adjustments via a Slider, paired with Moti-driven enter/exit animations (enterStyle={{ opacity: 0, y: 20 }}) for smooth list transitions. Design a \"Completed\" section using ThemeInverse or alt1 themes to create high-contrast visual separation between active and checked items. Integrate Toast notifications for item deletion and use the Select component for categorizing grocery items into aisles like Produce or Dairy.",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/shoppingListStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useShoppingList.ts",
+      "src/components/ShoppingListScreen.tsx",
+      "src/components/ShoppingItem.tsx",
+      "src/components/AddItemBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/ShoppingListScreen.tsx(28,17): error TS2322: Type '{ key: string; item: ShoppingItem; onToggle: (id: string) => void; onDelete: (id: string) => void; onUpdate: (id: string, updates: Partial<ShoppingItem>) => void; settings: Settings; }' is not assignable to type 'IntrinsicAttributes & ShoppingItemProps'.\r\n  Property 'onUpdate' does not exist on type 'IntrinsicAttributes & ShoppingItemProps'.\r\nsrc/components/ShoppingListScreen.tsx(62,19): error TS2322: Type '{ key"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 81.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 25,
+    "name": "Recipe book with ingredients list",
+    "description": "Build GourmetFlow, a high-end recipe management engine featuring tactile recipe cards constructed with Tamagui YStack and XStack layouts using pressStyle={{ scale: 0.97 }} for immediate physical response. Implement an interactive recipe detail view utilizing Accordion components for ingredient steps and a Tamagui Slider to dynamically re-calculate portion sizes, integrated with expo-haptics for tactile feedback on every adjustment. Use a BottomSheet for advanced filtering by dietary preference and a ZStack hero layout for stunning visual impact.",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/hooks/useRecipes.ts",
+      "src/hooks/useRecipeDetail.ts",
+      "src/hooks/useHaptics.ts",
+      "src/components/RecipeCard.tsx",
+      "src/components/RecipeDetail.tsx",
+      "src/components/DietaryFilterBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/recipe/[id].tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/index.tsx after 2 retries: 'useRecipes' imported as default but is a named export",
+      "Contract violations in app/(tabs)/recipe/[id].tsx after 2 retries: 'RecipeDetail' imported as default but is a named export; 'useRecipeDetail' imported as default but is a named export",
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(21,22): error TS2322: Type '\"chef-hat\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\napp/(tabs)/index.tsx(4,8): error TS2613: Module '\"D:/experement2/workspace/gourmetflow/src/hooks/useRecipes\"' has no default export. Did you mean to use 'import { useRecipes } fro"
+    ],
+    "autofixAttempts": 4,
+    "autofixSuccesses": 0,
+    "timeSeconds": 107.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 26,
+    "name": "Book reading tracker with progress bar",
+    "description": "Book reading tracker with progress bar",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/bookStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useBooks.ts",
+      "src/components/BookCard.tsx",
+      "src/components/AddBookForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/add-book.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 190.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "error"
+    ]
+  },
+  {
+    "index": 27,
+    "name": "Password generator with strength meter",
+    "description": "Build a high-fidelity Password Architect app using Tamagui v2 and Zustand to manage real-time generation logic and entropy states. The main interface features a large, interactive password display using `YStack` with `pressStyle={{ scale: 0.97 }}` for tactile copying, paired with a dynamic `Progress` bar strength meter that shifts color based on complexity. Utilize a `BottomSheet` with snap points to house a configuration suite containing a `Slider` for length and a `ToggleGroup` for character requirements like symbols and numbers. Implement fluid entry animations using `enterStyle={{ opacity: 0, y: 10 }}` for new password generations and trigger `expo-haptics` on every interaction. Deliver polished user feedback via Tamagui `Toast` notifications when passwords are successfully copied to the clipboard.",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/passwordStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/usePasswordGenerator.ts",
+      "src/hooks/useHaptics.ts",
+      "src/hooks/useClipboard.ts",
+      "src/components/PasswordDisplay.tsx",
+      "src/components/StrengthMeter.tsx",
+      "src/components/ConfigBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(79,11): error TS2322: Type '{ score: number; label: \"Calculating...\"; color: string; entropy: number; } | { score: number; label: \"Very Weak\"; color: string; entropy: number; }' is not assignable to type 'PasswordStrength'.\r\n  Type '{ score: number; label: \"Calculating...\"; color: string; entropy: number; }' is not assignable to type 'PasswordStrength'.\r\n    Types of property 'label' are incompatible.\r\n      Type '\"Calculating...\"' is not assignable to type"
+    ],
+    "autofixAttempts": 3,
+    "autofixSuccesses": 0,
+    "timeSeconds": 129.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 28,
+    "name": "Task manager with drag-and-drop priority",
+    "description": "Task manager with drag-and-drop priority",
+    "status": "error",
+    "filesGenerated": 10,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/taskStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTasks.ts",
+      "src/components/TaskList.tsx",
+      "src/components/TaskItem.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/TaskItem.tsx(70,13): error TS2322: Type '{ fontSize: \"$4\"; borderBottomWidth: number; borderColor: \"$borderColor\"; paddingVertical: \"$2\"; onChangeText: (text: any) => void; value: string; }' is not assignable to type 'IntrinsicAttributes & Omit<RNTamaguiTextNonStyleProps, keyof TextStylePropsBase | \"unstyled\"> & ... 5 more ... & RefAttributes<...>'.\r\n  Property 'onChangeText' does not exist on type 'IntrinsicAttributes & Omit<RNTamaguiTextNonStyleProps, keyof Tex"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 73,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 29,
+    "name": "Time zone converter",
+    "description": "Design a high-precision Time Zone Orchestrator using Tamagui v2, featuring a central `XStack` timeline controlled by a `Slider` to manipulate time globally",
+    "status": "error",
+    "filesGenerated": 8,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/timezoneStore.ts",
+      "src/hooks/useTimezoneManager.ts",
+      "src/components/TimezoneTimeline.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/TimezoneTimeline.tsx(241,20): error TS2304: Cannot find name 'formatTimeForTimezone'."
+    ],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 81.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 30,
+    "name": "Savings goal tracker with progress ring",
+    "description": "Build a premium Savings Goal Tracker using Tamagui v2 and Zustand, featuring a dashboard centered around a Moti-animated Progress Ring inside a ZStack with enterStyle={{ opacity: 0, scale: 0.9 }}. Utilize YStack for goal cards with separator={<Separator />} and implement tactile pressStyle={{ scale: 0.97 }} combined with expo-haptics for every interaction. Use Expo Router to navigate between a BottomSheet-",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [
+      "Plan validation failed: src/components/ProgressRing.tsx: dependency \"src/hooks/useTheme.ts\" is missing from plan.files"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 15.1,
+    "events": [
+      "planning",
+      "error"
+    ]
+  },
+  {
+    "index": 31,
+    "name": "Color palette generator with copy hex",
+    "description": "Color palette generator with copy hex",
+    "status": "error",
+    "filesGenerated": 10,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/paletteStore.ts",
+      "src/hooks/usePalette.ts",
+      "src/hooks/useClipboard.ts",
+      "src/components/ColorPalette.tsx",
+      "src/components/PaletteHistory.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/history.tsx after 2 retries: 'PaletteHistory' imported as default but is a named export",
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"palette\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/hooks/useClipboard.ts(2,10): error TS2305: Module '\"expo-clipboard\"' has no exported member 'Clipboard'."
+    ],
+    "autofixAttempts": 2,
+    "autofixSuccesses": 0,
+    "timeSeconds": 77.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 32,
+    "name": "Random quote viewer with favorites",
+    "description": "Random quote viewer with favorites",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/quoteStore.ts",
+      "src/stores/favoritesStore.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useQuotes.ts",
+      "src/hooks/useFavorites.ts",
+      "src/hooks/useTheme.ts",
+      "src/components/QuoteCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/favorites.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/favorites.tsx(9,58): error TS2304: Cannot find name 'Favorite'.\r\nsrc/components/QuoteCard.tsx(68,13): error TS2322: Type '\"heart\" | \"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\n  Type '\"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\""
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 80.4,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 33,
+    "name": "Dice roller for board games",
+    "description": "Dice roller for board games",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/diceStore.ts",
+      "src/hooks/useDiceRoller.ts",
+      "src/hooks/useDiceSettings.ts",
+      "src/components/DiceRoller.tsx",
+      "src/components/HistoryList.tsx",
+      "src/components/DiceSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/settings.tsx after 2 retries: 'DiceSettings' imported as default but is a named export",
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"dice\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/components/DiceSettings.tsx(3,10): error TS2614: Module '\"@expo/vector-icons/Feather\"' has no exported member 'Plus'. Did you mean to use 'import Plus from \"@expo/vector-icons/Fea"
+    ],
+    "autofixAttempts": 2,
+    "autofixSuccesses": 0,
+    "timeSeconds": 83.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 34,
+    "name": "Scoreboard for card games",
+    "description": "Develop AceCounter, a high-fidelity card game scoreboard built with Tamagui v2 and Zustand for real-time score synchronization across active sessions. The interface must leverage YStack and XStack architectures with Separator components to manage player lists, utilizing pressStyle={{ scale: 0.97 }} and expo-haptics for highly tactile scoring interactions. Implement a BottomSheet with snap points for game configuration and Select components for choosing specific game rulesets, using ThemeInverse for high-contrast leaderboard highlights. Use Moti-driven declarative animations (enterStyle={{ opacity: 0, y: 10 }}) for smooth player entry/exit and Tamagui Toast to provide instant feedback on score updates. All navigation must be handled via Expo Router, ensuring a seamless, fluid experience with professional Feather icon integration.",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/scoreStore.ts",
+      "src/stores/sessionStore.ts",
+      "src/hooks/useScoreboard.ts",
+      "src/hooks/useSession.ts",
+      "src/components/Scoreboard.tsx",
+      "src/components/GameConfig.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 206.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "error"
+    ]
+  },
+  {
+    "index": 35,
+    "name": "Emoji mood board creator",
+    "description": "Emoji mood board creator",
+    "status": "error",
+    "filesGenerated": 21,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/moodBoardStore.ts",
+      "src/stores/categoryStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useMoodBoard.ts",
+      "src/hooks/useCategories.ts",
+      "src/hooks/useSettings.ts",
+      "src/components/MoodBoardGrid.tsx",
+      "src/components/EmojiCard.tsx",
+      "src/components/CategoryFilter.tsx",
+      "src/components/EmojiPicker.tsx",
+      "src/components/CategorySelector.tsx",
+      "src/components/CategoryList.tsx",
+      "src/components/ThemeSelector.tsx",
+      "src/components/ThemeSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/create.tsx",
+      "app/(tabs)/categories.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/settings.tsx(8,50): error TS2304: Cannot find name 'Settings'.\r\nsrc/components/MoodBoardGrid.tsx(52,15): error TS2322: Type 'string' is not assignable to type 'Emoji'."
+    ],
+    "autofixAttempts": 2,
+    "autofixSuccesses": 0,
+    "timeSeconds": 158.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 36,
+    "name": "Daily affirmation app with swipe cards",
+    "description": "Build 'Aura,' a premium daily affirmation experience using Expo Router and Tamagui v2, centered around a high-fidelity card",
+    "status": "error",
+    "filesGenerated": 15,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/affirmationStore.ts",
+      "src/stores/historyStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useAffirmation.ts",
+      "src/hooks/useAffirmationHistory.ts",
+      "src/hooks/useTheme.ts",
+      "src/components/AffirmationCard.tsx",
+      "src/components/HistoryList.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/history.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/SettingsForm.tsx(91,22): error TS2741: Property 'index' is missing in type '{ children: string; value: string; }' but required in type 'SelectItemExtraProps'.\r\nsrc/components/SettingsForm.tsx(92,22): error TS2741: Property 'index' is missing in type '{ children: string; value: string; }' but required in type 'SelectItemExtraProps'.\r\nsrc/components/SettingsForm.tsx(93,22): error TS2741: Property 'index' is missing in type '{ children: string; value: string; }' but"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 91.7,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 37,
+    "name": "Trivia quiz with multiple choice",
+    "description": "Build a high-fidelity competitive trivia experience powered by Zustand for real-time score tracking and global state orchestration. The interface must leverage Tamagui v2's YStack/XStack layouts with subtle Separators, using ThemeInverse to highlight active question cards. Every multiple-choice button must feature tactile pressStyle={{ scale: 0.97 }} paired with expo-haptics for physical engagement and weight. Integrate a Progress bar for time decay and use Moti-driven enterStyle animations for fluid",
+    "status": "error",
+    "filesGenerated": 13,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/triviaStore.ts",
+      "src/stores/leaderboardStore.ts",
+      "src/hooks/useTriviaGame.ts",
+      "src/hooks/useLeaderboard.ts",
+      "src/components/QuestionCard.tsx",
+      "src/components/AnswerButton.tsx",
+      "src/components/ProgressBar.tsx",
+      "src/components/LeaderboardItem.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/leaderboard.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/QuestionCard.tsx(64,8): error TS2739: Type '{ timeRemaining: number; }' is missing the following properties from type 'ProgressBarProps': question, totalTime\r\nsrc/components/QuestionCard.tsx(75,24): error TS2367: This comparison appears to be unintentional because the types 'string' and 'boolean' have no overlap.\r\nsrc/hooks/useTriviaGame.ts(99,35): error TS7006: Parameter 'prev' implicitly has an 'any' type.\r\nsrc/hooks/useTriviaGame.ts(99,35): error TS2345: Argum"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 102.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 38,
+    "name": "Pet care tracker with feeding schedule",
+    "description": "Pet care tracker with feeding schedule",
+    "status": "error",
+    "filesGenerated": 19,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/feedingScheduleStore.ts",
+      "src/stores/petsStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useFeedingSchedule.ts",
+      "src/hooks/usePets.ts",
+      "src/components/FeedingScheduleCard.tsx",
+      "src/components/PetOverviewCard.tsx",
+      "src/components/FeedingScheduleList.tsx",
+      "src/components/AddFeedingModal.tsx",
+      "src/components/PetList.tsx",
+      "src/components/AddPetModal.tsx",
+      "src/components/NotificationSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/schedule.tsx",
+      "app/(tabs)/pets.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Contract violations in app/(tabs)/settings.tsx after 2 retries: 'NotificationSettings' imported as default but is a named export",
+      "Typecheck failed:\nsrc/stores/petsStore.ts(18,7): error TS2353: Object literal may only specify known properties, and 'createdAt' does not exist in type 'Pet'."
+    ],
+    "autofixAttempts": 2,
+    "autofixSuccesses": 0,
+    "timeSeconds": 142.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 39,
+    "name": "Plant watering reminder",
+    "description": "Plant watering reminder",
+    "status": "error",
+    "filesGenerated": 12,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/plantStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/usePlants.ts",
+      "src/components/PlantList.tsx",
+      "src/components/AddPlantForm.tsx",
+      "src/components/SettingsForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/add-plant.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"leaf\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"type\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"radio\" | ... 268 more ... | undefined'.\r\nsrc/components/SettingsForm.tsx(95,26): error TS2741: Property 'index' is missing in type '{ children: Element; value: string; }' but required in type 'SelectItemExtraProps'.\r\nsrc/com"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 227.6,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 40,
+    "name": "Birthday reminder with countdown",
+    "description": "Birthday reminder with countdown",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/birthdayStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useBirthdays.ts",
+      "src/components/BirthdayCard.tsx",
+      "src/components/BirthdayForm.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/add-birthday.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/add-birthday.tsx(10,49): error TS2304: Cannot find name 'Birthday'.\r\napp/(tabs)/index.tsx(50,11): error TS2322: Type '{ children: Element; showsVerticalScrollIndicator: false; onRefresh: () => void; refreshing: boolean; }' is not assignable to type 'IntrinsicAttributes & Omit<TamaguiComponentPropsBaseBase & ScrollViewProps, keyof StackStyleBase | \"fullscreen\" | \"contentContainerStyle\"> & ... 5 more ... & RefAttributes<...>'.\r\n  Property 'onRefresh' does not exist on "
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 95.1,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 41,
+    "name": "App with tabs and settings page",
+    "description": "App with tabs and settings page",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [
+      "Plan validation failed: src/components/MainComponent.tsx: dependency \"src/types/index.ts\" is missing from plan.files; src/components/SettingsComponent.tsx: dependency \"src/types/index.ts\" is missing from plan.files"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 13.8,
+    "events": [
+      "planning",
+      "error"
+    ]
+  },
+  {
+    "index": 42,
+    "name": "App with search bar and filterable list",
+    "description": "App with search bar and filterable list",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/itemStore.ts",
+      "src/hooks/useSearchFilter.ts",
+      "src/components/SearchFilterList.tsx",
+      "src/components/ItemDetails.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/details.tsx"
+    ],
+    "errors": [],
+    "autofixAttempts": 1,
+    "autofixSuccesses": 0,
+    "timeSeconds": 208.8,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "building",
+      "error"
+    ]
+  },
+  {
+    "index": 43,
+    "name": "App with form validation and error messages",
+    "description": "Build a high-fidelity User Onboarding & Profile Management Engine using Expo Router and Zustand for real-time, schema-based validation state. Utilize Tamagui v2's YStack/XStack architecture with Separators to construct a multi-step form flow featuring Select inputs and Slider components for granular user preferences. Implement tactile error feedback by triggering expo-haptics and displaying Moti-animated error messages with enterStyle={{ opacity: 0, y: -10 }} paired with Tamagui Toast notifications for submission status. Enhance interactivity using pressStyle={{ scale: 0.97 }} on all primary buttons and a bottom Sheet with snap points for advanced profile configuration. Integrate ThemeInverse sections to highlight critical action areas, ensuring a premium, fluid, and error-resilient user experience.",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/onboardingStore.ts",
+      "src/stores/profileStore.ts",
+      "src/hooks/useOnboardingStore.ts",
+      "src/hooks/useProfileStore.ts",
+      "src/components/OnboardingForm.tsx",
+      "src/components/ProfileSettings.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/profile.tsx"
+    ],
+    "errors": [
+      "Contract violations in src/components/OnboardingForm.tsx after 2 retries: 'useOnboardingStore' imported as default but is a named export",
+      "Contract violations in src/components/ProfileSettings.tsx after 2 retries: 'useProfileStore' imported as default but is a named export",
+      "Contract violations in app/(tabs)/profile.tsx after 2 retries: 'ProfileSettings' imported as default but is a named export",
+      "Typecheck failed:\nsrc/stores/onboardingStore.ts(71,53): error TS2339: Property 'replace' does not exist on type 'string | string[] | { email: boolean; push: boolean; sms: boolean; }'.\r\n  Property 'replace' does not exist on type 'string[]'.\r\nsrc/stores/onboardingStore.ts(75,31): error TS2769: No overload matches this call.\r\n  Overload 1 of 4, '(value: string | number | Date): Date', gave the following error.\r\n    Argument of type 'string | string[] | { email: boolean; push: boolean; sms: boolean"
+    ],
+    "autofixAttempts": 6,
+    "autofixSuccesses": 0,
+    "timeSeconds": 201.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 44,
+    "name": "App with dark mode toggle in settings",
+    "description": "App with dark mode toggle in settings",
+    "status": "error",
+    "filesGenerated": 9,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/themeStore.ts",
+      "src/hooks/useDarkMode.ts",
+      "src/components/HomeContent.tsx",
+      "src/components/SettingsScreen.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\napp/(tabs)/index.tsx(11,24): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?\r\nsrc/components/HomeContent.tsx(17,24): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?\r\nsrc/components/HomeContent.tsx(18,7): error TS2322: Type '{ children: Element[]; flex: number; padding: \"$4\"; backgroundColor: \"$backgroundDark\" | \"$background\"; "
+    ],
+    "autofixAttempts": 5,
+    "autofixSuccesses": 0,
+    "timeSeconds": 91.9,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 45,
+    "name": "App with animated card transitions",
+    "description": "App with animated card transitions",
+    "status": "error",
+    "filesGenerated": 7,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/hooks/useAnimation.ts",
+      "src/components/AnimatedCard.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/gallery.tsx"
+    ],
+    "errors": [
+      "Contract violations in src/components/AnimatedCard.tsx after 2 retries: 'useAnimationStore' imported as default but is a named export",
+      "Typecheck failed:\nsrc/components/AnimatedCard.tsx(15,11): error TS2339: Property 'isAnimating' does not exist on type '{ animationProps: AnimationProps; goToNextCard: () => void; goToPreviousCard: () => void; resetAnimation: () => void; }'.\r\nsrc/components/AnimatedCard.tsx(15,24): error TS2339: Property 'animationDirection' does not exist on type '{ animationProps: AnimationProps; goToNextCard: () => void; goToPreviousCard: () => void; resetAnimation: () => void; }'.\r\nsrc/components/AnimatedCard"
+    ],
+    "autofixAttempts": 2,
+    "autofixSuccesses": 0,
+    "timeSeconds": 98.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 46,
+    "name": "App with local storage persistence",
+    "description": "Develop a premium 'ZenTask' productivity engine powered by Zustand and MMKV for seamless local storage persistence. The UI must feature Tamagui v2 XStack/YStack layouts with Separator components, using pressStyle={{ scale: 0.97 }} on task cards to provide high-fidelity tactile feedback. Utilize a Bottom Sheet with snap points for task creation and Moti-",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/taskStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTasks.ts",
+      "src/components/TaskList.tsx",
+      "src/components/TaskCard.tsx",
+      "src/components/BottomSheetModal.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/BottomSheetModal.tsx(89,15): error TS2322: Type 'Dispatch<SetStateAction<\"medium\" | \"low\" | \"high\">>' is not assignable to type '(value: string) => void'.\r\n  Types of parameters 'value' and 'value' are incompatible.\r\n    Type 'string' is not assignable to type 'SetStateAction<\"medium\" | \"low\" | \"high\">'.\r\nsrc/components/BottomSheetModal.tsx(101,22): error TS2741: Property 'index' is missing in type '{ children: Element; value: string; }' but required in type 'Sel"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 100.3,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 47,
+    "name": "App with swipe-to-delete list items",
+    "description": "App with swipe-to-delete list items",
+    "status": "error",
+    "filesGenerated": 7,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/hooks/useListItems.ts",
+      "src/hooks/useSwipeGesture.ts",
+      "src/components/SwipeableListItem.tsx",
+      "app/(tabs)/index.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/SwipeableListItem.tsx(41,16): error TS2551: Property 'value' does not exist on type 'number'. Did you mean 'valueOf'?\r\nsrc/hooks/useSwipeGesture.ts(18,22): error TS2304: Cannot find name 'useSharedValue'.\r\nsrc/hooks/useSwipeGesture.ts(22,26): error TS2552: Cannot find name 'useAnimatedGestureHandler'. Did you mean 'PanGestureHandler'?\r\nsrc/hooks/useSwipeGesture.ts(23,15): error TS7006: Parameter '_' implicitly has an 'any' type.\r\nsrc/hooks/useSwipeGesture.ts(23,1"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 56.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 48,
+    "name": "App with bottom sheet modal form",
+    "description": "Create a premium productivity orchestrator called ZenFlow using Tamagui v2 and Zustand, featuring an ultra-responsive dashboard with task cards that utilize Moti enterStyle={{ opacity: 0, y: 10 }} for fluid entry. The core interaction revolves around a high-fidelity Bottom Sheet with snap points containing a complex input form built with Tamagui Select, ToggleGroup, and Slider components to capture metadata. Every interactive element must feature pressStyle={{ scale: 0.96 }} paired with expo-haptics for deep tactile feedback upon task creation. Use XStack/YStack layouts with Separator and theme='alt1' sections to organize task categories visually. Implement Expo Router for navigation, ensuring all form submissions trigger a Tamagui Toast notification for instant success feedback.",
+    "status": "error",
+    "filesGenerated": 10,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/taskStore.ts",
+      "src/stores/settingsStore.ts",
+      "src/hooks/useTasks.ts",
+      "src/components/TaskCard.tsx",
+      "src/components/TaskBottomSheet.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/TaskCard.tsx(55,6): error TS2304: Cannot find name 'MotiView'.\r\nsrc/components/TaskCard.tsx(135,7): error TS2304: Cannot find name 'MotiView'.\r\nsrc/hooks/useTasks.ts(40,9): error TS7053: Element implicitly has an 'any' type because expression of type 'keyof TaskFormData' can't be used to index type 'TaskFormErrors'.\r\n  Property 'description' does not exist on type 'TaskFormErrors'.\r\nsrc/hooks/useTasks.ts(80,43): error TS2304: Cannot find name 'Task'."
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 84.2,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  },
+  {
+    "index": 49,
+    "name": "App with progress indicators and loading states",
+    "description": "Build an elite Workflow Orchestrator app using Tamagui v2 and Zustand to manage real-time, high-fidelity execution tracking. Utilize advanced Progress components and Skeleton screens within YStack/XStack layouts to handle asynchronous data fetching with zero visual jitter. Implement fluid, Moti-inspired transitions (enterStyle={{ opacity: 0, y: 10 }}) for task status updates, paired with tactile pressStyle={{ scale: 0.97 }} on all interactive cards for a premium feel. Integrate a Bottom Sheet for job configuration and leverage Toast notifications alongside expo-haptics to provide physical feedback upon task completion or failure.",
+    "status": "error",
+    "filesGenerated": 0,
+    "filesCompleted": [],
+    "errors": [
+      "Plan validation failed: app/(tabs)/analytics.tsx: dependency \"src/components/AnalyticsDashboard.tsx\" is missing from plan.files; app/(tabs)/settings.tsx: dependency \"src/components/SettingsScreen.tsx\" is missing from plan.files"
+    ],
+    "autofixAttempts": 0,
+    "autofixSuccesses": 0,
+    "timeSeconds": 16.8,
+    "events": [
+      "planning",
+      "error"
+    ]
+  },
+  {
+    "index": 50,
+    "name": "App with onboarding walkthrough screens",
+    "description": "Create a premium, multi-step onboarding experience featuring fluid Moti animations with `enterStyle={{ opacity: 0, y: 20 }}` for high-impact screen transitions. Use Tamagui `YStack` layouts with `Separator` and `XStack` to host interactive preference selection via `Select` and `Slider` components. Implement highly tactile navigation buttons using `pressStyle={{ scale: 0.96 }}` paired with `expo-haptics` for physical confirmation during user input. Integrate a `Tamagui Sheet` for an expandable feature overview and use `Zustand` to track progress, triggering a success `Toast` upon the final transition via `Expo Router`. The UI must utilize `ThemeInverse` for highlighted value propositions to create a sophisticated visual hierarchy.",
+    "status": "error",
+    "filesGenerated": 11,
+    "filesCompleted": [
+      "src/types/index.ts",
+      "src/stores/onboardingStore.ts",
+      "src/stores/preferencesStore.ts",
+      "src/hooks/useOnboarding.ts",
+      "src/hooks/usePreferences.ts",
+      "src/components/OnboardingScreen.tsx",
+      "src/components/PreferencesScreen.tsx",
+      "app/_layout.tsx",
+      "app/(tabs)/index.tsx",
+      "app/(tabs)/settings.tsx"
+    ],
+    "errors": [
+      "Typecheck failed:\nsrc/components/PreferencesScreen.tsx(36,7): error TS2739: Type '{ [x: string]: true; }' is missing the following properties from type '{ highContrast: boolean; screenReader: boolean; largerText: boolean; }': highContrast, screenReader, largerText\r\nsrc/components/PreferencesScreen.tsx(94,15): error TS2322: Type '(value: number) => void' is not assignable to type '(value: number[]) => void'.\r\n  Types of parameters 'value' and 'value' are incompatible.\r\n    Type 'number[]' is not "
+    ],
+    "autofixAttempts": 3,
+    "autofixSuccesses": 0,
+    "timeSeconds": 95.5,
+    "events": [
+      "planning",
+      "scaffolding",
+      "generating",
+      "validating",
+      "error"
+    ]
+  }
+]

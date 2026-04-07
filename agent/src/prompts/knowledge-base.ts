@@ -9,7 +9,10 @@ export const KNOWLEDGE_BASE = {
 5. BORDERS: borderWidth={1} (or bw={1}). NEVER use boolean 'bordered'.
 6. THEMING: Use <ThemeInverse> to automatically invert colors for a section.
 7. COMPONENTS: <Button backgroundColor="$primary" size="$4">Text</Button>. NEVER use the 'theme' prop on ANY component (it causes TS2322 errors). Use direct color props instead.
-8. ICONS: Use @expo/vector-icons/Feather. Pass color and size. NEVER wrap icons in <ThemeInverse>. NEVER use non-existent icon names.
+8. ICONS: Use @expo/vector-icons/Feather.
+   CRITICAL: You MUST ONLY use these exact icon names. DO NOT invent names!
+   Allowed names: "home", "settings", "user", "search", "plus", "minus", "x", "check", "chevron-left", "chevron-right", "chevron-up", "chevron-down", "menu", "star", "heart", "clock", "calendar", "list", "edit", "trash-2", "save", "folder", "file-text", "image", "camera", "bell", "message-square", "mail", "phone", "map-pin", "link", "external-link", "share-2", "download", "upload", "cloud", "sun", "moon", "zap", "activity", "bar-chart-2", "pie-chart", "trending-up", "dollar-sign", "credit-card", "shopping-cart", "tag", "bookmark", "flag", "award", "gift", "music", "video", "play", "pause", "square", "circle".
+   Example: <Feather name="bar-chart-2" size={24} color="$color" />
 9. NEVER invent props like 'onSwipeEnd', 'onSwipeLeft', 'onDismiss'. Use standard 'onPress' or 'onLongPress' from Pressable (react-native).
 10. PRESSABLE: NEVER import Pressable from "tamagui". Import from "react-native" or use <Button>.
 11. TYPES: If you use a custom type (like Todo), you MUST import it: import type { Todo } from "@/types/index".

@@ -352,6 +352,44 @@ const extractStoreKeysFromSource = (
   return [];
 };
 
+/**
+ * Auto-heal import mismatches by rewriting the file on disk.
+ * Returns the healed content (or original if nothing changed).
+ */
+export const autoHealImportContracts = (
+  fileContent: string,
+  contracts: Record<string, ExportContract[]>,
+): string => {
+  const allContracts = Object.values(contracts).flat();
+  let result = fileContent;
+
+  // Fix: import X from "path" → import { X } from "path" (when X is named export)
+  for (const contract of allContracts) {
+    if (contract.isDefaultExport) continue;
+    const defaultPattern = new RegExp(
+      `import\\s+${contract.name}\\s+from\\s+["']([^"']+)["']`,
+      "g"
+    );
+    result = result.replace(defaultPattern, (_match, modulePath: string) =>
+      `import { ${contract.name} } from "${modulePath}"`
+    );
+  }
+
+  // Fix: import { X } from "path" → import X from "path" (when X is default export)
+  for (const contract of allContracts) {
+    if (!contract.isDefaultExport) continue;
+    const namedPattern = new RegExp(
+      `import\\s+\\{\\s*${contract.name}\\s*\\}\\s+from\\s+["']([^"']+)["']`,
+      "g"
+    );
+    result = result.replace(namedPattern, (_match, modulePath: string) =>
+      `import ${contract.name} from "${modulePath}"`
+    );
+  }
+
+  return result;
+};
+
 /** Validate that generated files respect export contracts of their dependencies */
 export const validateFileContracts = (
   fileContent: string,

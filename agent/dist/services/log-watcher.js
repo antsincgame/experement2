@@ -119,7 +119,7 @@ export const watchProcess = (childProcess, callback) => {
                 clearTimeout(successTimeout);
                 successTimeout = null;
             }
-            // Debounce: wait 500ms for more error chunks before parsing
+            // Debounce: wait 200ms for more error chunks before parsing
             if (errorFlushTimeout)
                 clearTimeout(errorFlushTimeout);
             errorFlushTimeout = setTimeout(() => {
@@ -129,7 +129,7 @@ export const watchProcess = (childProcess, callback) => {
                 }
                 errorBuffer = "";
                 errorFlushTimeout = null;
-            }, 500);
+            }, 200);
         }
     };
     const handleData = (data) => {

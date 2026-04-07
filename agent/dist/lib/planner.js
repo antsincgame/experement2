@@ -5,10 +5,10 @@ import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
 import { validateAppPlan } from "./project-validator.js";
 import { safeJsonParse } from "./json-repair.js";
 export const planApp = async (options) => {
-    const { description, temperature = 0.3, maxTokens = 32768, lmStudioUrl, model, onChunk } = options;
+    const { description, temperature = 0.3, maxTokens = 65536, lmStudioUrl, model, onChunk } = options;
     const messages = [
         { role: "system", content: SYSTEM_PLANNER },
-        { role: "user", content: `Create an app plan for: ${description}` },
+        { role: "user", content: `/no_think\nCreate an app plan for: ${description}\n\nRespond with ONLY a JSON object. No thinking, no explanation, no markdown.` },
     ];
     let fullJson = "";
     const generator = await streamCompletion(messages, {
@@ -17,11 +17,25 @@ export const planApp = async (options) => {
         lmStudioUrl,
         model,
     });
+    let planChunkBuffer = "";
+    let planLastSend = Date.now();
     for await (const chunk of generator) {
         fullJson += chunk;
-        onChunk?.(chunk);
+        planChunkBuffer += chunk;
+        if (Date.now() - planLastSend > 100) {
+            onChunk?.(planChunkBuffer);
+            planChunkBuffer = "";
+            planLastSend = Date.now();
+        }
     }
-    const trimmed = fullJson.trim();
+    if (planChunkBuffer)
+        onChunk?.(planChunkBuffer);
+    // Strip Qwen3 thinking blocks: <think>...</think>
+    let trimmed = fullJson.trim().replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    // Also strip unclosed thinking block (model started thinking but didn't close)
+    if (trimmed.includes("<think>")) {
+        trimmed = trimmed.replace(/<think>[\s\S]*/g, "").trim();
+    }
     let parsed;
     try {
         parsed = safeJsonParse(trimmed);

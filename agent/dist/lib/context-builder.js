@@ -1,6 +1,136 @@
-import { Project } from "ts-morph";
+// Fixes contract extraction typing so ts-morph analysis stays compatible with strict builds.
+import { Project, Node, SyntaxKind } from "ts-morph";
 import path from "path";
 import fs from "fs";
+const unwrapPromiseType = (returnType, sourceNode) => {
+    const returnTypeText = returnType.getText(sourceNode);
+    if (!returnTypeText.startsWith("Promise<")) {
+        return returnType;
+    }
+    return returnType.getTypeArguments()[0] ?? returnType;
+};
+/** Extract structured JSON export contracts from a generated file using ts-morph */
+export const extractExportContracts = (filePath) => {
+    if (!fs.existsSync(filePath))
+        return null;
+    try {
+        const project = new Project({ compilerOptions: { strict: true, skipLibCheck: true } });
+        const sf = project.addSourceFileAtPath(filePath);
+        const contracts = [];
+        for (const [name, declarations] of sf.getExportedDeclarations()) {
+            const decl = declarations[0];
+            if (!decl)
+                continue;
+            const isDefault = name === "default";
+            const actualName = Node.hasName(decl) ? decl.getName() : (isDefault ? "defaultExport" : name);
+            let kind = "constant";
+            let returnTypeStr = "";
+            let returnObjectKeys = [];
+            let propsInterface = null;
+            let params = [];
+            if (Node.isFunctionDeclaration(decl) || Node.isVariableDeclaration(decl)) {
+                const funcNode = Node.isVariableDeclaration(decl)
+                    ? decl.getInitializerIfKind(SyntaxKind.ArrowFunction)
+                    : decl;
+                if (funcNode && (Node.isFunctionDeclaration(funcNode) || Node.isArrowFunction(funcNode))) {
+                    const returnType = funcNode.getReturnType();
+                    returnTypeStr = returnType.getText(funcNode).slice(0, 300);
+                    if (actualName.startsWith("use")) {
+                        kind = "hook";
+                    }
+                    else if (/^[A-Z]/.test(actualName) && (returnTypeStr.includes("JSX") || returnTypeStr.includes("ReactNode") || returnTypeStr.includes("Element"))) {
+                        kind = "component";
+                    }
+                    else {
+                        kind = "function";
+                    }
+                    params = funcNode.getParameters().map((p) => ({
+                        name: p.getName(),
+                        type: p.getType().getText(funcNode).slice(0, 100),
+                    }));
+                    const baseType = unwrapPromiseType(returnType, funcNode);
+                    if (baseType.isObject() && !baseType.isArray() && !returnTypeStr.includes("Element")) {
+                        returnObjectKeys = baseType.getProperties().map((p) => p.getName());
+                    }
+                }
+                else if (Node.isVariableDeclaration(decl) && actualName.startsWith("use")) {
+                    // Zustand store: const useStore = create<StoreInterface>((set) => ({...}))
+                    // Extract keys from the store's return type (the hook's call signature)
+                    kind = "hook";
+                    const declType = decl.getType();
+                    const callSigs = declType.getCallSignatures();
+                    if (callSigs.length > 0) {
+                        const returnType = callSigs[0].getReturnType();
+                        returnTypeStr = returnType.getText().slice(0, 300);
+                        if (returnType.isObject() && !returnType.isArray()) {
+                            returnObjectKeys = returnType.getProperties().map((p) => p.getName());
+                        }
+                    }
+                    // Fallback: scan file for store interface
+                    if (returnObjectKeys.length === 0) {
+                        const storeName = actualName.replace(/^use/, "").replace(/Store$/, "");
+                        const interfaces = sf.getInterfaces();
+                        // Priority 1: interface matching store name
+                        let matched = interfaces.find((i) => {
+                            const n = i.getName();
+                            return n.includes(storeName) || n.includes("Store") || n.includes("State");
+                        });
+                        // Priority 2: any interface with 3+ properties (likely the store shape)
+                        if (!matched) {
+                            matched = interfaces.find((i) => i.getProperties().length >= 3);
+                        }
+                        if (matched) {
+                            returnObjectKeys = matched.getProperties().map((p) => p.getName());
+                            returnTypeStr = `{ ${returnObjectKeys.join("; ")} }`;
+                        }
+                    }
+                    // Fallback 2: parse store interface from raw source via regex
+                    if (returnObjectKeys.length === 0) {
+                        const src = sf.getFullText();
+                        const ifaceMatch = src.match(/interface\s+\w+\s*\{([^}]+)\}/);
+                        if (ifaceMatch) {
+                            const body = ifaceMatch[1];
+                            returnObjectKeys = body
+                                .split(/[;\n]/)
+                                .map((line) => line.trim().split(/[:(]/)[0].trim())
+                                .filter((k) => k.length > 0 && !k.startsWith("//"));
+                        }
+                    }
+                }
+            }
+            else if (Node.isInterfaceDeclaration(decl)) {
+                kind = "interface";
+                const members = decl.getProperties().map((p) => `${p.getName()}: ${p.getType().getText(p)}`).join("; ");
+                returnTypeStr = `{ ${members} }`;
+            }
+            else if (Node.isTypeAliasDeclaration(decl)) {
+                kind = "type";
+                returnTypeStr = decl.getType().getText(decl).slice(0, 300);
+            }
+            // Find Props interface for components
+            if (kind === "component") {
+                const propsInt = sf.getInterfaces().find((i) => i.getName().endsWith("Props"));
+                if (propsInt) {
+                    const members = propsInt.getProperties().map((p) => `${p.getName()}: ${p.getType().getText(p)}`).join("; ");
+                    propsInterface = `{ ${members} }`;
+                }
+            }
+            contracts.push({
+                name: actualName,
+                isDefaultExport: isDefault,
+                kind,
+                params,
+                returnType: returnTypeStr,
+                returnObjectKeys,
+                propsInterface,
+            });
+        }
+        return contracts.length > 0 ? contracts : null;
+    }
+    catch {
+        return null;
+    }
+};
 const extractExports = (sourceFile) => {
     const exports = [];
     for (const [name] of sourceFile.getExportedDeclarations()) {

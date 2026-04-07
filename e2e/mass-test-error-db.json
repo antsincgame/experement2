@@ -1,17 +1,17 @@
 {
-  "generatedAt": "2026-04-07T00:02:12.765Z",
+  "generatedAt": "2026-04-07T00:10:37.082Z",
   "config": {
     "lmUrl": "http://localhost:1234",
     "agentWsUrl": "ws://localhost:3100",
     "model": "qwen/qwen3-coder-30b",
     "enhancerModel": "google/gemma-4-26b-a4b",
     "timeoutMs": 300000,
-    "promptCount": 12
+    "promptCount": 17
   },
   "stats": {
-    "total": 12,
+    "total": 17,
     "ready": 0,
-    "error": 12,
+    "error": 17,
     "timeout": 0,
     "ws_error": 0
   },
@@ -116,6 +116,74 @@
       "samples": [
         "Typecheck failed:\napp/(tabs)/index.tsx(17,39): error TS2339: Property 'name' does not exist on type 'never'.\r\nsrc/components/PrecipitationTimeline.tsx(15,36): error TS2339: Property 'hourlyForecast' does not exist on type 'never'.\r\nsrc/components/PrecipitationTimeline.tsx(32,38): error TS2339: Prope"
       ]
+    },
+    {
+      "category": "typescript_ts2769",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Habit tracker with streaks"
+      ],
+      "signatures": [
+        "TS2769:src/components/TrendChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>, '(props: AbstractChartProps & LineChartProps): LineChart', gave the follo"
+      ],
+      "tsCodes": [
+        "TS2769"
+      ],
+      "samples": [
+        "Typecheck failed:\nsrc/components/TrendChart.tsx(44,7): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) =>"
+      ]
+    },
+    {
+      "category": "plan_validation",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Recipe book app"
+      ],
+      "signatures": [
+        "generic:app/(tabs)/planner.tsx: dependency \"src/components/MealPlanner.tsx\" is missing from plan.files"
+      ],
+      "tsCodes": [],
+      "samples": [
+        "Plan validation failed: app/(tabs)/planner.tsx: dependency \"src/components/MealPlanner.tsx\" is missing from plan.files"
+      ]
+    },
+    {
+      "category": "typescript_ts2349",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Workout log tracker"
+      ],
+      "signatures": [
+        "TS2349:src/stores/workoutStore.ts(line,col): error TS2349: This expression is not callable. Type 'Omit<Set, \"id\">' has no call signatures. src/stores/workoutStore.ts(line,col): error TS70"
+      ],
+      "tsCodes": [
+        "TS2349",
+        "TS7006"
+      ],
+      "samples": [
+        "Typecheck failed:\nsrc/stores/workoutStore.ts(104,9): error TS2349: This expression is not callable.\r\n  Type 'Omit<Set, \"id\">' has no call signatures.\r\nsrc/stores/workoutStore.ts(104,14): error TS7006: Parameter 'state' implicitly has an 'any' type.\r\nsrc/stores/workoutStore.ts(105,41): error TS7006: "
+      ]
+    },
+    {
+      "category": "typescript_ts2554",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Mood diary with calendar"
+      ],
+      "signatures": [
+        "TS2554:src/components/DailyLogs.tsx(line,col): error TS2554: Expected <n>-<n> arguments, but got <n>. src/components/QuickLogBottomSheet.tsx(line,col): error TS2305: Module '\"tamagui\"' ha"
+      ],
+      "tsCodes": [
+        "TS2305",
+        "TS2554"
+      ],
+      "samples": [
+        "Typecheck failed:\nsrc/components/DailyLogs.tsx(19,6): error TS2554: Expected 0-1 arguments, but got 2.\r\nsrc/components/QuickLogBottomSheet.tsx(2,40): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'."
+      ]
     }
   ],
   "signatures": [
@@ -217,6 +285,42 @@
         "Expense tracker"
       ],
       "sample": "Typecheck failed:\napp/(tabs)/add.tsx(10,47): error TS2304: Cannot find name 'Expense'.\r\nsrc/components/CategoryChart.tsx(63,10): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & BarChartProps): BarChart', gave the following error.\r\n    Property 'yAxisSuf"
+    },
+    {
+      "signature": "TS2769:src/components/TrendChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>, '(props: AbstractChartProps & LineChartProps): LineChart', gave the follo",
+      "category": "typescript_ts2769",
+      "count": 1,
+      "projects": [
+        "Habit tracker with streaks"
+      ],
+      "sample": "Typecheck failed:\nsrc/components/TrendChart.tsx(44,7): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.\r\n    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) =>"
+    },
+    {
+      "signature": "generic:app/(tabs)/planner.tsx: dependency \"src/components/MealPlanner.tsx\" is missing from plan.files",
+      "category": "plan_validation",
+      "count": 1,
+      "projects": [
+        "Recipe book app"
+      ],
+      "sample": "Plan validation failed: app/(tabs)/planner.tsx: dependency \"src/components/MealPlanner.tsx\" is missing from plan.files"
+    },
+    {
+      "signature": "TS2349:src/stores/workoutStore.ts(line,col): error TS2349: This expression is not callable. Type 'Omit<Set, \"id\">' has no call signatures. src/stores/workoutStore.ts(line,col): error TS70",
+      "category": "typescript_ts2349",
+      "count": 1,
+      "projects": [
+        "Workout log tracker"
+      ],
+      "sample": "Typecheck failed:\nsrc/stores/workoutStore.ts(104,9): error TS2349: This expression is not callable.\r\n  Type 'Omit<Set, \"id\">' has no call signatures.\r\nsrc/stores/workoutStore.ts(104,14): error TS7006: Parameter 'state' implicitly has an 'any' type.\r\nsrc/stores/workoutStore.ts(105,41): error TS7006: "
+    },
+    {
+      "signature": "TS2554:src/components/DailyLogs.tsx(line,col): error TS2554: Expected <n>-<n> arguments, but got <n>. src/components/QuickLogBottomSheet.tsx(line,col): error TS2305: Module '\"tamagui\"' ha",
+      "category": "typescript_ts2554",
+      "count": 1,
+      "projects": [
+        "Mood diary with calendar"
+      ],
+      "sample": "Typecheck failed:\nsrc/components/DailyLogs.tsx(19,6): error TS2554: Expected 0-1 arguments, but got 2.\r\nsrc/components/QuickLogBottomSheet.tsx(2,40): error TS2305: Module '\"tamagui\"' has no exported member 'Pressable'."
     }
   ]
 }

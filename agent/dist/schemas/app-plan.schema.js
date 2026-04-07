@@ -12,12 +12,25 @@ export const NavigationScreenSchema = z.object({
     name: z.string().min(1),
     icon: z.string().optional(),
 });
+export const ThemeSchema = z.object({
+    style: z.string().default("premium"),
+    background: z.string().default("#F8FAFC"),
+    surface: z.string().default("#FFFFFF"),
+    primary: z.string().default("#6366F1"),
+    primaryText: z.string().default("#0F172A"),
+    secondaryText: z.string().default("#64748B"),
+    accent: z.string().default("#6366F1"),
+    cardRadius: z.number().default(20),
+    buttonRadius: z.number().default(28),
+    isDark: z.boolean().default(false),
+}).default({});
 export const AppPlanSchema = z.object({
     name: z.string().min(1).transform((s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-")),
     displayName: z.string().min(1),
     description: z.string().min(1),
     files: z.array(FileInPlanSchema).min(1),
     extraDependencies: z.array(z.string()).default([]),
+    theme: ThemeSchema,
     navigation: z
         .object({
         type: z.enum(SUPPORTED_NAVIGATION_TYPES).default("stack"),

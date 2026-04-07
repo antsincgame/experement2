@@ -14,6 +14,7 @@ interface EditorOptions {
     maxTokens?: number;
     onThinking?: (text: string) => void;
     onBlock?: (block: SearchReplaceBlock) => void;
+    onDiff?: (filepath: string, before: string, after: string) => void;
     onAnalysis?: (action: EditAction) => void;
 }
 interface EditorResult {

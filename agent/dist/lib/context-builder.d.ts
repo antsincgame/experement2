@@ -1,3 +1,18 @@
+export interface ExportContractParam {
+    name: string;
+    type: string;
+}
+export interface ExportContract {
+    name: string;
+    isDefaultExport: boolean;
+    kind: "function" | "component" | "hook" | "constant" | "type" | "interface";
+    params: ExportContractParam[];
+    returnType: string;
+    returnObjectKeys: string[];
+    propsInterface: string | null;
+}
+/** Extract structured JSON export contracts from a generated file using ts-morph */
+export declare const extractExportContracts: (filePath: string) => ExportContract[] | null;
 export interface SkeletonEntry {
     path: string;
     exports: string[];

@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Request, Response as ExpressResponse } from "express";
 export declare const clearModelCache: (baseUrl?: string) => void;
 interface ChatMessage {
     role: "system" | "user" | "assistant";
@@ -23,8 +23,9 @@ export declare const completeNonStreaming: (messages: ChatMessage[], options?: {
     model?: string;
     lmStudioUrl?: string;
 }) => Promise<string>;
+export declare const getActiveRequestCount: () => number;
 export declare const abortTask: (taskId: string) => boolean;
 export declare const abortAll: () => number;
-export declare const handleLLMProxyRoute: (req: Request, res: Response) => Promise<void>;
+export declare const handleLLMProxyRoute: (req: Request, res: ExpressResponse) => Promise<void>;
 export {};
 //# sourceMappingURL=llm-proxy.d.ts.map
