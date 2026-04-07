@@ -88,6 +88,73 @@ const normalizeImportDeclarations = (code: string): string => {
   }
 };
 
+// Feather icon names that actually exist — used by the hallucination sanitizer.
+const VALID_FEATHER_ICONS = new Set([
+  "home", "settings", "user", "search", "plus", "minus", "x", "check",
+  "chevron-left", "chevron-right", "chevron-up", "chevron-down", "menu",
+  "star", "heart", "clock", "calendar", "list", "edit", "trash-2", "save",
+  "folder", "file-text", "image", "camera", "bell", "message-square", "mail",
+  "phone", "map-pin", "link", "external-link", "share-2", "download", "upload",
+  "cloud", "sun", "moon", "zap", "activity", "bar-chart-2", "pie-chart",
+  "trending-up", "dollar-sign", "credit-card", "shopping-cart", "tag",
+  "bookmark", "flag", "award", "gift", "music", "video", "play", "pause",
+  "square", "circle", "info", "alert-circle", "alert-triangle", "eye",
+  "eye-off", "lock", "unlock", "refresh-cw", "rotate-cw", "log-out",
+  "log-in", "volume-2", "volume-x", "wifi", "battery", "copy", "clipboard",
+  "globe", "hash", "at-sign", "percent", "layers", "grid", "align-left",
+  "bold", "italic", "type", "delete", "filter", "repeat", "skip-forward",
+  "skip-back", "fast-forward", "rewind", "thumbs-up", "thumbs-down",
+  "more-horizontal", "more-vertical", "sliders", "tool", "target",
+  "crosshair", "navigation", "map", "compass", "anchor", "package",
+  "truck", "coffee", "droplet", "wind", "thermometer", "umbrella",
+]);
+
+// Fallback mapping for common hallucinated icon names
+const ICON_FALLBACKS: Record<string, string> = {
+  "calculator": "hash",
+  "palette": "droplet",
+  "heart-outline": "heart",
+  "home-outline": "home",
+  "settings-outline": "settings",
+  "trash-outline": "trash-2",
+  "add": "plus",
+  "remove": "minus",
+  "close": "x",
+  "done": "check",
+  "money": "dollar-sign",
+  "wallet": "credit-card",
+  "clock-outline": "clock",
+  "timer": "clock",
+  "stopwatch": "clock",
+  "fitness": "activity",
+  "dumbbell": "activity",
+  "weight": "activity",
+  "water": "droplet",
+  "food": "coffee",
+  "restaurant": "coffee",
+  "book": "book-open",
+  "document": "file-text",
+  "note": "file-text",
+  "chart": "bar-chart-2",
+  "graph": "trending-up",
+  "analytics": "bar-chart-2",
+  "notification": "bell",
+  "alarm": "bell",
+  "person": "user",
+  "people": "user",
+  "profile": "user",
+  "account": "user",
+  "category": "grid",
+  "tag-outline": "tag",
+  "history": "clock",
+  "refresh": "refresh-cw",
+  "share": "share-2",
+  "favorite": "star",
+  "weather": "cloud",
+  "temp": "thermometer",
+  "temperature": "thermometer",
+};
+
 /** Post-process: fix common LLM mistakes that cause crashes */
 const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   let result = code;
@@ -98,6 +165,107 @@ const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
 
   result = result.replace(/from\s+["']@\/src\//g, 'from "@/');
   result = result.replace(/from\s*["']expo-router\/tabs["']/g, 'from "expo-router"');
+
+  // ── Silver Bullet: Regex Post-Processor for LLM Hallucinations ──
+
+  // 1. Fix hallucinated Feather icon names → replace with valid fallback
+  result = result.replace(
+    /(<Feather[^>]*\bname=["'])([^"']+)(["'])/g,
+    (_match, prefix, iconName, suffix) => {
+      if (VALID_FEATHER_ICONS.has(iconName)) return `${prefix}${iconName}${suffix}`;
+      const fallback = ICON_FALLBACKS[iconName] ?? "circle";
+      return `${prefix}${fallback}${suffix}`;
+    }
+  );
+
+  // Also fix name={} JSX expression pattern: name={"calculator"}
+  result = result.replace(
+    /(<Feather[^>]*\bname=\{["'])([^"']+)(["']\})/g,
+    (_match, prefix, iconName, suffix) => {
+      if (VALID_FEATHER_ICONS.has(iconName)) return `${prefix}${iconName}${suffix}`;
+      const fallback = ICON_FALLBACKS[iconName] ?? "circle";
+      return `${prefix}${fallback}${suffix}`;
+    }
+  );
+
+  // 2. Fix Pressable imported from "tamagui" → move to "react-native"
+  result = result.replace(
+    /import\s*\{([^}]*)\}\s*from\s*["']tamagui["']/g,
+    (match, imports: string) => {
+      if (!imports.includes("Pressable")) return match;
+      const cleaned = imports
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter((s: string) => s && s !== "Pressable")
+        .join(", ");
+      const pressableImport = 'import { Pressable } from "react-native";\n';
+      return cleaned
+        ? `${pressableImport}import { ${cleaned} } from "tamagui"`
+        : `${pressableImport}// tamagui imports removed (only had Pressable)`;
+    }
+  );
+
+  // 3. Fix View/Text imported from "react-native" → use Tamagui equivalents
+  result = result.replace(
+    /import\s*\{([^}]*)\}\s*from\s*["']react-native["']/g,
+    (match, imports: string) => {
+      const parts = imports.split(",").map((s: string) => s.trim()).filter(Boolean);
+      const hasView = parts.includes("View");
+      const hasText = parts.includes("Text");
+      if (!hasView && !hasText) return match;
+      const rnOnly = parts.filter((s: string) => s !== "View" && s !== "Text");
+      const tamaguiReplacements: string[] = [];
+      if (hasView) tamaguiReplacements.push("YStack");
+      if (hasText) tamaguiReplacements.push("Text");
+      // Check if tamagui import already exists in file to avoid duplicates
+      const lines: string[] = [];
+      if (rnOnly.length > 0) lines.push(`import { ${rnOnly.join(", ")} } from "react-native"`);
+      // We'll add tamagui replacements — dedup handled below
+      if (tamaguiReplacements.length > 0) {
+        lines.push(`/* RN_TO_TAMAGUI:${tamaguiReplacements.join(",")} */`);
+      }
+      return lines.join(";\n");
+    }
+  );
+  // Merge RN_TO_TAMAGUI markers into existing tamagui import
+  const tamaguiMarkerMatch = result.match(/\/\* RN_TO_TAMAGUI:([\w,]+) \*\//);
+  if (tamaguiMarkerMatch) {
+    const newImports = tamaguiMarkerMatch[1].split(",");
+    result = result.replace(/\/\* RN_TO_TAMAGUI:[\w,]+ \*\/\n?/g, "");
+    if (result.includes('from "tamagui"')) {
+      result = result.replace(
+        /import\s*\{([^}]*)\}\s*from\s*["']tamagui["']/,
+        (_match, imports: string) => {
+          const existing = imports.split(",").map((s: string) => s.trim()).filter(Boolean);
+          const merged = [...new Set([...existing, ...newImports])];
+          return `import { ${merged.join(", ")} } from "tamagui"`;
+        }
+      );
+    } else {
+      result = `import { ${newImports.join(", ")} } from "tamagui";\n` + result;
+    }
+    // Replace View JSX tags with YStack
+    if (newImports.includes("YStack")) {
+      result = result.replace(/<View\b/g, "<YStack").replace(/<\/View>/g, "</YStack>");
+    }
+  }
+
+  // 4. Fix <Card.Header>, <Card.Body>, <Card.Footer> → plain YStack
+  result = result.replace(/<Card\.Header[^>]*>/g, '<YStack padding="$4" borderBottomWidth={1} borderColor="$borderColor">');
+  result = result.replace(/<\/Card\.Header>/g, "</YStack>");
+  result = result.replace(/<Card\.Body[^>]*>/g, '<YStack padding="$4">');
+  result = result.replace(/<\/Card\.Body>/g, "</YStack>");
+  result = result.replace(/<Card\.Footer[^>]*>/g, '<YStack padding="$4" borderTopWidth={1} borderColor="$borderColor">');
+  result = result.replace(/<\/Card\.Footer>/g, "</YStack>");
+
+  // 5. Kill hallucinated module imports (moti, solito, etc.)
+  result = result.replace(/import\s+.*from\s*["']moti[^"']*["'];?\n?/g, "");
+  result = result.replace(/import\s+.*from\s*["']solito[^"']*["'];?\n?/g, "");
+  result = result.replace(/import\s+.*from\s*["']@motionone[^"']*["'];?\n?/g, "");
+  result = result.replace(/import\s+.*from\s*["']react-native-reanimated["'];?\n?/g, "");
+
+  // ── End Silver Bullet ──
+
   result = fixHookImports(result);
   result = fixComponentImports(result);
   result = ensureDefaultExport(result, filePath);
@@ -105,15 +273,12 @@ const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
 
   // Fix: React.useState/useEffect/useCallback → direct import (if React not imported)
   if (result.includes("React.use") && !result.includes("import React")) {
-    // Extract all React.useX calls
     const reactHooks = new Set<string>();
     const hookMatches = result.matchAll(/React\.(use\w+)/g);
     for (const m of hookMatches) reactHooks.add(m[1]);
     if (reactHooks.size > 0) {
       const hooksList = [...reactHooks].join(", ");
-      // Add direct import at top
       result = `import { ${hooksList} } from "react";\n` + result;
-      // Replace React.useX with useX
       for (const hook of reactHooks) {
         result = result.replace(new RegExp(`React\\.${hook}`, "g"), hook);
       }
