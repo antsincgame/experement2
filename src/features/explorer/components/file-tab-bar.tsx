@@ -24,7 +24,7 @@ const FileTabBar = ({
       horizontal
       showsHorizontalScrollIndicator={false}
       className="border-b border-border-subtle"
-      style={{ backgroundColor: "#0D0D10", maxHeight: 36 }}
+      style={{ backgroundColor: "#0D0D1A", maxHeight: 36 }}
     >
       {openFiles.map((file) => {
         const isActive = file === activeFile;
@@ -34,8 +34,8 @@ const FileTabBar = ({
             className="flex-row items-center"
             style={{
               borderTopWidth: isActive ? 2 : 0,
-              borderTopColor: "#00F0FF",
-              backgroundColor: isActive ? "#09090B" : "transparent",
+              borderTopColor: "#00E5FF",
+              backgroundColor: isActive ? "#0A0A0A" : "transparent",
             }}
           >
             <Pressable
@@ -44,7 +44,7 @@ const FileTabBar = ({
             >
               <FileCode2
                 size={12}
-                color={isActive ? "#00F0FF" : "#52525B"}
+                color={isActive ? "#00E5FF" : "#4A4A6A"}
                 strokeWidth={1.5}
               />
               <Text
@@ -61,7 +61,7 @@ const FileTabBar = ({
               className="pr-2 opacity-0 hover:opacity-100"
               style={{ opacity: isActive ? 0.5 : 0 }}
             >
-              <X size={11} color="#A1A1AA" strokeWidth={1.5} />
+              <X size={11} color="#8888AA" strokeWidth={1.5} />
             </Pressable>
           </View>
         );

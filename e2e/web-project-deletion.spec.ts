@@ -101,13 +101,6 @@ test("Clear All removes projects from the list", async ({ page }) => {
     // Wait for deletion to process
     await page.waitForTimeout(3_000);
 
-    // The project should no longer appear in the list
-    // Note: it may reappear if disk listing runs again, but the store should be cleared
-    const projectStillVisible = await page
-      .getByText(FIXTURE_PROJECT.name, { exact: true })
-      .isVisible({ timeout: 3_000 })
-      .catch(() => false);
-
     // After clear, the project list in the store is reset
     const storeState = await page.evaluate(() => {
       const raw = window.localStorage.getItem("app-factory-projects");

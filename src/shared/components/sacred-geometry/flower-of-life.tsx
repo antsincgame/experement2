@@ -9,7 +9,7 @@ interface FlowerOfLifeProps {
 const FlowerOfLife = ({
   size = 400,
   opacity = 0.04,
-  color = "#00f0ff",
+  color = "#00E5FF",
 }: FlowerOfLifeProps) => {
   const r = size / 6;
   const cx = size / 2;

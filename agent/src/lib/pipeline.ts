@@ -1,4 +1,4 @@
-// Verifies generated projects with deterministic validation gates and event-bus updates before previewing.
+// Verifies generated projects with deterministic validation gates and scoped preview events before announcing success.
 import { spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -32,6 +32,7 @@ interface CreateOptions {
   plannerModel?: string;
   temperature?: number;
   maxTokens?: number;
+  requestId?: string;
   onProjectNameResolved?: (projectName: string) => void;
 }
 
@@ -49,6 +50,7 @@ interface IterateOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  requestId?: string;
 }
 
 interface IterateResult {
@@ -262,7 +264,11 @@ export const createProject = async (
   try {
     return await _createProjectInner(options);
   } catch (error) {
-    broadcast({ type: "status", status: "error" });
+    broadcast({
+      type: "status",
+      status: "error",
+      ...(options.requestId ? { requestId: options.requestId } : {}),
+    });
     throw error;
   }
 };
@@ -270,11 +276,38 @@ export const createProject = async (
 const _createProjectInner = async (
   options: CreateOptions
 ): Promise<CreateResult> => {
-  const { description, lmStudioUrl, model, plannerModel, temperature, maxTokens, onProjectNameResolved } = options;
+  const {
+    description,
+    lmStudioUrl,
+    model,
+    plannerModel,
+    temperature,
+    maxTokens,
+    requestId,
+    onProjectNameResolved,
+  } = options;
+  let projectSlug: string | null = null;
+  const emitOperation = (message: Record<string, unknown>): void => {
+    broadcast({
+      ...message,
+      ...(requestId ? { requestId } : {}),
+      ...(projectSlug ? { projectName: projectSlug } : {}),
+    });
+  };
+  const emitBuildScoped = (
+    buildId: string,
+    message: Record<string, unknown>
+  ): void => {
+    emitOperation({ ...message, buildId });
+  };
 
   // ── Step 1: Plan ──────────────────────────────────────
-  broadcast({ type: "status", status: "planning" });
-  broadcast({ type: "build_event", eventType: "moe_swap", message: `🧠 [MoE] Loading Planner Model (${plannerModel || model || "Auto"})...` });
+  emitOperation({ type: "status", status: "planning" });
+  emitOperation({
+    type: "build_event",
+    eventType: "moe_swap",
+    message: `🧠 [MoE] Loading Planner Model (${plannerModel || model || "Auto"})...`,
+  });
 
   const plan = await planApp({
     description,
@@ -282,11 +315,11 @@ const _createProjectInner = async (
     model: plannerModel || model,
     temperature,
     maxTokens,
-    onChunk: (chunk) => broadcast({ type: "plan_chunk", chunk }),
+    onChunk: (chunk) => emitOperation({ type: "plan_chunk", chunk }),
   });
 
   // Deduplicate project name
-  let projectSlug = plan.name;
+  projectSlug = plan.name;
   let suffix = 0;
   while (fs.existsSync(getProjectPath(projectSlug))) {
     suffix++;
@@ -295,10 +328,10 @@ const _createProjectInner = async (
 
   onProjectNameResolved?.(projectSlug);
 
-  broadcast({ type: "plan_complete", plan: { ...plan, name: projectSlug } });
+  emitOperation({ type: "plan_complete", plan: { ...plan, name: projectSlug } });
 
   // ── Step 2: Scaffold ──────────────────────────────────
-  broadcast({ type: "status", status: "scaffolding" });
+  emitOperation({ type: "status", status: "scaffolding" });
 
   const projectPath = await createProjectFromCache(
     projectSlug,
@@ -306,11 +339,15 @@ const _createProjectInner = async (
     plan.extraDependencies
   );
 
-  broadcast({ type: "scaffold_complete", projectName: projectSlug });
+  emitOperation({ type: "scaffold_complete" });
 
   // ── Step 3: Generate files ────────────────────────────
-  broadcast({ type: "status", status: "generating" });
-  broadcast({ type: "build_event", eventType: "moe_swap", message: `💻 [MoE] Swapping to Generation Model (${model || "Auto"})...` });
+  emitOperation({ type: "status", status: "generating" });
+  emitOperation({
+    type: "build_event",
+    eventType: "moe_swap",
+    message: `💻 [MoE] Swapping to Generation Model (${model || "Auto"})...`,
+  });
 
   const files = await generateFiles({
     projectName: projectSlug,
@@ -321,17 +358,17 @@ const _createProjectInner = async (
     temperature,
     maxTokens,
     onFileStart: (filepath, index, total) =>
-      broadcast({
+      emitOperation({
         type: "file_generating",
         filepath,
         progress: (index + 1) / total,
       }),
-    onChunk: (chunk) => broadcast({ type: "code_chunk", chunk }),
+    onChunk: (chunk) => emitOperation({ type: "code_chunk", chunk }),
     onFileComplete: (filepath) =>
-      broadcast({ type: "file_complete", filepath }),
+      emitOperation({ type: "file_complete", filepath }),
   });
 
-  broadcast({ type: "generation_complete", filesCount: files.length });
+  emitOperation({ type: "generation_complete", filesCount: files.length });
 
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
@@ -357,12 +394,19 @@ const _createProjectInner = async (
 
         if (retries === MAX_CONTRACT_RETRIES) {
           const summary = violations.map((v) => v.message).join("; ");
-          broadcast({ type: "system_error", error: `Contract violations in ${fp} after ${MAX_CONTRACT_RETRIES} retries: ${summary}` });
+          emitOperation({
+            type: "system_error",
+            error: `Contract violations in ${fp} after ${MAX_CONTRACT_RETRIES} retries: ${summary}`,
+          });
           break;
         }
 
         retries++;
-        broadcast({ type: "autofix_start", file: fp, error: `Contract violations: ${violations.length}` });
+        emitOperation({
+          type: "autofix_start",
+          file: fp,
+          error: `Contract violations: ${violations.length}`,
+        });
 
         const fixSuccess = await regenerateFileWithContracts(
           projectSlug, projectPath, fp, violations, allContracts,
@@ -385,15 +429,15 @@ const _createProjectInner = async (
   gitInit(projectPath);
 
   // ── Step 5: Deterministic Validation Gates ────────────
-  broadcast({ type: "status", status: "validating" });
+  emitOperation({ type: "status", status: "validating" });
   const gateResult = await runProjectQualityGates(
     projectPath,
     plan.navigation?.type
   );
   if (!gateResult.success) {
     const message = gateResult.errors.join("\n\n");
-    broadcast({ type: "system_error", error: message });
-    broadcast({ type: "status", status: "error" });
+    emitOperation({ type: "system_error", error: message });
+    emitOperation({ type: "status", status: "error" });
     return { projectName: projectSlug, port: 0, plan };
   }
 
@@ -401,7 +445,7 @@ const _createProjectInner = async (
   try {
     const typecheckResult = await runTypecheck(projectPath);
     if (!typecheckResult.success) {
-      broadcast({
+      emitOperation({
         type: "system_error",
         error: `TypeScript errors:\n${typecheckResult.combinedOutput.slice(0, 1000)}`,
       });
@@ -412,7 +456,17 @@ const _createProjectInner = async (
   }
 
   // ── Step 6: Build Verification Loop ───────────────────
-  broadcast({ type: "status", status: "building" });
+  const buildId = crypto.randomUUID();
+  emitOperation({
+    type: "status",
+    status: "building",
+    previewStatus: "starting",
+    buildId,
+  });
+  emitBuildScoped(buildId, {
+    type: "preview_status",
+    previewStatus: "starting",
+  });
 
   let buildSuccess = false;
   let buildError: string | null = null;
@@ -422,7 +476,13 @@ const _createProjectInner = async (
 
   // clearCache=true for initial project build
   const { port: expoPort } = await startExpo(projectSlug, projectPath, (event) => {
-    broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
+    emitBuildScoped(buildId, {
+      type: "build_event",
+      eventType: event.type,
+      message: event.message,
+      error: event.error,
+      previewStatus: "starting",
+    });
 
     if (event.type === "build_success") {
       buildSuccess = true;
@@ -450,7 +510,11 @@ const _createProjectInner = async (
     const parsed = parseMetroError(buildError);
     if (!parsed) break;
 
-    broadcast({ type: "autofix_start", file: parsed.file, error: parsed.raw });
+    emitBuildScoped(buildId, {
+      type: "autofix_start",
+      file: parsed.file,
+      error: parsed.raw,
+    });
 
     const fixResult = await autoFix({
       projectName: projectSlug,
@@ -458,15 +522,29 @@ const _createProjectInner = async (
       lmStudioUrl,
       maxAttempts: 1,
       onAttempt: () =>
-        broadcast({ type: "autofix_attempt", attempt: autoFixAttempts, maxAttempts: MAX_BUILD_AUTOFIX }),
+        emitBuildScoped(buildId, {
+          type: "autofix_attempt",
+          attempt: autoFixAttempts,
+          maxAttempts: MAX_BUILD_AUTOFIX,
+        }),
       onFix: (block) =>
-        broadcast({ type: "autofix_block", filepath: block.filepath }),
+        emitBuildScoped(buildId, {
+          type: "autofix_block",
+          filepath: block.filepath,
+        }),
     });
 
     if (fixResult.success) {
-      broadcast({ type: "autofix_success", attempts: autoFixAttempts });
+      emitBuildScoped(buildId, {
+        type: "autofix_success",
+        attempts: autoFixAttempts,
+      });
     } else {
-      broadcast({ type: "autofix_failed", attempts: autoFixAttempts, error: fixResult.lastError });
+      emitBuildScoped(buildId, {
+        type: "autofix_failed",
+        attempts: autoFixAttempts,
+        error: fixResult.lastError,
+      });
     }
 
     // Wait for Metro to recompile after fix
@@ -475,7 +553,11 @@ const _createProjectInner = async (
     await waitForBuildOutcome(30000, () => buildSuccess || Boolean(buildError));
 
     if (!buildSuccess && !buildError) {
-      broadcast({ type: "autofix_failed", attempts: autoFixAttempts, error: "Metro recompile timed out after fix" });
+      emitBuildScoped(buildId, {
+        type: "autofix_failed",
+        attempts: autoFixAttempts,
+        error: "Metro recompile timed out after fix",
+      });
       break;
     }
   }
@@ -488,17 +570,11 @@ const _createProjectInner = async (
     if (!postFixGateResult.success) {
       buildSuccess = false;
       buildError = postFixGateResult.errors.join("\n\n");
-      broadcast({ type: "system_error", error: buildError });
+      emitBuildScoped(buildId, { type: "system_error", error: buildError });
     }
   }
 
-  if (buildSuccess) {
-    broadcast({ type: "status", status: "ready" });
-  } else {
-    broadcast({ type: "status", status: buildError ? "error" : "ready" });
-  }
-
-  if (expoPort) {
+  if (buildSuccess && expoPort) {
     // Wait for Metro to actually accept requests before announcing preview
     let metroReady = false;
     for (let i = 0; i < 40; i++) {
@@ -510,17 +586,53 @@ const _createProjectInner = async (
     }
     if (metroReady) {
       setPreviewPort(projectSlug, expoPort);
-      broadcast({ type: "preview_ready", port: expoPort, projectName: projectSlug, proxyUrl: `/preview/${encodeURIComponent(projectSlug)}/` });
+      emitBuildScoped(buildId, {
+        type: "preview_ready",
+        port: expoPort,
+        proxyUrl: `/preview/${encodeURIComponent(projectSlug)}/`,
+      });
+      emitBuildScoped(buildId, {
+        type: "preview_status",
+        previewStatus: "ready",
+      });
+      emitOperation({
+        type: "status",
+        status: "ready",
+        previewStatus: "ready",
+        buildId,
+      });
     } else {
+      buildSuccess = false;
+      buildError = `Metro not ready on port ${expoPort}`;
       console.warn(`[Pipeline] Metro not ready on port ${expoPort} — preview not announced`);
     }
+  }
+
+  if (!buildSuccess || buildError) {
+    const previewError = buildError ?? "Preview failed to start";
+    emitBuildScoped(buildId, {
+      type: "preview_status",
+      previewStatus: "error",
+      error: previewError,
+    });
+    emitOperation({
+      type: "status",
+      status: "error",
+      previewStatus: "error",
+      buildId,
+    });
   }
 
   // Git commit the successful state
   if (buildSuccess) {
     const hash = gitCommit(projectPath, "v1: initial generation (build verified)");
     if (hash) {
-      broadcast({ type: "version_created", version: 1, hash, description: description.slice(0, 60) });
+      emitOperation({
+        type: "version_created",
+        version: 1,
+        hash,
+        description: description.slice(0, 60),
+      });
     }
   }
 
@@ -534,12 +646,20 @@ export const iterateProject = async (
     return await _iterateProjectInner(options);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    const scopedMessage = {
+      ...(options.requestId ? { requestId: options.requestId } : {}),
+      projectName: options.projectName,
+    };
     if (msg.includes("LLM_SERVER_DOWN") || msg.includes("LLM_NETWORK_ERROR")) {
-      broadcast({ type: "system_error", error: `AI server disconnected: ${msg}` });
+      broadcast({
+        type: "system_error",
+        error: `AI server disconnected: ${msg}`,
+        ...scopedMessage,
+      });
     } else {
-      broadcast({ type: "system_error", error: msg });
+      broadcast({ type: "system_error", error: msg, ...scopedMessage });
     }
-    broadcast({ type: "status", status: "error" });
+    broadcast({ type: "status", status: "error", ...scopedMessage });
     return { appliedBlocks: 0, failedBlocks: 0, errors: [msg] };
   }
 };
@@ -547,10 +667,17 @@ export const iterateProject = async (
 const _iterateProjectInner = async (
   options: IterateOptions
 ): Promise<IterateResult> => {
-  const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens } = options;
+  const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens, requestId } = options;
   const projectPath = getProjectPath(projectName);
+  const emitProject = (message: Record<string, unknown>): void => {
+    broadcast({
+      ...message,
+      projectName,
+      ...(requestId ? { requestId } : {}),
+    });
+  };
 
-  broadcast({ type: "status", status: "analyzing" });
+  emitProject({ type: "status", status: "analyzing" });
 
   const result = await editProject({
     projectName,
@@ -560,35 +687,43 @@ const _iterateProjectInner = async (
     model,
     temperature,
     maxTokens,
-    onThinking: (text) => broadcast({ type: "thinking", content: text }),
+    onThinking: (text) => emitProject({ type: "thinking", content: text }),
     onAnalysis: (action) =>
-      broadcast({
+      emitProject({
         type: "analysis_complete",
         files: action.files,
         thinking: action.thinking,
       }),
     onBlock: (block) =>
-      broadcast({ type: "block_applied", filepath: block.filepath, blockType: block.type }),
+      emitProject({ type: "block_applied", filepath: block.filepath, blockType: block.type }),
     onDiff: (filepath, before, after) =>
-      broadcast({ type: "file_diff", filepath, before: before.slice(0, 5000), after: after.slice(0, 5000) }),
+      emitProject({
+        type: "file_diff",
+        filepath,
+        before: before.slice(0, 5000),
+        after: after.slice(0, 5000),
+      }),
   });
 
   if (result.appliedBlocks > 0) {
-    broadcast({ type: "status", status: "validating" });
+    emitProject({ type: "status", status: "validating" });
 
     const gateResult = await runProjectQualityGates(projectPath);
     if (!gateResult.success) {
-      broadcast({
+      const combinedErrors = [...result.errors, ...gateResult.errors];
+      const failedCount = Math.max(result.failedBlocks, gateResult.errors.length, 1);
+      emitProject({
         type: "iteration_complete",
         applied: result.appliedBlocks,
-        failed: result.failedBlocks,
-        errors: [...result.errors, ...gateResult.errors],
+        failed: failedCount,
+        errors: combinedErrors,
       });
+      emitProject({ type: "status", status: "error" });
 
       return {
         appliedBlocks: result.appliedBlocks,
-        failedBlocks: result.failedBlocks,
-        errors: [...result.errors, ...gateResult.errors],
+        failedBlocks: failedCount,
+        errors: combinedErrors,
       };
     }
 
@@ -599,7 +734,7 @@ const _iterateProjectInner = async (
     );
 
     if (commitHash) {
-      broadcast({
+      emitProject({
         type: "version_created",
         version: versionNumber,
         hash: commitHash,
@@ -608,7 +743,7 @@ const _iterateProjectInner = async (
     }
   }
 
-  broadcast({
+  emitProject({
     type: "iteration_complete",
     applied: result.appliedBlocks,
     failed: result.failedBlocks,
@@ -625,17 +760,25 @@ const _iterateProjectInner = async (
 export const revertVersion = async (
   projectName: string,
   commitHash: string,
-  _lmStudioUrl?: string
+  _lmStudioUrl?: string,
+  requestId?: string
 ): Promise<void> => {
   const projectPath = getProjectPath(projectName);
   const port = getActivePort(projectName);
+  const emitProject = (message: Record<string, unknown>): void => {
+    broadcast({
+      ...message,
+      projectName,
+      ...(requestId ? { requestId } : {}),
+    });
+  };
 
-  broadcast({ type: "reloading_preview" });
+  emitProject({ type: "reloading_preview" });
 
   killExpo(projectName);
 
   if (!GIT_HASH_PATTERN.test(commitHash)) {
-    broadcast({
+    emitProject({
       type: "system_error",
       error: `Invalid commit hash: ${commitHash}`,
     });
@@ -646,7 +789,7 @@ export const revertVersion = async (
     runGitCommand(projectPath, ["clean", "-fd"]);
     runGitCommand(projectPath, ["checkout", commitHash, "--", "."]);
   } catch (err) {
-    broadcast({
+    emitProject({
       type: "system_error",
       error: `Git revert failed: ${err instanceof Error ? err.message : "unknown"}`,
     });
@@ -654,13 +797,43 @@ export const revertVersion = async (
   }
 
   if (port) {
+    const buildId = crypto.randomUUID();
+    emitProject({
+      type: "preview_status",
+      previewStatus: "starting",
+      buildId,
+    });
     await startExpoClearCache(projectName, projectPath, port, (event) => {
-      broadcast({ type: "build_event", eventType: event.type, message: event.message, error: event.error });
+      emitProject({
+        type: "build_event",
+        buildId,
+        eventType: event.type,
+        message: event.message,
+        error: event.error,
+        previewStatus: "starting",
+      });
     });
     setPreviewPort(projectName, port);
-    broadcast({ type: "preview_ready", port, projectName, proxyUrl: `/preview/${encodeURIComponent(projectName)}/` });
+    emitProject({
+      type: "preview_ready",
+      buildId,
+      port,
+      proxyUrl: `/preview/${encodeURIComponent(projectName)}/`,
+    });
+    emitProject({
+      type: "preview_status",
+      previewStatus: "ready",
+      buildId,
+    });
+    emitProject({
+      type: "status",
+      status: "ready",
+      previewStatus: "ready",
+      buildId,
+    });
   } else {
-    broadcast({ type: "status", status: "ready" });
+    emitProject({ type: "preview_status", previewStatus: "stopped", buildId: crypto.randomUUID() });
+    emitProject({ type: "status", status: "ready" });
   }
 };
 

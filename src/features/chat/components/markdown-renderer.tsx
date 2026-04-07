@@ -161,7 +161,7 @@ const renderInlineMarkdown = (text: string): ReactNode[] => {
 
     if (first.type === "bold") {
       parts.push(
-        <Text key={key++} style={{ fontWeight: "700", color: "#2D2D4A" }}>
+        <Text key={key++} style={{ fontWeight: "700", color: "#FFFFFF" }}>
           {first.m[1]}
         </Text>
       );
@@ -178,8 +178,8 @@ const renderInlineMarkdown = (text: string): ReactNode[] => {
           style={{
             fontFamily: CODE_FONT,
             fontSize: 12,
-            color: "#D946EF",
-            backgroundColor: "rgba(217, 70, 239, 0.08)",
+            color: "#FFD700",
+            backgroundColor: "rgba(255, 215, 0, 0.1)",
             paddingHorizontal: 4,
             borderRadius: 3,
           }}
@@ -192,7 +192,7 @@ const renderInlineMarkdown = (text: string): ReactNode[] => {
       parts.push(
         <Text
           key={key++}
-          style={{ color: isSafeUrl(url) ? "#00BCD4" : "#888", textDecorationLine: "underline" }}
+          style={{ color: isSafeUrl(url) ? "#00E5FF" : "#4A4A6A", textDecorationLine: "underline" }}
           onPress={() => {
             if (isSafeUrl(url)) {
               void Linking.openURL(url);
@@ -228,7 +228,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
               alignItems: "center",
             }}
           >
-            <Text style={{ color: "#666", fontSize: 9, fontFamily: CODE_FONT, textTransform: "uppercase", letterSpacing: 1 }}>
+            <Text style={{ color: "#4A4A6A", fontSize: 9, fontFamily: CODE_FONT, textTransform: "uppercase", letterSpacing: 1 }}>
               {lang}
             </Text>
           </View>
@@ -257,7 +257,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
     return (
       <View style={{ marginVertical: 6, borderRadius: 8, backgroundColor: "#1E1E2E", padding: 12 }}>
         {lang && (
-          <Text style={{ color: "#666", fontSize: 9, fontFamily: CODE_FONT, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+          <Text style={{ color: "#4A4A6A", fontSize: 9, fontFamily: CODE_FONT, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
             {lang}
           </Text>
         )}
@@ -282,7 +282,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
                 style={{
                   fontSize: sizes[(block.level ?? 1) - 1] ?? 13,
                   fontWeight: "700",
-                  color: "#2D2D4A",
+                  color: "#FFFFFF",
                   marginBottom: 4,
                   marginTop: i > 0 ? 8 : 0,
                 }}
@@ -303,7 +303,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
                     <Text style={{ color: '#7C4DFF', fontSize: 13, lineHeight: 20, marginRight: 6, fontWeight: '600', width: 16 }}>
                       {block.ordered ? `${j + 1}.` : "\u2022"}
                     </Text>
-                    <Text style={{ color: '#4A4A6A', fontSize: 13, lineHeight: 20, flex: 1 }}>
+                    <Text style={{ color: '#C0C0D0', fontSize: 13, lineHeight: 20, flex: 1 }}>
                       {renderInlineMarkdown(item)}
                     </Text>
                   </View>
@@ -325,19 +325,19 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
                   borderRadius: 4,
                 }}
               >
-                <Text style={{ color: "#6A6A8A", fontSize: 13, lineHeight: 20, fontStyle: "italic" }}>
+                <Text style={{ color: "#8888AA", fontSize: 13, lineHeight: 20, fontStyle: "italic" }}>
                   {renderInlineMarkdown(block.content)}
                 </Text>
               </View>
             );
 
           case "hr":
-            return <View key={i} style={{ height: 1, backgroundColor: "rgba(0,0,0,0.08)", marginVertical: 8 }} />;
+            return <View key={i} style={{ height: 1, backgroundColor: "rgba(255,215,0,0.1)", marginVertical: 8 }} />;
 
           case "paragraph":
           default:
             return (
-              <Text key={i} style={{ color: "#4A4A6A", fontSize: 13, lineHeight: 20, marginBottom: 6 }}>
+              <Text key={i} style={{ color: "#C0C0D0", fontSize: 13, lineHeight: 20, marginBottom: 6 }}>
                 {renderInlineMarkdown(block.content)}
               </Text>
             );

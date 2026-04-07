@@ -1,5 +1,5 @@
 // Moves welcome-screen orchestration out of the route so project loading and actions stay reusable.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { createUserMessage } from "@/features/chat/schemas/message.schema";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
@@ -33,6 +33,7 @@ export const useHomeScreenController = () => {
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [diskProjects, setDiskProjects] = useState<ProjectListItem[]>([]);
+  const enhanceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (projectName && status !== "idle") {
@@ -58,13 +59,19 @@ export const useHomeScreenController = () => {
         const projects = await apiClient.listProjects();
         setDiskProjects(projects);
         hydrateStoredProjects({ projects, addProject });
-      } catch (error) {
-        console.warn("[home-screen] Failed to list projects", error);
+      } catch {
+        useSettingsStore.getState().addErrorLog({ level: "warn", source: "home-screen", message: "Failed to list projects" });
       }
     };
 
     void loadProjects();
   }, [addProject, agentUrl]);
+
+  useEffect(() => () => {
+    if (enhanceErrorTimerRef.current) {
+      clearTimeout(enhanceErrorTimerRef.current);
+    }
+  }, [enhanceErrorTimerRef]);
 
   const allProjects = useMemo(() => (
     projectList.length > 0
@@ -98,11 +105,17 @@ export const useHomeScreenController = () => {
       const msg = error instanceof Error ? error.message : "Enhancement failed";
       setEnhanceError(msg);
       useSettingsStore.getState().addErrorLog({ level: "error", source: "enhance", message: msg });
-      setTimeout(() => setEnhanceError(null), 4_000);
+      if (enhanceErrorTimerRef.current) {
+        clearTimeout(enhanceErrorTimerRef.current);
+      }
+      enhanceErrorTimerRef.current = setTimeout(() => {
+        setEnhanceError(null);
+        enhanceErrorTimerRef.current = null;
+      }, 4_000);
     } finally {
       setEnhancing(false);
     }
-  }, [enhancerModel, lmStudioUrl, welcomeInput]);
+  }, [enhanceErrorTimerRef, enhancerModel, lmStudioUrl, welcomeInput]);
 
   const handleCreate = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -127,8 +140,8 @@ export const useHomeScreenController = () => {
 
     try {
       await apiClient.deleteAllProjects();
-    } catch (error) {
-      console.warn("[home-screen] Failed to clear projects", error);
+    } catch {
+      useSettingsStore.getState().addErrorLog({ level: "warn", source: "home-screen", message: "Failed to clear projects" });
     }
   }, [reset]);
 

@@ -42,7 +42,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
         <Text style={{ color: "#FF3366", fontSize: 14, fontWeight: "700", marginBottom: 8 }}>
           {this.props.fallbackLabel ?? "Something went wrong"}
         </Text>
-        <Text style={{ color: "#888", fontSize: 11, fontFamily: "monospace", textAlign: "center", marginBottom: 16, maxWidth: 400 }}>
+        <Text style={{ color: "#8888AA", fontSize: 11, fontFamily: "monospace", textAlign: "center", marginBottom: 16, maxWidth: 400 }}>
           {this.state.error?.message ?? "Unknown error"}
         </Text>
         <Pressable
@@ -50,7 +50,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
           className="px-4 py-2 rounded-xl"
           style={{ backgroundColor: "rgba(0,229,255,0.1)", borderWidth: 1, borderColor: "rgba(0,229,255,0.2)" }}
         >
-          <Text style={{ color: "#00BCD4", fontSize: 12, fontWeight: "600" }}>Try Again</Text>
+          <Text style={{ color: "#00E5FF", fontSize: 12, fontWeight: "600" }}>Try Again</Text>
         </Pressable>
       </View>
     );

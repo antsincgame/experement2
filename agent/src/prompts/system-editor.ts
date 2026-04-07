@@ -1,4 +1,4 @@
-// Reuses the shared generation contract so edit and autofix prompts follow the same import and icon rules.
+// Reuses the shared generation contract so edit and autofix prompts stay strict for Expo runtime while allowing web-only Tailwind references.
 import { ICON_CONTRACT, PATH_ALIAS } from "../lib/generation-contract.js";
 
 export const SYSTEM_EDITOR_ANALYZE = `You are an expert code analyzer for React Native (Expo) projects.
@@ -45,7 +45,7 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 3. Minimize changes — do NOT rewrite entire files.
 4. For new files, output the full code.
 5. Do NOT wrap SEARCH/REPLACE blocks in markdown code fences.
-6. Use StyleSheet.create for ALL styling — NO NativeWind, NO className prop.
+6. Use StyleSheet.create for styling in Expo runtime files unless the target file is clearly web-only HTML/CSS/JSX outside React Native.
 7. TypeScript strict — no \`any\`.
 8. FORBIDDEN: local binary assets. Use @expo/vector-icons or external URLs.
 9. Icons: \`import ${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}"\` (default import ONLY).
@@ -55,9 +55,13 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 
 ## FORBIDDEN (instant crash):
 - NativeWind
-- className prop on any React Native component
-- tailwind classes
+- className prop on React Native runtime components
+- tailwind classes inside Expo React Native runtime files
 - Inline style objects in JSX (extract to StyleSheet.create)
+
+## Web-Only Exception
+- If the target is a web-only template/snippet outside Expo React Native runtime, Tailwind utility classes and Alpine.js-compatible attribute patterns are allowed.
+- Do NOT introduce Alpine.js or raw Tailwind classes into \`app/**/*.tsx\` or \`src/**/*.tsx\` React Native runtime files.
 
 ## Response Format
 

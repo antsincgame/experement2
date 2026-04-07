@@ -36,11 +36,11 @@ const getFileIcon = (name: string) => {
 
 const getFileColor = (name: string): string => {
   const ext = name.split(".").pop() ?? "";
-  if (ext === "tsx" || ext === "jsx") return "#00F0FF";
-  if (ext === "ts" || ext === "js") return "#A1A1AA";
+  if (ext === "tsx" || ext === "jsx") return "#00E5FF";
+  if (ext === "ts" || ext === "js") return "#8888AA";
   if (ext === "json") return "#FFD700";
-  if (ext === "css") return "#BF00FF";
-  return "#52525B";
+  if (ext === "css") return "#7C4DFF";
+  return "#4A4A6A";
 };
 
 const FileTree = memo(
@@ -85,10 +85,10 @@ const TreeNode = memo(
             className="flex-row items-center h-7"
             style={{ paddingLeft: indent + 4 }}
           >
-            <Arrow size={12} color="#52525B" strokeWidth={1.5} />
+            <Arrow size={12} color="#4A4A6A" strokeWidth={1.5} />
             <FolderIcon
               size={14}
-              color="#A1A1AA"
+              color="#8888AA"
               strokeWidth={1.5}
               style={{ marginLeft: 2 }}
             />

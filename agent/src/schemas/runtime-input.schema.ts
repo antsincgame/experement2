@@ -1,4 +1,4 @@
-﻿// Defines strict Zod schemas for every HTTP and WebSocket payload, including model/runtime overrides.
+﻿// Defines strict Zod schemas for every HTTP and WebSocket payload, including required request scoping.
 import path from "path";
 import { z } from "zod";
 
@@ -69,7 +69,7 @@ export const ProjectFileQuerySchema = z.object({
 
 const RequestIdSchema = z.string().uuid("requestId must be a UUID");
 const WsRequestMetadataSchema = z.object({
-  requestId: RequestIdSchema.optional(),
+  requestId: RequestIdSchema,
 });
 
 const UserAssistantMessageSchema = z.object({

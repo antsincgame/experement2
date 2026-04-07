@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { View, Text, TextInput, Pressable, Modal, Platform, ScrollView } from "react-native";
 import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info } from "lucide-react-native";
 import { apiClient, type LmModel } from "@/shared/lib/api-client";
+import { mixedStyle } from "@/shared/lib/web-styles";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useProjectStore } from "@/stores/project-store";
 
@@ -12,7 +13,22 @@ interface SettingsDrawerProps {
 }
 
 const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
-  const settings = useSettingsStore();
+  const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
+  const setLmStudioUrl = useSettingsStore((state) => state.setLmStudioUrl);
+  const model = useSettingsStore((state) => state.model);
+  const setModel = useSettingsStore((state) => state.setModel);
+  const temperature = useSettingsStore((state) => state.temperature);
+  const setTemperature = useSettingsStore((state) => state.setTemperature);
+  const maxTokens = useSettingsStore((state) => state.maxTokens);
+  const setMaxTokens = useSettingsStore((state) => state.setMaxTokens);
+  const agentUrl = useSettingsStore((state) => state.agentUrl);
+  const setAgentUrl = useSettingsStore((state) => state.setAgentUrl);
+  const plannerModel = useSettingsStore((state) => state.plannerModel);
+  const setPlannerModel = useSettingsStore((state) => state.setPlannerModel);
+  const enhancerModel = useSettingsStore((state) => state.enhancerModel);
+  const setEnhancerModel = useSettingsStore((state) => state.setEnhancerModel);
+  const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
+  const setEnhancerEnabled = useSettingsStore((state) => state.setEnhancerEnabled);
   const lmStatus = useProjectStore((s) => s.lmStudioStatus);
   const isConnected = useProjectStore((s) => s.isConnected);
 
@@ -34,12 +50,12 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   }, []);
 
   // Debounce URL changes to avoid spamming fetch on each keystroke
-  const [debouncedUrl, setDebouncedUrl] = useState(settings.lmStudioUrl);
+  const [debouncedUrl, setDebouncedUrl] = useState(lmStudioUrl);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedUrl(settings.lmStudioUrl), 500);
+    const timer = setTimeout(() => setDebouncedUrl(lmStudioUrl), 500);
     return () => clearTimeout(timer);
-  }, [settings.lmStudioUrl]);
+  }, [lmStudioUrl]);
 
   useEffect(() => {
     if (visible) void fetchModels().catch(() => {});
@@ -47,36 +63,36 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <Pressable className="flex-1" style={{ backgroundColor: "rgba(0,0,0,0.3)" }} onPress={onClose} />
+      <Pressable className="flex-1" style={{ backgroundColor: "rgba(0,0,0,0.6)" }} onPress={onClose} />
       <View
         className="absolute bottom-0 left-0 right-0 rounded-t-3xl"
-        style={{
-          backgroundColor: "rgba(255, 255, 255, 0.85)",
+        style={mixedStyle({
+          backgroundColor: "rgba(18, 18, 31, 0.95)",
           ...(Platform.OS === "web"
             ? { backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }
             : {}),
           borderTopWidth: 1,
-          borderTopColor: "rgba(255,255,255,0.9)",
+          borderTopColor: "rgba(255,215,0,0.15)",
           maxHeight: "80%",
-        } as never}
+        })}
       >
         <View className="flex-row items-center justify-between px-6 py-4"
-          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" }}
+          style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,215,0,0.1)" }}
         >
           <View className="flex-row items-center gap-2">
-            <Settings size={15} color="#7C4DFF" strokeWidth={1.5} />
-            <Text className="text-ink-dark text-sm font-semibold">Settings</Text>
+            <Settings size={15} color="#FFD700" strokeWidth={1.5} />
+            <Text className="text-white text-sm font-semibold">Settings</Text>
           </View>
           <Pressable
             onPress={onClose}
             className="w-7 h-7 rounded-full items-center justify-center"
-            style={{ backgroundColor: "rgba(0,0,0,0.05)" }}
+            style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
           >
-            <X size={14} color="#4A4A6A" strokeWidth={1.5} />
+            <X size={14} color="#C0C0D0" strokeWidth={1.5} />
           </Pressable>
         </View>
 
-        <View className="flex-row gap-4 px-6 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.04)" }}>
+        <View className="flex-row gap-4 px-6 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}>
           <StatusBadge icon={isConnected ? Wifi : WifiOff} label="Agent" connected={isConnected} />
           <StatusBadge icon={Server} label="LM Studio" connected={lmStatus === "connected"} />
           <View className="flex-row items-center gap-1">
@@ -89,22 +105,22 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
         <ScrollView className="px-6 py-4 pb-8" contentContainerStyle={{ gap: 16 }}>
           <View>
-            <Field label="LM Studio URL" value={settings.lmStudioUrl} onChange={settings.setLmStudioUrl} />
+            <Field label="LM Studio URL" value={lmStudioUrl} onChange={setLmStudioUrl} />
             <View className="flex-row gap-1.5 mt-1.5">
               <Pressable
-                onPress={() => settings.setLmStudioUrl("http://localhost:1234")}
+                onPress={() => setLmStudioUrl("http://localhost:1234")}
                 className="px-2.5 py-1 rounded-lg"
                 style={{
-                  backgroundColor: settings.lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
+                  backgroundColor: lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
                   borderWidth: 1,
-                  borderColor: settings.lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
+                  borderColor: lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
                 }}
               >
-                <Text style={{ fontSize: 9, color: settings.lmStudioUrl.includes("1234") ? "#00BCD4" : "#888", fontWeight: "600" }}>LM Studio :1234</Text>
+                <Text style={{ fontSize: 9, color: lmStudioUrl.includes("1234") ? "#00E5FF" : "#4A4A6A", fontWeight: "600" }}>LM Studio :1234</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
-                  apiClient.testLlmConnection(settings.lmStudioUrl)
+                  apiClient.testLlmConnection(lmStudioUrl)
                     .then((result) => {
                       if (result.ok) {
                         alert(`LLM connected! ${result.models} models available.`);
@@ -116,12 +132,12 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                 className="px-2.5 py-1 rounded-lg"
                 style={{ backgroundColor: "rgba(0,255,136,0.1)", borderWidth: 1, borderColor: "rgba(0,255,136,0.2)" }}
               >
-                <Text style={{ fontSize: 9, color: "#00CC66", fontWeight: "600" }}>Test LM Studio</Text>
+                <Text style={{ fontSize: 9, color: "#00FF88", fontWeight: "600" }}>Test LM Studio</Text>
               </Pressable>
             </View>
           </View>
           <View>
-            <Field label="Agent URL" value={settings.agentUrl} onChange={settings.setAgentUrl} />
+            <Field label="Agent URL" value={agentUrl} onChange={setAgentUrl} />
             <Pressable
               onPress={() => {
                 apiClient.testAgentConnection()
@@ -135,7 +151,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               className="mt-1.5 px-3 py-1.5 rounded-lg self-start"
               style={{ backgroundColor: "rgba(0,229,255,0.1)", borderWidth: 1, borderColor: "rgba(0,229,255,0.2)" }}
             >
-              <Text style={{ fontSize: 10, color: "#00BCD4", fontWeight: "600" }}>Test Connection</Text>
+              <Text style={{ fontSize: 10, color: "#00FF88", fontWeight: "600" }}>Test Connection</Text>
             </Pressable>
           </View>
 
@@ -146,8 +162,8 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             loading={modelsLoading}
             open={modelDropdownOpen}
             onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); }}
-            onSelect={(id) => { settings.setModel(id); setModelDropdownOpen(false); }}
-            currentModel={settings.model || models[0]?.id || "auto (first loaded)"}
+            onSelect={(id) => { setModel(id); setModelDropdownOpen(false); }}
+            currentModel={model || models[0]?.id || "auto (first loaded)"}
           />
           <ModelSelector
             label="Planner Model (Architecture)"
@@ -155,16 +171,16 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             loading={modelsLoading}
             open={plannerDropdownOpen}
             onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEnhancerDropdownOpen(false); }}
-            onSelect={(id) => { settings.setPlannerModel(id); setPlannerDropdownOpen(false); }}
-            currentModel={settings.plannerModel || "same as generation"}
+            onSelect={(id) => { setPlannerModel(id); setPlannerDropdownOpen(false); }}
+            currentModel={plannerModel || "same as generation"}
           />
 
           <View className="flex-row gap-4">
             <View className="flex-1">
-              <Field label="Temperature" value={String(settings.temperature)} onChange={(v) => settings.setTemperature(parseFloat(v) || 0.4)} keyboardType="numeric" />
+              <Field label="Temperature" value={String(temperature)} onChange={(v) => setTemperature(parseFloat(v) || 0.4)} keyboardType="numeric" />
             </View>
             <View className="flex-1">
-              <Field label="Max Tokens" value={String(settings.maxTokens)} onChange={(v) => settings.setMaxTokens(parseInt(v, 10) || 65536)} keyboardType="numeric" />
+              <Field label="Max Tokens" value={String(maxTokens)} onChange={(v) => setMaxTokens(parseInt(v, 10) || 65536)} keyboardType="numeric" />
             </View>
           </View>
 
@@ -174,16 +190,16 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             style={{ backgroundColor: "rgba(124, 77, 255, 0.06)", borderWidth: 1, borderColor: "rgba(124, 77, 255, 0.15)" }}
           >
             <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-ink-base text-xs font-semibold">Prompt Enhancer</Text>
+              <Text className="text-white text-xs font-semibold">Prompt Enhancer</Text>
               <Pressable
-                onPress={() => settings.setEnhancerEnabled(!settings.enhancerEnabled)}
+                onPress={() => setEnhancerEnabled(!enhancerEnabled)}
                 className="px-2 py-0.5 rounded"
                 style={{
-                  backgroundColor: settings.enhancerEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
+                  backgroundColor: enhancerEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
                 }}
               >
-                <Text style={{ fontSize: 10, color: settings.enhancerEnabled ? "#00E5FF" : "#8888AA" }}>
-                  {settings.enhancerEnabled ? "ON" : "OFF"}
+                <Text style={{ fontSize: 10, color: enhancerEnabled ? "#00E5FF" : "#8888AA" }}>
+                  {enhancerEnabled ? "ON" : "OFF"}
                 </Text>
               </Pressable>
             </View>
@@ -193,8 +209,8 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               loading={modelsLoading}
               open={enhancerDropdownOpen}
               onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); }}
-              onSelect={(id) => { settings.setEnhancerModel(id); setEnhancerDropdownOpen(false); }}
-              currentModel={settings.enhancerModel || "same as generation"}
+              onSelect={(id) => { setEnhancerModel(id); setEnhancerDropdownOpen(false); }}
+              currentModel={enhancerModel || "same as generation"}
             />
           </View>
 
@@ -219,17 +235,17 @@ interface ModelSelectorProps {
 
 const ModelSelector = ({ label, models, loading, open, onToggle, onSelect, currentModel }: ModelSelectorProps) => (
   <View>
-    <Text className="text-ink-light text-[10px] uppercase tracking-wider mb-1.5 font-medium">{label}</Text>
+    <Text className="text-ink-faint text-[10px] uppercase tracking-wider mb-1.5 font-medium">{label}</Text>
     <Pressable
       onPress={onToggle}
       className="flex-row items-center justify-between px-3 py-2.5 rounded-xl"
       style={{
-        backgroundColor: "rgba(255,255,255,0.7)",
+        backgroundColor: "rgba(26,26,46,0.6)",
         borderWidth: 1,
-        borderColor: open ? "rgba(0,229,255,0.4)" : "rgba(0,0,0,0.06)",
+        borderColor: open ? "rgba(255,215,0,0.4)" : "rgba(255,255,255,0.08)",
       }}
     >
-      <Text style={{ fontSize: 12, color: "#4A4A6A", flex: 1 }} numberOfLines={1}>
+      <Text style={{ fontSize: 12, color: "#C0C0D0", flex: 1 }} numberOfLines={1}>
         {loading ? "Loading models..." : currentModel}
       </Text>
       <ChevronDown size={12} color="#8888AA" strokeWidth={1.5} />
@@ -237,13 +253,13 @@ const ModelSelector = ({ label, models, loading, open, onToggle, onSelect, curre
     {open && models.length > 0 && (
       <View
         className="mt-1 rounded-xl overflow-hidden"
-        style={{
-          backgroundColor: "rgba(255,255,255,0.95)",
+        style={mixedStyle({
+          backgroundColor: "rgba(18,18,31,0.95)",
           borderWidth: 1,
-          borderColor: "rgba(0,0,0,0.08)",
-          ...(Platform.OS === "web" ? { boxShadow: "0 4px 16px rgba(0,0,0,0.1)" } : {}),
+          borderColor: "rgba(255,215,0,0.15)",
+          ...(Platform.OS === "web" ? { boxShadow: "0 4px 16px rgba(0,0,0,0.4)" } : {}),
           maxHeight: 150,
-        } as never}
+        })}
       >
         <ScrollView>
           {models.map((m) => (
@@ -253,11 +269,11 @@ const ModelSelector = ({ label, models, loading, open, onToggle, onSelect, curre
               className="px-3 py-2.5"
               style={{
                 borderBottomWidth: 1,
-                borderBottomColor: "rgba(0,0,0,0.04)",
-                backgroundColor: m.id === currentModel ? "rgba(0,229,255,0.08)" : "transparent",
+                borderBottomColor: "rgba(255,255,255,0.04)",
+                backgroundColor: m.id === currentModel ? "rgba(255,215,0,0.1)" : "transparent",
               }}
             >
-              <Text style={{ fontSize: 11, color: m.id === currentModel ? "#00BCD4" : "#4A4A6A" }} numberOfLines={1}>
+              <Text style={{ fontSize: 11, color: m.id === currentModel ? "#FFD700" : "#C0C0D0" }} numberOfLines={1}>
                 {m.id}
               </Text>
             </Pressable>
@@ -298,16 +314,16 @@ interface FieldProps {
 
 const Field = ({ label, value, onChange, keyboardType = "default" }: FieldProps) => (
   <View>
-    <Text className="text-ink-light text-[10px] uppercase tracking-wider mb-1.5 font-medium">{label}</Text>
+    <Text className="text-ink-faint text-[10px] uppercase tracking-wider mb-1.5 font-medium">{label}</Text>
     <TextInput
       value={value}
       onChangeText={onChange}
       keyboardType={keyboardType}
-      className="text-ink-dark text-sm px-3 py-2.5 rounded-xl"
+      className="text-white text-sm px-3 py-2.5 rounded-xl"
       style={{
-        backgroundColor: "rgba(255,255,255,0.7)",
+        backgroundColor: "rgba(26,26,46,0.6)",
         borderWidth: 1,
-        borderColor: "rgba(0,0,0,0.06)",
+        borderColor: "rgba(255,255,255,0.08)",
       }}
     />
   </View>
@@ -364,7 +380,7 @@ const ErrorLogPanel = () => {
       >
         <View className="flex-row items-center gap-2">
           <AlertTriangle size={13} color={headerColor} strokeWidth={1.5} />
-          <Text className="text-ink-base text-xs font-semibold">Event Log</Text>
+          <Text className="text-white text-xs font-semibold">Event Log</Text>
           <View className="flex-row items-center gap-1.5">
             {errorCount > 0 && (
               <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,51,102,0.15)" }}>
@@ -373,11 +389,11 @@ const ErrorLogPanel = () => {
             )}
             {warnCount > 0 && (
               <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,215,0,0.12)" }}>
-                <Text style={{ fontSize: 8, color: "#B8860B", fontWeight: "700" }}>{warnCount} warn</Text>
+                <Text style={{ fontSize: 8, color: "#FFD700", fontWeight: "700" }}>{warnCount} warn</Text>
               </View>
             )}
             <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(0,229,255,0.08)" }}>
-              <Text style={{ fontSize: 8, color: "#00BCD4", fontWeight: "600" }}>{errorLogs.length} total</Text>
+              <Text style={{ fontSize: 8, color: "#00E5FF", fontWeight: "600" }}>{errorLogs.length} total</Text>
             </View>
           </View>
         </View>
@@ -408,7 +424,7 @@ const ErrorLogPanel = () => {
             {(["all", "error", "warn", "info"] as const).map((level) => {
               const isActive = filter === level;
               const count = level === "all" ? errorLogs.length : level === "error" ? errorCount : level === "warn" ? warnCount : infoCount;
-              const color = level === "error" ? "#FF3366" : level === "warn" ? "#FFD700" : level === "info" ? "#00E5FF" : "#666";
+              const color = level === "error" ? "#FF3366" : level === "warn" ? "#FFD700" : level === "info" ? "#00E5FF" : "#4A4A6A";
               return (
                 <Pressable
                   key={level}
@@ -420,7 +436,7 @@ const ErrorLogPanel = () => {
                     borderColor: isActive ? `${color}30` : "transparent",
                   }}
                 >
-                  <Text style={{ fontSize: 9, color: isActive ? color : "#888", fontWeight: isActive ? "700" : "500" }}>
+                    <Text style={{ fontSize: 9, color: isActive ? color : "#4A4A6A", fontWeight: isActive ? "700" : "500" }}>
                     {level.toUpperCase()} ({count})
                   </Text>
                 </Pressable>
@@ -454,16 +470,16 @@ const ErrorLogPanel = () => {
                       <View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: levelColor }} />
                       <Text style={{ fontSize: 8, color: "#8888AA", fontFamily: "monospace" }}>{time}</Text>
                       <Text style={{ fontSize: 8, color: levelColor, fontWeight: "700" }}>{entry.level.toUpperCase()}</Text>
-                      <Text style={{ fontSize: 8, color: "#666" }}>[{entry.source}]</Text>
+                      <Text style={{ fontSize: 8, color: "#4A4A6A" }}>[{entry.source}]</Text>
                       <View className="flex-1" />
-                      <Copy size={8} color="#CCC" />
+                      <Copy size={8} color="#C0C0D0" />
                     </View>
-                    <Text style={{ fontSize: 11, color: "#4A4A6A", lineHeight: 15 }} numberOfLines={2}>
+                    <Text style={{ fontSize: 11, color: "#C0C0D0", lineHeight: 15 }} numberOfLines={2}>
                       {entry.message}
                     </Text>
                     {entry.details && (
                       <Text
-                        style={{ fontSize: 9, color: "#888", fontFamily: "monospace", marginTop: 2, lineHeight: 13 }}
+                        style={{ fontSize: 9, color: "#8888AA", fontFamily: "monospace", marginTop: 2, lineHeight: 13 }}
                         numberOfLines={5}
                       >
                         {entry.details}

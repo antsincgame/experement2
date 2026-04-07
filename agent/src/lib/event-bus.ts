@@ -1,4 +1,4 @@
-// Centralizes preview routing and scope-aware WebSocket delivery so project events do not leak across clients.
+// Centralizes preview routing and explicit scope-aware WebSocket delivery so project events do not leak across clients.
 import type { NextFunction, Request, Response } from "express";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { WebSocket } from "ws";
@@ -7,7 +7,7 @@ import { createPreviewProxy } from "../services/preview-proxy.js";
 // ── WebSocket clients ──
 const clients = new Map<string, WebSocket>();
 
-interface EventScope {
+export interface EventScope {
   clientId?: string;
   projectName?: string;
   requestId?: string;
@@ -15,17 +15,45 @@ interface EventScope {
 
 const eventScopeStorage = new AsyncLocalStorage<EventScope>();
 
-const withScopeMessage = (message: Record<string, unknown>): Record<string, unknown> => {
-  const scope = eventScopeStorage.getStore();
-  if (!scope) {
+const mergeScopeIntoMessage = (
+  message: Record<string, unknown>,
+  scope?: EventScope
+): Record<string, unknown> => {
+  const effectiveScope = scope ?? eventScopeStorage.getStore();
+  if (!effectiveScope) {
     return message;
   }
 
   return {
-    ...(scope.projectName && message.projectName === undefined ? { projectName: scope.projectName } : {}),
-    ...(scope.requestId && message.requestId === undefined ? { requestId: scope.requestId } : {}),
+    ...(effectiveScope.projectName && message.projectName === undefined ? { projectName: effectiveScope.projectName } : {}),
+    ...(effectiveScope.requestId && message.requestId === undefined ? { requestId: effectiveScope.requestId } : {}),
     ...message,
   };
+};
+
+const getEffectiveScope = (scope?: EventScope): EventScope | undefined => {
+  if (scope) {
+    return scope;
+  }
+
+  return eventScopeStorage.getStore();
+};
+
+const sendScopedToClient = (
+  clientId: string,
+  message: Record<string, unknown>,
+  scope?: EventScope
+): void => {
+  const ws = clients.get(clientId);
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  safeSend(
+    clientId,
+    ws,
+    JSON.stringify(mergeScopeIntoMessage(message, getEffectiveScope(scope)))
+  );
 };
 
 export const runWithEventScope = <T>(scope: EventScope, task: () => T): T =>
@@ -39,29 +67,44 @@ export const unregisterClient = (clientId: string): void => {
   clients.delete(clientId);
 };
 
-export const broadcast = (message: Record<string, unknown>): void => {
-  const scopedMessage = withScopeMessage(message);
-  const scope = eventScopeStorage.getStore();
-  if (scope?.clientId) {
-    sendToClient(scope.clientId, scopedMessage);
+const safeSend = (clientId: string, ws: WebSocket, data: string): void => {
+  try {
+    ws.send(data);
+  } catch {
+    unregisterClient(clientId);
+    try {
+      ws.close();
+    } catch {
+      // Socket is already closing/closed.
+    }
+  }
+};
+
+export const broadcast = (
+  message: Record<string, unknown>,
+  scope?: EventScope
+): void => {
+  const effectiveScope = getEffectiveScope(scope);
+  const scopedMessage = mergeScopeIntoMessage(message, effectiveScope);
+  if (effectiveScope?.clientId) {
+    sendScopedToClient(effectiveScope.clientId, scopedMessage);
     return;
   }
 
   const data = JSON.stringify(scopedMessage);
-  for (const ws of clients.values()) {
+  for (const [clientId, ws] of clients.entries()) {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
+      safeSend(clientId, ws, data);
     }
   }
 };
 
 export const sendToClient = (
   clientId: string,
-  message: Record<string, unknown>
+  message: Record<string, unknown>,
+  scope?: EventScope
 ): void => {
-  const ws = clients.get(clientId);
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify(withScopeMessage(message)));
+  sendScopedToClient(clientId, message, scope);
 };
 
 // ── Per-project preview proxy ──
@@ -111,7 +154,14 @@ export const handlePreviewRequest = (
   // Extract project name from URL: /preview/:projectName/...
   const pathAfterPreview = req.path; // already stripped of /preview by Express mount
   const segments = pathAfterPreview.split("/").filter(Boolean);
-  const projectName = segments[0] ? decodeURIComponent(segments[0]) : undefined;
+  let projectName: string | undefined;
+
+  try {
+    projectName = segments[0] ? decodeURIComponent(segments[0]) : undefined;
+  } catch {
+    res.status(400).send("Preview project name is not valid URL encoding.");
+    return;
+  }
 
   if (!projectName) {
     res.status(400).send("Preview requests must include a project name.");

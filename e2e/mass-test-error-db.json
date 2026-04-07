@@ -1,0 +1,222 @@
+{
+  "generatedAt": "2026-04-07T00:02:12.765Z",
+  "config": {
+    "lmUrl": "http://localhost:1234",
+    "agentWsUrl": "ws://localhost:3100",
+    "model": "qwen/qwen3-coder-30b",
+    "enhancerModel": "google/gemma-4-26b-a4b",
+    "timeoutMs": 300000,
+    "promptCount": 12
+  },
+  "stats": {
+    "total": 12,
+    "ready": 0,
+    "error": 12,
+    "timeout": 0,
+    "ws_error": 0
+  },
+  "categories": [
+    {
+      "category": "typescript_ts2322",
+      "count": 5,
+      "projectCount": 5,
+      "projects": [
+        "Color palette generator",
+        "Counter with increment and decrement",
+        "Random quote viewer",
+        "Simple calculator",
+        "Tip calculator"
+      ],
+      "signatures": [
+        "TS2322:app/(tabs)/_layout.tsx(line,col): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"divide\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | ",
+        "TS2322:app/(tabs)/_layout.tsx(line,col): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | ",
+        "TS2322:app/(tabs)/_layout.tsx(line,col): error TS2322: Type '\"palette\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"li",
+        "TS2322:src/components/CounterCard.tsx(line,col): error TS2322: Type '{ children: Element[]; bg: \"$background\"; borderRadius: number; p: \"$<n>\"; elevation: number; ai: \"center\"; jc: \"cente",
+        "TS2322:src/components/QuoteCard.tsx(line,col): error TS2322: Type '\"heart\" | \"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"re"
+      ],
+      "tsCodes": [
+        "TS2322"
+      ],
+      "samples": [
+        "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"divide\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | ... 268 ",
+        "Typecheck failed:\nsrc/components/CounterCard.tsx(69,7): error TS2322: Type '{ children: Element[]; bg: \"$background\"; borderRadius: number; p: \"$6\"; elevation: number; ai: \"center\"; jc: \"center\"; gap: \"$4\"; w: \"100%\"; maxW: number; }' is not assignable to type 'IntrinsicAttributes & Omit<RNTamaguiVi",
+        "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 m",
+        "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"palette\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more",
+        "Typecheck failed:\nsrc/components/QuoteCard.tsx(49,13): error TS2322: Type '\"heart\" | \"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | "
+      ]
+    },
+    {
+      "category": "typescript_ts2304",
+      "count": 3,
+      "projectCount": 3,
+      "projects": [
+        "Expense tracker",
+        "Note taking app",
+        "Todo list app"
+      ],
+      "signatures": [
+        "TS2304:app/(tabs)/add.tsx(line,col): error TS2304: Cannot find name 'Expense'. src/components/CategoryChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>",
+        "TS2304:app/(tabs)/index.tsx(line,col): error TS2304: Cannot find name 'Task'. src/components/BottomSheetTaskCreator.tsx(line,col): error TS2304: Cannot find name 'Task'. src/components/Bo",
+        "TS2304:src/hooks/useNotes.ts(line,col): error TS2304: Cannot find name 'Note'."
+      ],
+      "tsCodes": [
+        "TS2304",
+        "TS2322",
+        "TS2769"
+      ],
+      "samples": [
+        "Typecheck failed:\napp/(tabs)/index.tsx(24,41): error TS2304: Cannot find name 'Task'.\r\nsrc/components/BottomSheetTaskCreator.tsx(11,26): error TS2304: Cannot find name 'Task'.\r\nsrc/components/BottomSheetTaskCreator.tsx(127,13): error TS2322: Type '\"datetime\"' is not assignable to type 'KeyboardTypeO",
+        "Typecheck failed:\nsrc/hooks/useNotes.ts(5,38): error TS2304: Cannot find name 'Note'.",
+        "Typecheck failed:\napp/(tabs)/add.tsx(10,47): error TS2304: Cannot find name 'Expense'.\r\nsrc/components/CategoryChart.tsx(63,10): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & BarChartProps): BarChart', gave the following error.\r\n    Property 'yAxisSuf"
+      ]
+    },
+    {
+      "category": "static_validation_failure",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Flashcard quiz app"
+      ],
+      "signatures": [
+        "generic:Static validation failed: src/hooks/useHaptics.ts: import \"@/stores/settingsStore\" cannot be resolved from src/hooks/useHaptics.ts"
+      ],
+      "tsCodes": [],
+      "samples": [
+        "Static validation failed: src/hooks/useHaptics.ts: import \"@/stores/settingsStore\" cannot be resolved from src/hooks/useHaptics.ts"
+      ]
+    },
+    {
+      "category": "other",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Unit converter"
+      ],
+      "signatures": [
+        "generic:LLM error (<n>): <!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-<n>\"> <title>Error</title> </head> <body> <pre>Internal Server Error</pre> </body> </html>"
+      ],
+      "tsCodes": [],
+      "samples": [
+        "LLM error (500): <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Internal Server Error</pre>\n</body>\n</html>\n"
+      ]
+    },
+    {
+      "category": "typescript_ts2339",
+      "count": 1,
+      "projectCount": 1,
+      "projects": [
+        "Weather dashboard"
+      ],
+      "signatures": [
+        "TS2339:app/(tabs)/index.tsx(line,col): error TS2339: Property 'name' does not exist on type 'never'. src/components/PrecipitationTimeline.tsx(line,col): error TS2339: Property 'hourlyFore"
+      ],
+      "tsCodes": [
+        "TS2339"
+      ],
+      "samples": [
+        "Typecheck failed:\napp/(tabs)/index.tsx(17,39): error TS2339: Property 'name' does not exist on type 'never'.\r\nsrc/components/PrecipitationTimeline.tsx(15,36): error TS2339: Property 'hourlyForecast' does not exist on type 'never'.\r\nsrc/components/PrecipitationTimeline.tsx(32,38): error TS2339: Prope"
+      ]
+    }
+  ],
+  "signatures": [
+    {
+      "signature": "TS2304:app/(tabs)/index.tsx(line,col): error TS2304: Cannot find name 'Task'. src/components/BottomSheetTaskCreator.tsx(line,col): error TS2304: Cannot find name 'Task'. src/components/Bo",
+      "category": "typescript_ts2304",
+      "count": 1,
+      "projects": [
+        "Todo list app"
+      ],
+      "sample": "Typecheck failed:\napp/(tabs)/index.tsx(24,41): error TS2304: Cannot find name 'Task'.\r\nsrc/components/BottomSheetTaskCreator.tsx(11,26): error TS2304: Cannot find name 'Task'.\r\nsrc/components/BottomSheetTaskCreator.tsx(127,13): error TS2322: Type '\"datetime\"' is not assignable to type 'KeyboardTypeO"
+    },
+    {
+      "signature": "TS2322:app/(tabs)/_layout.tsx(line,col): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"divide\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | ",
+      "category": "typescript_ts2322",
+      "count": 1,
+      "projects": [
+        "Simple calculator"
+      ],
+      "sample": "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"divide\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | ... 268 "
+    },
+    {
+      "signature": "TS2322:src/components/CounterCard.tsx(line,col): error TS2322: Type '{ children: Element[]; bg: \"$background\"; borderRadius: number; p: \"$<n>\"; elevation: number; ai: \"center\"; jc: \"cente",
+      "category": "typescript_ts2322",
+      "count": 1,
+      "projects": [
+        "Counter with increment and decrement"
+      ],
+      "sample": "Typecheck failed:\nsrc/components/CounterCard.tsx(69,7): error TS2322: Type '{ children: Element[]; bg: \"$background\"; borderRadius: number; p: \"$6\"; elevation: number; ai: \"center\"; jc: \"center\"; gap: \"$4\"; w: \"100%\"; maxW: number; }' is not assignable to type 'IntrinsicAttributes & Omit<RNTamaguiVi"
+    },
+    {
+      "signature": "TS2304:src/hooks/useNotes.ts(line,col): error TS2304: Cannot find name 'Note'.",
+      "category": "typescript_ts2304",
+      "count": 1,
+      "projects": [
+        "Note taking app"
+      ],
+      "sample": "Typecheck failed:\nsrc/hooks/useNotes.ts(5,38): error TS2304: Cannot find name 'Note'."
+    },
+    {
+      "signature": "generic:Static validation failed: src/hooks/useHaptics.ts: import \"@/stores/settingsStore\" cannot be resolved from src/hooks/useHaptics.ts",
+      "category": "static_validation_failure",
+      "count": 1,
+      "projects": [
+        "Flashcard quiz app"
+      ],
+      "sample": "Static validation failed: src/hooks/useHaptics.ts: import \"@/stores/settingsStore\" cannot be resolved from src/hooks/useHaptics.ts"
+    },
+    {
+      "signature": "generic:LLM error (<n>): <!DOCTYPE html> <html lang=\"en\"> <head> <meta charset=\"utf-<n>\"> <title>Error</title> </head> <body> <pre>Internal Server Error</pre> </body> </html>",
+      "category": "other",
+      "count": 1,
+      "projects": [
+        "Unit converter"
+      ],
+      "sample": "LLM error (500): <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Internal Server Error</pre>\n</body>\n</html>\n"
+    },
+    {
+      "signature": "TS2322:app/(tabs)/_layout.tsx(line,col): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | ",
+      "category": "typescript_ts2322",
+      "count": 1,
+      "projects": [
+        "Tip calculator"
+      ],
+      "sample": "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"calculator\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 m"
+    },
+    {
+      "signature": "TS2322:app/(tabs)/_layout.tsx(line,col): error TS2322: Type '\"palette\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"li",
+      "category": "typescript_ts2322",
+      "count": 1,
+      "projects": [
+        "Color palette generator"
+      ],
+      "sample": "Typecheck failed:\napp/(tabs)/_layout.tsx(12,22): error TS2322: Type '\"palette\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | \"radio\" | ... 268 more"
+    },
+    {
+      "signature": "TS2322:src/components/QuoteCard.tsx(line,col): error TS2322: Type '\"heart\" | \"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"re",
+      "category": "typescript_ts2322",
+      "count": 1,
+      "projects": [
+        "Random quote viewer"
+      ],
+      "sample": "Typecheck failed:\nsrc/components/QuoteCard.tsx(49,13): error TS2322: Type '\"heart\" | \"heart-outline\"' is not assignable to type '\"settings\" | \"italic\" | \"bold\" | \"map\" | \"filter\" | \"search\" | \"repeat\" | \"anchor\" | \"link\" | \"code\" | \"menu\" | \"video\" | \"circle\" | \"image\" | \"layout\" | \"key\" | \"type\" | "
+    },
+    {
+      "signature": "TS2339:app/(tabs)/index.tsx(line,col): error TS2339: Property 'name' does not exist on type 'never'. src/components/PrecipitationTimeline.tsx(line,col): error TS2339: Property 'hourlyFore",
+      "category": "typescript_ts2339",
+      "count": 1,
+      "projects": [
+        "Weather dashboard"
+      ],
+      "sample": "Typecheck failed:\napp/(tabs)/index.tsx(17,39): error TS2339: Property 'name' does not exist on type 'never'.\r\nsrc/components/PrecipitationTimeline.tsx(15,36): error TS2339: Property 'hourlyForecast' does not exist on type 'never'.\r\nsrc/components/PrecipitationTimeline.tsx(32,38): error TS2339: Prope"
+    },
+    {
+      "signature": "TS2304:app/(tabs)/add.tsx(line,col): error TS2304: Cannot find name 'Expense'. src/components/CategoryChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>",
+      "category": "typescript_ts2304",
+      "count": 1,
+      "projects": [
+        "Expense tracker"
+      ],
+      "sample": "Typecheck failed:\napp/(tabs)/add.tsx(10,47): error TS2304: Cannot find name 'Expense'.\r\nsrc/components/CategoryChart.tsx(63,10): error TS2769: No overload matches this call.\r\n  Overload 1 of 2, '(props: AbstractChartProps & BarChartProps): BarChart', gave the following error.\r\n    Property 'yAxisSuf"
+    }
+  ]
+}

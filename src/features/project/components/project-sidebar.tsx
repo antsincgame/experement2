@@ -8,6 +8,7 @@ import {
   Platform,
 } from "react-native";
 import { FolderOpen, Plus, X } from "lucide-react-native";
+import { mixedStyle } from "@/shared/lib/web-styles";
 import type { ProjectEntry } from "@/stores/project-store.types";
 
 interface ProjectSidebarProps {
@@ -26,27 +27,27 @@ const ProjectSidebar = ({
   onSelectProject,
 }: ProjectSidebarProps) => (
   <View
-    style={{
+    style={mixedStyle({
       width: 180,
-      backgroundColor: "rgba(255,255,255,0.45)",
+      backgroundColor: "rgba(26,26,46,0.85)",
       borderRightWidth: 1,
-      borderRightColor: "rgba(0,0,0,0.06)",
+      borderRightColor: "rgba(255,215,0,0.1)",
       ...(Platform.OS === "web"
         ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }
         : {}),
-    } as never}
+    })}
   >
     <View
       className="px-3 py-2.5 flex-row items-center justify-between"
-      style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" }}
+      style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,215,0,0.1)" }}
     >
       <View className="flex-row items-center gap-1.5">
-        <FolderOpen size={12} color="#7C4DFF" strokeWidth={1.5} />
+        <FolderOpen size={12} color="#FFD700" strokeWidth={1.5} />
         <Text
           style={{
             fontSize: 10,
             fontWeight: "700",
-            color: "#4A4A6A",
+            color: "#C0C0D0",
             letterSpacing: 1,
             textTransform: "uppercase",
           }}
@@ -93,7 +94,7 @@ const ProjectSidebar = ({
                 style={{
                   fontSize: 11,
                   fontWeight: isActive ? "600" : "400",
-                  color: isActive ? "#00BCD4" : "#4A4A6A",
+                  color: isActive ? "#00E5FF" : "#C0C0D0",
                 }}
                 numberOfLines={1}
               >

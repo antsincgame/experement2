@@ -1,4 +1,4 @@
-// Covers the pure project-store transitions that guard multi-project switching and hydration behavior.
+// Covers the pure project and preview store transitions that guard multi-project switching and hydration behavior.
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../features/chat/schemas/message.schema";
 import {
@@ -22,6 +22,7 @@ const createState = (): ProjectState => ({
     { name: "beta", displayName: "Beta", status: "ready", port: null, createdAt: 2 },
   ],
   status: "generating",
+  previewStatus: "ready",
   plan: null,
   messages: [createMessage("current alpha message")],
   fileTree: [{ name: "app.tsx", path: "app.tsx", type: "file" }],
@@ -32,6 +33,9 @@ const createState = (): ProjectState => ({
   currentVersion: 1,
   previewUrl: "http://localhost:3100/preview/alpha/",
   previewPort: 8081,
+  previewBuildId: "11111111-1111-1111-1111-111111111111",
+  previewRevision: 0,
+  lastPreviewError: null,
   generationProgress: 0.8,
   currentGeneratingFile: "app.tsx",
   isConnected: true,
@@ -66,6 +70,8 @@ const createState = (): ProjectState => ({
   addVersion: () => undefined,
   setCurrentVersion: () => undefined,
   setPreview: () => undefined,
+  setPreviewStatus: () => undefined,
+  bumpPreviewRevision: () => undefined,
   setGenerationProgress: () => undefined,
   setConnected: () => undefined,
   setLmStudioStatus: () => undefined,

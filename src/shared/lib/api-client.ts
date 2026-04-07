@@ -37,6 +37,12 @@ interface DataEnvelope<T> {
   data: T;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isDataEnvelope = <T>(value: unknown): value is DataEnvelope<T> =>
+  isRecord(value) && "data" in value;
+
 const appendQuery = (
   url: URL,
   query?: Record<string, QueryValue>
@@ -90,10 +96,10 @@ class ApiClient {
     return new Error(raw || `${response.status} ${response.statusText}`);
   }
 
-  private async fetchJson<T>(
+  private async fetchJson(
     url: string,
     options: RequestOptions = {}
-  ): Promise<T> {
+  ): Promise<unknown> {
     const { body, headers, timeoutMs = this.defaultTimeoutMs, ...init } = options;
     const finalHeaders = new Headers(headers);
     const controller = new AbortController();
@@ -116,7 +122,7 @@ class ApiClient {
       }
 
       try {
-        return await response.json() as T;
+        return await response.json();
       } catch {
         throw new Error(`Invalid JSON response from ${url}`);
       }
@@ -136,17 +142,23 @@ class ApiClient {
     query?: Record<string, QueryValue>
   ): Promise<T> {
     const url = this.buildUrl(this.getAgentUrl(), pathname, query);
-    const response = await this.fetchJson<DataEnvelope<T>>(url);
+    const response = await this.fetchJson(url);
+    if (!isDataEnvelope<T>(response)) {
+      throw new Error(`Invalid response envelope from ${url}`);
+    }
     return response.data;
   }
 
   async postData<T>(pathname: string, body: unknown, timeoutMs?: number): Promise<T> {
     const url = this.buildUrl(this.getAgentUrl(), pathname);
-    const response = await this.fetchJson<DataEnvelope<T>>(url, {
+    const response = await this.fetchJson(url, {
       method: "POST",
       body,
       timeoutMs,
     });
+    if (!isDataEnvelope<T>(response)) {
+      throw new Error(`Invalid response envelope from ${url}`);
+    }
     return response.data;
   }
 
@@ -155,10 +167,13 @@ class ApiClient {
     headers?: HeadersInit
   ): Promise<T> {
     const url = this.buildUrl(this.getAgentUrl(), pathname);
-    const response = await this.fetchJson<DataEnvelope<T>>(url, {
+    const response = await this.fetchJson(url, {
       method: "DELETE",
       headers,
     });
+    if (!isDataEnvelope<T>(response)) {
+      throw new Error(`Invalid response envelope from ${url}`);
+    }
     return response.data;
   }
 

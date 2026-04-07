@@ -1,4 +1,4 @@
-// Splits project lifecycle actions out of the main store file to reduce cross-domain coupling.
+// Splits project lifecycle actions out of the main store file so preview runtime can stay separate.
 import type {
   AppStatus,
   ProjectEntry,
@@ -52,6 +52,7 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
       projectName: null,
       projectList: [],
       status: "idle",
+      previewStatus: "stopped",
       plan: null,
       messages: [],
       fileTree: [],
@@ -62,6 +63,9 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
       currentVersion: 0,
       previewUrl: null,
       previewPort: null,
+      previewBuildId: null,
+      previewRevision: 0,
+      lastPreviewError: null,
       generationProgress: 0,
       currentGeneratingFile: null,
       isConnected: false,

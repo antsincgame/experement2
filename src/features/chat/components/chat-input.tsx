@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SendHorizontal, Square, Sparkles } from "lucide-react-native";
 import { apiClient } from "@/shared/lib/api-client";
+import { mixedStyle } from "@/shared/lib/web-styles";
 import { useSettingsStore } from "@/stores/settings-store";
 
 interface ChatInputProps {
@@ -29,6 +30,7 @@ const ChatInput = ({
   const [enhancing, setEnhancing] = useState(false);
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const handleSendRef = useRef<() => void>(() => undefined);
+  const enhanceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
   const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
@@ -46,6 +48,12 @@ const ChatInput = ({
   useEffect(() => {
     handleSendRef.current = handleSend;
   }, [handleSend]);
+
+  useEffect(() => () => {
+    if (enhanceErrorTimerRef.current) {
+      clearTimeout(enhanceErrorTimerRef.current);
+    }
+  }, []);
 
   const handleEnhance = useCallback(async () => {
     const trimmed = text.trim();
@@ -69,7 +77,13 @@ const ChatInput = ({
       const msg = error instanceof Error ? error.message : "Enhancement failed";
       setEnhanceError(msg);
       useSettingsStore.getState().addErrorLog({ level: "error", source: "enhance", message: msg });
-      setTimeout(() => setEnhanceError(null), 4_000);
+      if (enhanceErrorTimerRef.current) {
+        clearTimeout(enhanceErrorTimerRef.current);
+      }
+      enhanceErrorTimerRef.current = setTimeout(() => {
+        setEnhanceError(null);
+        enhanceErrorTimerRef.current = null;
+      }, 4_000);
     } finally {
       setEnhancing(false);
     }
@@ -96,14 +110,14 @@ const ChatInput = ({
   return (
     <View
       className="px-3 py-3"
-      style={{ borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" }}
+      style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" }}
     >
       <View
         className="flex-row items-end rounded-xl overflow-hidden"
         style={{
-          backgroundColor: "rgba(255, 255, 255, 0.7)",
+          backgroundColor: "rgba(26, 26, 46, 0.6)",
           borderWidth: 1,
-          borderColor: "rgba(0, 229, 255, 0.2)",
+          borderColor: "rgba(255, 215, 0, 0.15)",
         }}
       >
         <TextInput
@@ -111,10 +125,10 @@ const ChatInput = ({
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
-          placeholderTextColor="#8888AA"
+          placeholderTextColor="#4A4A6A"
           multiline
-          className="flex-1 text-ink-dark text-sm px-4 py-3 max-h-32"
-          style={{ fontFamily: "Inter, system-ui, sans-serif", outlineStyle: "none" } as never}
+          className="flex-1 text-white text-sm px-4 py-3 max-h-32"
+          style={mixedStyle({ fontFamily: "Inter, system-ui, sans-serif", outlineStyle: "none" })}
         />
 
         <View className="flex-row items-center m-1.5 gap-1">
@@ -151,9 +165,9 @@ const ChatInput = ({
               accessibilityRole="button"
               onPress={handleSend}
               className="w-8 h-8 rounded-lg items-center justify-center"
-              style={{ backgroundColor: "#00E5FF" } as never}
+              style={{ backgroundColor: "#FFD700" }}
             >
-              <SendHorizontal size={14} color="#FFFFFF" strokeWidth={2} />
+              <SendHorizontal size={14} color="#0A0A0A" strokeWidth={2} />
             </Pressable>
           ) : null}
         </View>

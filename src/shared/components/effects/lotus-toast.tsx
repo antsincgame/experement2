@@ -11,16 +11,36 @@ interface LotusToastProps {
 const LotusToast = ({ visible, onHide }: LotusToastProps) => {
   const [opacity] = useState(new Animated.Value(0));
   const onHideRef = useRef(onHide);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
   onHideRef.current = onHide;
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      animationRef.current?.stop();
+      animationRef.current = null;
+      opacity.setValue(0);
+      return;
+    }
 
-    Animated.sequence([
+    let cancelled = false;
+    const animation = Animated.sequence([
       Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.delay(2500),
       Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-    ]).start(() => onHideRef.current());
+    ]);
+
+    animationRef.current = animation;
+    animation.start(() => {
+      if (!cancelled) {
+        onHideRef.current();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      animation.stop();
+      animationRef.current = null;
+    };
   }, [visible, opacity]);
 
   if (!visible) return null;
@@ -38,7 +58,7 @@ const LotusToast = ({ visible, onHide }: LotusToastProps) => {
       <View
         className="flex-row items-center gap-3 px-4 py-3 rounded-2xl"
         style={{
-          backgroundColor: "rgba(255, 255, 255, 0.85)",
+          backgroundColor: "rgba(18, 18, 31, 0.9)",
           borderWidth: 1,
           borderColor: "rgba(0, 255, 136, 0.3)",
           shadowColor: "#00FF88",
@@ -51,9 +71,9 @@ const LotusToast = ({ visible, onHide }: LotusToastProps) => {
         <View>
           <View className="flex-row items-center gap-1.5">
             <CheckCircle2 size={13} color="#00FF88" strokeWidth={2} />
-            <Text className="text-ink-dark text-xs font-semibold">Build Successful</Text>
+            <Text className="text-white text-xs font-semibold">Build Successful</Text>
           </View>
-          <Text className="text-ink-light text-[10px] mt-0.5">App is ready in preview</Text>
+          <Text className="text-ink-faint text-[10px] mt-0.5">App is ready in preview</Text>
         </View>
       </View>
     </Animated.View>

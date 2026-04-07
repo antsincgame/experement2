@@ -1,11 +1,13 @@
 // Renders the active workspace chrome while the controller hook handles routing and async orchestration.
 import { Platform, Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Download, Settings, Zap } from "lucide-react-native";
 import VersionTimeline from "@/features/history/components/version-timeline";
 import SettingsDrawer from "@/features/settings/components/settings-drawer";
 import LotusToast from "@/shared/components/effects/lotus-toast";
-import AuroraBackground from "@/shared/components/effects/aurora-background";
+import NeonBackground from "@/shared/components/effects/neon-background";
 import WorkspaceLayout from "@/features/workspace/components/workspace-layout";
+import { mixedStyle } from "@/shared/lib/web-styles";
 import type { FileNode, ProjectEntry } from "@/stores/project-store";
 
 interface ProjectScreenContentProps {
@@ -63,30 +65,30 @@ export const ProjectScreenContent = ({
   status,
   terminalVisible,
 }: ProjectScreenContentProps) => (
-  <AuroraBackground intensity="subtle">
-    <View className="flex-1">
+  <NeonBackground intensity="subtle">
+    <SafeAreaView className="flex-1">
       <View
         className="h-11 flex-row items-center justify-between px-4"
-        style={{
-          backgroundColor: "rgba(255,255,255,0.5)",
+        style={mixedStyle({
+          backgroundColor: "rgba(26,26,46,0.85)",
           borderBottomWidth: 1,
-          borderBottomColor: "rgba(0,0,0,0.06)",
+          borderBottomColor: "rgba(255,215,0,0.1)",
           ...(Platform.OS === "web"
             ? { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }
             : {}),
-        } as never}
+        })}
       >
         <Pressable onPress={handleCreateNew} className="flex-row items-center gap-2.5">
           <View
             className="w-6 h-6 rounded-md items-center justify-center"
-            style={{
-              background: "linear-gradient(135deg, #00E5FF, #7C4DFF)",
-              backgroundColor: "#00E5FF",
-            } as never}
+            style={mixedStyle({
+              background: "linear-gradient(135deg, #FFD700, #00E5FF)",
+              backgroundColor: "#FFD700",
+            })}
           >
-            <Zap size={12} color="#FFFFFF" strokeWidth={2} />
+            <Zap size={12} color="#0A0A0A" strokeWidth={2} />
           </View>
-          <Text className="text-ink-dark text-sm font-semibold">
+          <Text className="text-white text-sm font-semibold">
             {routeProjectName ?? "App Factory"}
           </Text>
           <View
@@ -99,16 +101,16 @@ export const ProjectScreenContent = ({
                   : "#FFD700",
             }}
           />
-          <Text className="text-ink-light text-[10px] uppercase tracking-wider font-medium">
+          <Text className="text-ink-faint text-[10px] uppercase tracking-wider font-medium">
             {status}
           </Text>
           {currentGeneratingFile && !["idle", "ready", "error"].includes(status) && (
-            <Text style={{ fontSize: 10, color: "#00BCD4", fontFamily: "monospace", marginLeft: 6 }} numberOfLines={1}>
+            <Text style={{ fontSize: 10, color: "#00E5FF", fontFamily: "monospace", marginLeft: 6 }} numberOfLines={1}>
               {currentGeneratingFile}
             </Text>
           )}
           {generationProgress > 0 && generationProgress < 1 && (
-            <Text style={{ fontSize: 9, color: "#888", fontWeight: "600", marginLeft: 4 }}>
+            <Text style={{ fontSize: 9, color: "#8888AA", fontWeight: "600", marginLeft: 4 }}>
               {Math.round(generationProgress * 100)}%
             </Text>
           )}
@@ -126,22 +128,22 @@ export const ProjectScreenContent = ({
           <Pressable
             onPress={() => setSettingsVisible(true)}
             className="w-8 h-8 rounded-lg items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.5)", borderWidth: 1, borderColor: "rgba(255,255,255,0.7)" }}
+            style={{ backgroundColor: "rgba(255,215,0,0.08)", borderWidth: 1, borderColor: "rgba(255,215,0,0.2)" }}
           >
-            <Settings size={14} color="#4A4A6A" strokeWidth={1.5} />
+            <Settings size={14} color="#FFD700" strokeWidth={1.5} />
           </Pressable>
         </View>
       </View>
 
       {generationProgress > 0 && generationProgress < 1 && (
-        <View style={{ height: 2, backgroundColor: "rgba(0,0,0,0.04)" }}>
+        <View style={{ height: 2, backgroundColor: "rgba(255,255,255,0.05)" }}>
           <View
-            style={{
+            style={mixedStyle({
               height: "100%",
               width: `${generationProgress * 100}%`,
               backgroundColor: "#00E5FF",
               ...(Platform.OS === "web" ? { transition: "width 0.3s ease" } : {}),
-            } as never}
+            })}
           />
         </View>
       )}
@@ -167,6 +169,6 @@ export const ProjectScreenContent = ({
       <VersionTimeline onRevert={revertVersion} />
       <SettingsDrawer visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
       <LotusToast visible={showLotusToast} onHide={() => setShowLotusToast(false)} />
-    </View>
-  </AuroraBackground>
+    </SafeAreaView>
+  </NeonBackground>
 );

@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Unit Converter",
+    "slug": "unit-converter",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "generated-app",
+    "userInterfaceStyle": "automatic",
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

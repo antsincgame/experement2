@@ -46,12 +46,23 @@ export const enqueueProjectOperation = <T>(
     .catch(() => undefined)
     .then(async () => {
       console.log(`[ProjectQueue] ${operationName} started (${key})`);
-      return Promise.race([
-        task(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Operation ${operationName} timed out after ${OPERATION_TIMEOUT_MS / 1000}s`)), OPERATION_TIMEOUT_MS)
-        ),
-      ]);
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        return await Promise.race([
+          task(),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new Error(`Operation ${operationName} timed out after ${OPERATION_TIMEOUT_MS / 1000}s`));
+            }, OPERATION_TIMEOUT_MS);
+            timeoutId.unref();
+          }),
+        ]);
+      } finally {
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId);
+        }
+      }
     });
 
   entry.tail = run

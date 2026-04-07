@@ -5,15 +5,15 @@ export const KNOWLEDGE_BASE = {
 1. LAYOUT: ALWAYS use <YStack> (col), <XStack> (row), <ZStack> (absolute). NEVER use React Native View. Use \`separator={<Separator />}\` for lists.
 2. TEXT: Use <Text>, <Paragraph>, <H1>-<H6>. NEVER use React Native Text.
 3. TOKENS: p="$4", m="$2", gap="$3", br="$4", w="100%", h="$4", flex={1}.
-4. COLORS: bg="$background", color="$color", borderColor="$borderColor". NEVER use hex strings like "#FFF".
+4. COLORS: Prefer Tamagui tokens like bg="$background", color="$color", borderColor="$borderColor" for Tamagui components. Hex/RGBA values are acceptable for planner theme values and third-party library configs.
 5. BORDERS: borderWidth={1} (or bw={1}). NEVER use boolean 'bordered'.
 6. THEMING: Use <ThemeInverse> to automatically invert colors for a section.
 7. COMPONENTS: <Button backgroundColor="$primary" size="$4">Text</Button>. NEVER use the 'theme' prop on ANY component (it causes TS2322 errors). Use direct color props instead.
 8. ICONS: Use @expo/vector-icons/Feather. Pass color and size. NEVER wrap icons in <ThemeInverse>. NEVER use non-existent icon names.
 9. NEVER invent props like 'onSwipeEnd', 'onSwipeLeft', 'onDismiss'. Use standard 'onPress' or 'onLongPress' from Pressable (react-native).
-9. PRESSABLE: NEVER import Pressable from "tamagui". Import from "react-native" or use <Button>.
-10. TYPES: If you use a custom type (like Todo), you MUST import it: import type { Todo } from "@/types/index".
-11. THEME NAME: <Theme name="light"> or <Theme name="dark"> ONLY. For conditional styling use inline props: bg={isActive ? "$blue5" : "$gray3"}.`,
+10. PRESSABLE: NEVER import Pressable from "tamagui". Import from "react-native" or use <Button>.
+11. TYPES: If you use a custom type (like Todo), you MUST import it: import type { Todo } from "@/types/index".
+12. THEME NAME: <Theme name="light"> or <Theme name="dark"> ONLY. For conditional styling use inline props: bg={isActive ? "$blue5" : "$gray3"}.`,
 
   forms: `## 📚 RAG DOCS: TAMAGUI FORMS & INPUTS
 1. INPUTS: <Input placeholder="Type..." bw={1} bc="$borderColor" /> or <TextArea />.
@@ -46,6 +46,27 @@ export const KNOWLEDGE_BASE = {
 3. TACTILE PROPS: Use \`pressStyle={{ scale: 0.97, opacity: 0.8 }}\` and \`hoverStyle={{ opacity: 0.9 }}\` on buttons/cards.
 4. HAPTICS: Import \`* as Haptics from 'expo-haptics'\` and call \`Haptics.selectionAsync()\` on press events.`,
 
+  alpineWeb: `## 📚 RAG DOCS: ALPINE.JS WEB ANIMATIONS & MICRO-INTERACTIONS
+1. USE ALPINE ONLY FOR WEB-ONLY TEMPLATES OR STATIC HTML FRAGMENTS. NEVER put Alpine.js into Expo React Native runtime files.
+2. STATE: Prefer \`x-data\` with small local state objects: \`x-data="{ open: false, active: 'all' }"\`.
+3. TOGGLES: Use \`x-show\`, \`x-cloak\`, \`@click\`, \`@keydown.escape.window\`, \`@click.outside\` for dropdowns, modals, accordions.
+4. ANIMATIONS: Prefer \`x-transition\` with clear enter/leave durations: \`x-transition.opacity.duration.200ms\`, \`x-transition:enter="transition ease-out duration-200"\`.
+5. LIST FILTERS/TABS: Use \`x-for\` + computed getters or small helper methods inside \`x-data\`. Keep logic readable; no giant inline expressions.
+6. ACCESSIBILITY: Mirror state with \`:aria-expanded\`, \`:aria-hidden\`, focusable buttons, and keyboard close handlers.
+7. NEVER mix Alpine DOM mutation with large imperative scripts when declarative directives are enough.
+8. GOOD FIT: dropdowns, tabs, accordion, modal, command palette, hover/focus micro-interactions, dismissible banners.`,
+
+  tailwindTemplates: `## 📚 RAG DOCS: TAILWINDCSS UI STARTERS & STYLING PATTERNS
+1. USE TAILWIND TEMPLATES ONLY FOR WEB-ONLY HTML/JSX SURFACES OR WHEN THE USER EXPLICITLY ASKS FOR TAILWIND-LIKE STRUCTURE. For Expo React Native screens, translate the intent into NativeWind/Tamagui patterns instead of raw CSS classes.
+2. START FROM COMPOSABLE BLOCKS: page shell, hero, stats grid, card list, pricing cards, auth form, settings panel, modal, command menu.
+3. SPACING SYSTEM: Prefer \`px-4 sm:px-6 lg:px-8\`, \`py-12 sm:py-16\`, \`gap-4 sm:gap-6\`, \`max-w-7xl mx-auto\` for balanced layouts.
+4. CARD TEMPLATE: \`rounded-2xl border border-slate-200/70 bg-white/80 shadow-sm backdrop-blur\`.
+5. DARK PANELS: \`bg-slate-950 text-white\`, muted copy via \`text-slate-400\`, dividers via \`border-white/10\`.
+6. CTA BUTTONS: primary \`inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-medium\`; add hover/focus/active states explicitly.
+7. MOTION: Pair Tailwind transitions with utility presets like \`transition duration-200 ease-out\`; if richer interaction is needed on web-only surfaces, combine with Alpine \`x-transition\`.
+8. SKELETONS/EMPTY STATES: use subtle borders, muted text, and one strong CTA rather than noisy gradients everywhere.
+9. DO NOT dump giant template blobs. Adapt a template block to the requested feature and keep the class list intentional.`,
+
   sqlite: `## 📚 RAG DOCS: EXPO-SQLITE (MODERN API SDK 51+)
 NEVER use .transaction() or .executeSql(). They WILL CRASH.
 1. INIT: \`const db = SQLite.openDatabaseSync('db.db');\`
@@ -56,6 +77,7 @@ NEVER use .transaction() or .executeSql(). They WILL CRASH.
   charts: `## 📚 RAG DOCS: REACT-NATIVE-CHART-KIT
 The 'data' prop MUST exactly match this TS interface to prevent TS2322:
 { labels: string[], datasets: { data: number[], color?: (opacity: number) => string, strokeWidth?: number }[] }
+Hex/RGBA values are allowed inside chartConfig because this is third-party library config, not Tamagui styling.
 Example: <LineChart data={{ labels: ["A"], datasets: [{ data: [1] }] }} width={300} height={200} chartConfig={{ backgroundColor: "#fff", color: (o = 1) => \`rgba(0,0,0,\${o})\` }} />`,
 };
 
@@ -66,6 +88,8 @@ export const getRelevantDocs = (description: string, dependencies: string[]): st
   if (text.match(/form|input|setting|switch|slider|check|radio/)) docs.push(KNOWLEDGE_BASE.forms);
   if (text.match(/sheet|dialog|modal|overlay|popup|toast/)) docs.push(KNOWLEDGE_BASE.overlays);
   if (text.match(/animat|bouncy|toggle|interactive|pressstyle|motion|smooth/)) docs.push(KNOWLEDGE_BASE.animations);
+  if (text.match(/alpine|x-data|x-show|x-transition|accordion|dropdown|modal web|micro-?interaction/)) docs.push(KNOWLEDGE_BASE.alpineWeb);
+  if (text.match(/tailwind|tailwindcss|hero|landing|marketing|template|dashboard|admin|card grid|pricing|auth form/)) docs.push(KNOWLEDGE_BASE.tailwindTemplates);
   if (text.match(/sqlite|database|db|sql|offline/)) docs.push(KNOWLEDGE_BASE.sqlite);
   if (text.match(/chart|stat|analytic|graph/)) docs.push(KNOWLEDGE_BASE.charts);
 

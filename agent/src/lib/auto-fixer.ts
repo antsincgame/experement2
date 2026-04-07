@@ -18,6 +18,7 @@ interface AutoFixOptions {
   projectName: string;
   error: MetroError;
   lmStudioUrl?: string;
+  model?: string;
   maxAttempts?: number;
   onAttempt?: (attempt: number, maxAttempts: number) => void;
   onFix?: (block: SearchReplaceBlock) => void;
@@ -56,6 +57,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
     projectName,
     error,
     lmStudioUrl,
+    model,
     maxAttempts = 3,
     onAttempt,
     onFix,
@@ -81,6 +83,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
       temperature: 0.2,
       maxTokens: 4096,
       lmStudioUrl,
+      model,
     });
 
     let blocksApplied = 0;

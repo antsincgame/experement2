@@ -1,4 +1,4 @@
-// Keeps project-store transitions pure and testable so domain slices can share one set of helpers.
+// Keeps project and preview store transitions pure so lifecycle changes remain testable.
 import type {
   ProjectChat,
   ProjectState,
@@ -129,6 +129,7 @@ export const buildProjectRemovalState = (
     projectChats,
     projectName: nextProject?.name ?? null,
     status: nextProject?.status ?? "idle",
+    previewStatus: "stopped",
     messages: nextChat.messages,
     fileTree: nextChat.fileTree,
     openFiles: nextChat.openFiles,
@@ -138,6 +139,9 @@ export const buildProjectRemovalState = (
     streamingContent: nextChat.streamingContent,
     previewUrl: nextChat.previewUrl,
     previewPort: nextChat.previewPort,
+    previewBuildId: null,
+    previewRevision: 0,
+    lastPreviewError: null,
   };
 };
 
@@ -152,6 +156,7 @@ export const buildProjectSwitchState = (
   return {
     projectName,
     status: nextStatus,
+    previewStatus: "stopped",
     projectChats,
     messages: nextChat.messages,
     fileTree: nextChat.fileTree,
@@ -162,6 +167,9 @@ export const buildProjectSwitchState = (
     streamingContent: nextChat.streamingContent,
     previewUrl: null,
     previewPort: null,
+    previewBuildId: null,
+    previewRevision: 0,
+    lastPreviewError: null,
   };
 };
 

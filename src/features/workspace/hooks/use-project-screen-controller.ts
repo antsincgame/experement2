@@ -1,4 +1,4 @@
-// Owns project-screen routing and preview orchestration so the route file can stay almost stateless.
+// Owns project-screen routing and preview orchestration so lifecycle and preview success stay decoupled.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { Linking } from "react-native";
@@ -21,23 +21,32 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const terminalVisible = useProjectStore((state) => state.terminalVisible);
   const generationProgress = useProjectStore((state) => state.generationProgress);
   const currentGeneratingFile = useProjectStore((state) => state.currentGeneratingFile);
+  const previewBuildId = useProjectStore((state) => state.previewBuildId);
+  const previewStatus = useProjectStore((state) => state.previewStatus);
   const addMessage = useProjectStore((state) => state.addMessage);
   const openFile = useProjectStore((state) => state.openFile);
   const closeFile = useProjectStore((state) => state.closeFile);
   const removeProject = useProjectStore((state) => state.removeProject);
   const setActiveFile = useProjectStore((state) => state.setActiveFile);
-  const switchProject = useProjectStore((state) => state.switchProject);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
-  const previousStatus = useRef(status);
+  const previousPreviewStatus = useRef(previewStatus);
+  const previousPreviewBuildId = useRef<string | null>(previewBuildId);
   const activeProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (previousStatus.current !== "ready" && status === "ready" && projectName) {
+    const hasFreshPreview = previewBuildId !== null && previewBuildId !== previousPreviewBuildId.current;
+    if (
+      previousPreviewStatus.current !== "ready" &&
+      previewStatus === "ready" &&
+      projectName &&
+      hasFreshPreview
+    ) {
       setShowLotusToast(true);
     }
-    previousStatus.current = status;
-  }, [projectName, status]);
+    previousPreviewStatus.current = previewStatus;
+    previousPreviewBuildId.current = previewBuildId;
+  }, [previewBuildId, previewStatus, projectName]);
 
   // Open project workspace — fires ONLY when route changes, NOT when store updates.
   // Uses ref to prevent infinite loop: switchProject updates store.projectName,

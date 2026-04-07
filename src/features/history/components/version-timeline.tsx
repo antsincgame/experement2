@@ -13,7 +13,7 @@ const VersionTimeline = ({ onRevert }: VersionTimelineProps) => {
   if (versions.length === 0) return null;
 
   return (
-    <View className="border-t border-border-subtle" style={{ backgroundColor: "#0D0D10" }}>
+    <View className="border-t border-border-subtle" style={{ backgroundColor: "#0D0D1A" }}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -48,9 +48,9 @@ const VersionChip = ({ version, isCurrent, onRevert }: VersionChipProps) => (
     }`}
   >
     {isCurrent ? (
-      <GitCommitHorizontal size={11} color="#00F0FF" strokeWidth={1.5} />
+      <GitCommitHorizontal size={11} color="#00E5FF" strokeWidth={1.5} />
     ) : (
-      <RotateCcw size={10} color="#52525B" strokeWidth={1.5} />
+      <RotateCcw size={10} color="#4A4A6A" strokeWidth={1.5} />
     )}
     <Text
       className={`text-[10px] ${isCurrent ? "text-accent-cyan" : "text-txt-dim"}`}

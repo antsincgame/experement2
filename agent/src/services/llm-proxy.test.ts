@@ -31,21 +31,18 @@ describe("llm-proxy model caching", () => {
     const fetchMock = vi
       .fn()
       .mockRejectedValueOnce(new Error("offline"))
-      .mockResolvedValueOnce(mockCompletionResponse("first reply"))
       .mockResolvedValueOnce(mockModelsResponse(["qwen3-coder-32b"]))
       .mockResolvedValueOnce(mockCompletionResponse("second reply"));
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await completeNonStreaming(
-      [{ role: "user", content: "hello" }],
-      { lmStudioUrl: "http://lm-studio.test" }
-    );
-
-    const firstCompletionBody = JSON.parse(
-      fetchMock.mock.calls[1]?.[1]?.body as string
-    ) as { model?: string };
-    expect(firstCompletionBody.model).toBeUndefined();
+    await expect(
+      completeNonStreaming(
+        [{ role: "user", content: "hello" }],
+        { lmStudioUrl: "http://lm-studio.test" }
+      )
+    ).rejects.toThrow("No LLM model available");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     clearModelCache("http://lm-studio.test");
 
@@ -55,7 +52,7 @@ describe("llm-proxy model caching", () => {
     );
 
     const secondCompletionBody = JSON.parse(
-      fetchMock.mock.calls[3]?.[1]?.body as string
+      fetchMock.mock.calls[2]?.[1]?.body as string
     ) as { model?: string };
     expect(secondCompletionBody.model).toBe("qwen3-coder-32b");
   });

@@ -113,7 +113,6 @@ export const SAFE_EXTRA_DEPENDENCIES = new Set([
   "react-native-calendars",
   "react-native-gifted-charts",
   "react-native-modal",
-  "@tamagui/lucide-icons",
   "react-native-image-zoom-viewer",
   "lottie-react-native",
   "date-fns",

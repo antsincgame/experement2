@@ -1,5 +1,6 @@
 ﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL and scoped request metadata.
 import { useCallback } from "react";
+import type { ChatMessage } from "@/features/chat/schemas/message.schema";
 import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
 import {
   parseIncomingWsMessage,
@@ -14,13 +15,18 @@ const logError = (source: string, message: string, details?: string) => {
 const logWarn = (source: string, message: string) => {
   useSettingsStore.getState().addErrorLog({ level: "warn", source, message });
 };
+const logInfo = (source: string, message: string) => {
+  useSettingsStore.getState().addErrorLog({ level: "info", source, message });
+};
 
 interface WsRuntime {
   currentUrl?: string;
   initialized?: boolean;
+  initialConnectTimer?: ReturnType<typeof setTimeout>;
   reconnectTimer?: ReturnType<typeof setTimeout>;
   socket?: WebSocket;
   messageQueue?: string[];
+  settingsUnsubscribe?: () => void;
 }
 
 const createRequestId = (): string => crypto.randomUUID();
@@ -48,6 +54,16 @@ const clearReconnectTimer = (): void => {
 
   clearTimeout(runtime.reconnectTimer);
   runtime.reconnectTimer = undefined;
+};
+
+const clearInitialConnectTimer = (): void => {
+  const runtime = getRuntime();
+  if (!runtime.initialConnectTimer) {
+    return;
+  }
+
+  clearTimeout(runtime.initialConnectTimer);
+  runtime.initialConnectTimer = undefined;
 };
 
 const disconnectSocket = (): void => {
@@ -104,9 +120,12 @@ const handleSocketMessage = (payload: string): void => {
     useProjectStore.getState().handleWsMessage(message);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[WS] Failed to parse message", error);
     logError("websocket", `Failed to parse message: ${msg}`, payload.slice(0, 500));
   }
+};
+
+const enqueueMessage = (payload: string): void => {
+  getRuntime().messageQueue?.push(payload);
 };
 
 const ensureConnected = (): void => {
@@ -142,18 +161,22 @@ const ensureConnected = (): void => {
 
     clearReconnectTimer();
     useProjectStore.getState().setConnected(true);
-    console.log(`[WS] Connected ${nextUrl}`);
+    logInfo("websocket", `Connected ${nextUrl}`);
 
     const runtime = getRuntime();
     if (runtime.messageQueue && runtime.messageQueue.length > 0) {
-      console.log(`[WS] Flushing ${runtime.messageQueue.length} queued messages`);
+      logInfo("websocket", `Flushing ${runtime.messageQueue.length} queued messages`);
       const queue = [...runtime.messageQueue];
       runtime.messageQueue = [];
       for (const payload of queue) {
         try {
           socket.send(payload);
-        } catch {
-          runtime.messageQueue.push(payload);
+        } catch (error) {
+          enqueueMessage(payload);
+          logWarn(
+            "websocket",
+            `Failed to flush queued message: ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
     }
@@ -171,13 +194,13 @@ const ensureConnected = (): void => {
     runtime.socket = undefined;
     runtime.currentUrl = undefined;
     useProjectStore.getState().setConnected(false);
-    console.log(`[WS] Closed code=${event.code} clean=${event.wasClean}`);
+    logInfo("websocket", `Closed code=${event.code} clean=${event.wasClean}`);
     logWarn("websocket", `Disconnected (code=${event.code}, clean=${event.wasClean}), reconnecting...`);
     scheduleReconnect();
   };
 
   socket.onerror = () => {
-    console.warn(`[WS] Socket error for ${nextUrl}`);
+    logWarn("websocket", `Socket error for ${nextUrl}`);
     logWarn("websocket", `Connection error: ${nextUrl}`);
   };
 };
@@ -191,7 +214,7 @@ const initializeRuntime = (): void => {
   runtime.initialized = true;
   let previousAgentUrl = normalizeBaseUrl(useSettingsStore.getState().agentUrl);
 
-  useSettingsStore.subscribe((state) => {
+  runtime.settingsUnsubscribe = useSettingsStore.subscribe((state) => {
     const nextAgentUrl = normalizeBaseUrl(state.agentUrl);
     if (nextAgentUrl === previousAgentUrl) {
       return;
@@ -203,23 +226,32 @@ const initializeRuntime = (): void => {
     ensureConnected();
   });
 
-  setTimeout(() => {
+  runtime.initialConnectTimer = setTimeout(() => {
+    getRuntime().initialConnectTimer = undefined;
     ensureConnected();
   }, 500);
 };
 
 initializeRuntime();
 
-export const useWebSocket = () => {
-  const isConnected = useProjectStore((state) => state.isConnected);
+export const disposeWebSocketRuntime = (): void => {
+  const runtime = getRuntime();
+  runtime.settingsUnsubscribe?.();
+  runtime.settingsUnsubscribe = undefined;
+  clearInitialConnectTimer();
+  clearReconnectTimer();
+  disconnectSocket();
+  runtime.initialized = false;
+};
 
+export const useWebSocket = () => {
   const send = useCallback((message: OutgoingWsMessage): boolean => {
     const runtime = getRuntime();
     const socket = runtime.socket;
     const payload = JSON.stringify(message);
 
     if (!socket || socket.readyState !== WebSocket.OPEN) {
-      runtime.messageQueue?.push(payload);
+      enqueueMessage(payload);
       ensureConnected();
       return true;
     }
@@ -227,9 +259,13 @@ export const useWebSocket = () => {
     try {
       socket.send(payload);
       return true;
-    } catch {
+    } catch (error) {
       // Socket may have closed between readyState check and send
-      runtime.messageQueue?.push(payload);
+      enqueueMessage(payload);
+      logWarn(
+        "websocket",
+        `Send failed, retrying after reconnect: ${error instanceof Error ? error.message : String(error)}`
+      );
       ensureConnected();
       return true;
     }
@@ -256,12 +292,12 @@ export const useWebSocket = () => {
     }
 
     const chatHistory = messages
-      .filter((message: { isHidden?: boolean; role: string }) => (
+      .filter((message): message is ChatMessage & { role: "user" | "assistant" } => (
         !message.isHidden &&
         (message.role === "user" || message.role === "assistant")
       ))
-      .map((message: { content: string; role: string }) => ({
-        role: message.role as "user" | "assistant",
+      .map((message) => ({
+        role: message.role,
         content: message.content,
       }));
 
@@ -314,7 +350,6 @@ export const useWebSocket = () => {
   return {
     abortGeneration,
     createProject,
-    isConnected,
     iterate,
     revertVersion,
     send,

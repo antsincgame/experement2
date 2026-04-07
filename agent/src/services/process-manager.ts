@@ -54,9 +54,17 @@ const killProcess = (cp: ChildProcess): void => {
 
     // Kill entire process group on Unix (negative PID = process group)
     try { process.kill(-pid, "SIGTERM"); } catch { cp.kill("SIGTERM"); }
-    setTimeout(() => {
+    const forceKillTimer = setTimeout(() => {
       try { if (!cp.killed) process.kill(-pid, "SIGKILL"); } catch { /* already dead */ }
     }, 5000);
+    forceKillTimer.unref();
+
+    const clearForceKillTimer = (): void => {
+      clearTimeout(forceKillTimer);
+    };
+
+    cp.once("exit", clearForceKillTimer);
+    cp.once("close", clearForceKillTimer);
   } catch {
     // The process may have already exited before cleanup completed.
   }
@@ -218,6 +226,7 @@ export const runProjectCommand = async (
   timeoutMs = 120000
 ): Promise<CommandResult> => {
   return new Promise((resolve) => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const child = spawn(command, args, {
       cwd: projectPath,
       env: { ...process.env, CI: "1", BROWSER: "none" },
@@ -235,7 +244,7 @@ export const runProjectCommand = async (
       }
 
       settled = true;
-      if (timeout) {
+      if (timeout !== undefined) {
         clearTimeout(timeout);
       }
 
@@ -262,7 +271,7 @@ export const runProjectCommand = async (
       finish(1);
     });
 
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       killProcess(child);
       stderr += `\nCommand timed out after ${timeoutMs}ms`;
       finish(124, true);

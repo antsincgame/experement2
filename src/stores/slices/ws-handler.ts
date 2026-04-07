@@ -1,4 +1,4 @@
-// Maps validated WebSocket events onto store actions so protocol changes fail loudly on the client.
+// Maps validated WebSocket events onto store actions so project lifecycle and preview runtime stay in sync.
 import {
   createAssistantMessage,
   createSystemMessage,
@@ -7,13 +7,22 @@ import {
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
 import type {
-  AppStatus,
   ProjectStoreGet,
   ProjectStoreSet,
 } from "../project-store.types";
 
 type StoreGet = ProjectStoreGet;
 type StoreSet = ProjectStoreSet;
+
+const GLOBAL_MESSAGE_TYPES = new Set([
+  "connected",
+  "lm_studio_status",
+  "llm_server_status",
+]);
+
+const UNSCOPED_FALLBACK_TYPES = new Set([
+  "generation_aborted",
+]);
 
 const getMessageProjectName = (msg: IncomingWsMessage): string | null =>
   "projectName" in msg && typeof msg.projectName === "string"
@@ -24,14 +33,58 @@ const matchesActiveProject = (
   store: StoreGet,
   msg: IncomingWsMessage
 ): boolean => {
-  const messageProjectName = getMessageProjectName(msg);
-  const currentProjectName = store().projectName;
-
-  if (!messageProjectName || !currentProjectName) {
+  if (GLOBAL_MESSAGE_TYPES.has(msg.type)) {
     return true;
   }
 
+  const messageProjectName = getMessageProjectName(msg);
+  const currentProjectName = store().projectName;
+
+  if (!currentProjectName) {
+    return true;
+  }
+
+  if (!messageProjectName) {
+    return UNSCOPED_FALLBACK_TYPES.has(msg.type);
+  }
+
   return messageProjectName === currentProjectName;
+};
+
+const applyErrorState = (
+  store: ReturnType<StoreGet>,
+  options: {
+    clearPreview?: boolean;
+    error?: string | null;
+    buildId?: string | null;
+  } = {}
+): void => {
+  if (options.clearPreview ?? true) {
+    store.setPreview(null, null);
+  }
+  store.setPreviewStatus("error", {
+    error: options.error ?? null,
+    buildId: options.buildId ?? null,
+  });
+  store.setStatus("error");
+};
+
+const applyPreviewStatus = (
+  store: ReturnType<StoreGet>,
+  previewStatus: "stopped" | "starting" | "ready" | "error",
+  options: {
+    error?: string | null;
+    buildId?: string | null;
+    clearPreview?: boolean;
+  } = {}
+): void => {
+  if (options.clearPreview) {
+    store.setPreview(null, null);
+  }
+  store.setPreviewStatus(previewStatus, {
+    error: options.error ?? null,
+    buildId: options.buildId ?? null,
+  });
 };
 
 export const createWsHandler = (
@@ -51,12 +104,23 @@ export const createWsHandler = (
 
     case "status":
       if (!matchesActiveProject(get, msg)) {
+        if (get().projectName && !getMessageProjectName(msg)) {
+          log({ level: "warn", source: "ws", message: `Ignored unscoped status event: ${msg.status}` });
+        }
         break;
       }
-      store.setStatus(msg.status as AppStatus);
-      // Clear preview on error — dead Metro port should not persist
-      if (msg.status === "error") {
-        store.setPreview(null, null);
+      store.setStatus(msg.status);
+      if (msg.previewStatus) {
+        applyPreviewStatus(store, msg.previewStatus, {
+          buildId: msg.buildId ?? null,
+          clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error",
+        });
+      }
+      if (msg.status === "error" && msg.previewStatus === "error") {
+        applyErrorState(store, {
+          clearPreview: true,
+          buildId: msg.buildId ?? null,
+        });
       }
       log({ level: "info", source: "status", message: `Status → ${msg.status}` });
       break;
@@ -132,9 +196,12 @@ export const createWsHandler = (
 
     case "build_event": {
       if (!matchesActiveProject(get, msg)) {
+        if (get().projectName && !getMessageProjectName(msg)) {
+          log({ level: "warn", source: "ws", message: `Ignored unscoped build event: ${msg.eventType}` });
+        }
         break;
       }
-      const eventType = msg.eventType as string;
+      const eventType = msg.eventType;
       if (eventType === "build_error") {
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
       } else if (eventType === "build_success") {
@@ -145,15 +212,40 @@ export const createWsHandler = (
       break;
     }
 
+    case "preview_status":
+      if (!matchesActiveProject(get, msg)) {
+        break;
+      }
+      applyPreviewStatus(store, msg.previewStatus, {
+        buildId: msg.buildId,
+        error: msg.error,
+        clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error" || msg.previewStatus === "stopped",
+      });
+      if (msg.previewStatus === "error") {
+        store.addMessage(createErrorMessage("Preview failed to start.", msg.error));
+        log({
+          level: "error",
+          source: "preview",
+          message: "Preview failed",
+          details: msg.error,
+        });
+      } else if (msg.previewStatus === "starting") {
+        log({ level: "info", source: "preview", message: "Preview starting" });
+      }
+      break;
+
     case "preview_ready": {
       if (!matchesActiveProject(get, msg)) {
         break;
       }
-      const previewProject = msg.projectName as string | undefined;
       const currentProject = get().projectName;
-      if (!previewProject || previewProject === currentProject) {
+      if (msg.projectName === currentProject) {
         const prevPort = get().previewPort;
         store.setPreview(msg.proxyUrl, msg.port);
+        store.setPreviewStatus("ready", {
+          buildId: msg.buildId,
+          error: null,
+        });
         store.setStatus("ready");
         if (prevPort !== msg.port) {
           store.addMessage(createAssistantMessage(`Preview started on port ${msg.port}.`));
@@ -162,7 +254,7 @@ export const createWsHandler = (
           void fetchProjectFiles(currentProject);
         }
       }
-      log({ level: "info", source: "preview", message: `Preview: ${previewProject ?? "unknown"} → port ${msg.port}` });
+      log({ level: "info", source: "preview", message: `Preview: ${msg.projectName} → port ${msg.port}` });
       break;
     }
 
@@ -170,14 +262,14 @@ export const createWsHandler = (
       if (!matchesActiveProject(get, msg)) {
         break;
       }
-      store.addMessage(createAssistantMessage(msg.content as string));
+      store.addMessage(createAssistantMessage(msg.content));
       break;
 
     case "analysis_complete": {
       if (!matchesActiveProject(get, msg)) {
         break;
       }
-      const thinking = msg.thinking as string | undefined;
+      const thinking = msg.thinking;
       if (thinking) store.addMessage(createAssistantMessage(thinking));
       const { files } = msg;
       if (files?.length) store.addMessage(createSystemMessage(`Analyzing: ${files.join(", ")}`, true));
@@ -211,14 +303,25 @@ export const createWsHandler = (
         break;
       }
       const { applied, failed } = msg;
-      if (failed > 0) {
-        const errors = msg.errors ?? [];
-        store.addMessage(createErrorMessage(`Applied ${applied} changes, ${failed} errors`, errors.join("\n") || undefined));
-        log({ level: "error", source: "iteration", message: `${failed} blocks failed`, details: errors.join("\n") });
-      } else if (applied > 0) {
-        store.addMessage(createAssistantMessage(`Applied ${applied} changes [ok]`));
+      const errors = msg.errors ?? [];
+      const hasFailure = failed > 0 || errors.length > 0;
+      if (hasFailure) {
+        const failureCount = Math.max(failed, errors.length, 1);
+        store.addMessage(createErrorMessage(`Applied ${applied} changes, ${failureCount} errors`, errors.join("\n") || undefined));
+        log({ level: "error", source: "iteration", message: `${failureCount} blocks failed`, details: errors.join("\n") });
+        applyErrorState(store, {
+          error: errors.join("\n") || "Iteration failed",
+        });
+      } else {
+        store.setStatus("ready");
+        if (get().previewStatus === "starting") {
+          store.setPreviewStatus("stopped", { buildId: get().previewBuildId });
+        }
       }
-      store.setStatus("ready");
+      if (applied > 0 && !hasFailure) {
+        store.addMessage(createAssistantMessage(`Applied ${applied} changes [ok]`));
+        store.setStatus("ready");
+      }
       break;
     }
 
@@ -252,7 +355,10 @@ export const createWsHandler = (
       }
       store.addMessage(createErrorMessage(`Could not fix after ${msg.attempts} attempts.`, msg.error, msg.file));
       log({ level: "error", source: "autofix", message: `Autofix failed after ${msg.attempts} attempts`, details: `File: ${msg.file ?? "unknown"}\n${msg.error ?? ""}` });
-      store.setStatus("error");
+      applyErrorState(store, {
+        error: msg.error ?? "Autofix failed",
+        buildId: msg.buildId ?? null,
+      });
       break;
 
     case "reloading_preview":
@@ -268,7 +374,10 @@ export const createWsHandler = (
       }
       store.addMessage(createErrorMessage(`Error: ${msg.error}`, msg.error, msg.file));
       log({ level: "error", source: "system", message: String(msg.error), details: msg.file ? `File: ${msg.file}` : undefined });
-      store.setStatus("error");
+      applyErrorState(store, {
+        error: msg.error,
+        buildId: msg.buildId ?? null,
+      });
       break;
 
     case "generation_aborted":
@@ -277,6 +386,7 @@ export const createWsHandler = (
       }
       store.addMessage(createSystemMessage("Generation aborted by user", false));
       store.setStatus("ready");
+      applyPreviewStatus(store, "stopped", { clearPreview: true });
       log({ level: "warn", source: "pipeline", message: "Generation aborted by user" });
       break;
 
@@ -291,7 +401,7 @@ export const createWsHandler = (
       store.addProject({
         name: pName,
         displayName: existing?.displayName ?? pName,
-        status: "ready",
+        status: existing?.status ?? store.status ?? "ready",
         port: msg.port ?? existing?.port ?? null,
         createdAt: existing?.createdAt ?? Date.now(),
       });
@@ -317,7 +427,7 @@ export const createWsHandler = (
 
     case "lm_studio_status":
     case "llm_server_status": {
-      const lmStatus = msg.status as "connected" | "disconnected" | "checking";
+      const lmStatus = msg.status;
       set({ lmStudioStatus: lmStatus });
       if (lmStatus === "disconnected") log({ level: "error", source: "llm-server", message: "LLM server disconnected" });
       else if (lmStatus === "connected") log({ level: "info", source: "llm-server", message: "LLM server connected" });

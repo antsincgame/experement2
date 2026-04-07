@@ -28,7 +28,21 @@ module.exports = {
           lime: "#00FF88",
           "lime-bg": "rgba(0, 255, 136, 0.12)",
           gold: "#FFD700",
+          "gold-warm": "#F4A836",
+          "gold-pale": "#FFE066",
+          "gold-glow": "rgba(255, 215, 0, 0.4)",
           pink: "#FF3366",
+          emerald: "#00FF88",
+        },
+        accent: {
+          cyan: "#00E5FF",
+          "cyan-glow": "rgba(0, 229, 255, 0.15)",
+          "cyan-dim": "rgba(0, 229, 255, 0.08)",
+        },
+        txt: {
+          main: "#E0E0F0",
+          muted: "#8888AA",
+          dim: "#52525B",
         },
         ink: {
           dark: "#0B0D17",
@@ -36,6 +50,18 @@ module.exports = {
           muted: "#4A4A6A",
           light: "#8888AA",
           faint: "#C0C0D0",
+        },
+        border: {
+          subtle: "rgba(82, 82, 91, 0.4)",
+        },
+        void: {
+          black: "#0A0A0A",
+          deep: "#0D0D1A",
+          nebula: "#12121F",
+        },
+        surface: {
+          DEFAULT: "#1A1A1A",
+          elevated: "#2A2A2A",
         },
       },
       fontFamily: {
@@ -51,7 +77,7 @@ module.exports = {
         neon: "0 0 40px rgba(0, 229, 255, 0.3), 0 0 80px rgba(255, 45, 170, 0.15)",
       },
       animation: {
-        "aurora": "aurora 12s ease-in-out infinite",
+        "neon-drift": "neonDrift 12s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
         "glow-pulse": "glowPulse 3s ease-in-out infinite alternate",
         "shimmer": "shimmer 2s linear infinite",
@@ -62,7 +88,7 @@ module.exports = {
         "code-flash": "codeFlash 1.2s ease-out forwards",
       },
       keyframes: {
-        aurora: {
+        neonDrift: {
           "0%, 100%": { backgroundPosition: "0% 50%" },
           "25%": { backgroundPosition: "50% 0%" },
           "50%": { backgroundPosition: "100% 50%" },

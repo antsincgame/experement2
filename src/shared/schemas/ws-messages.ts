@@ -1,9 +1,10 @@
-// Defines typed WebSocket payloads so the client can validate and handle agent events safely.
+// Defines stricter WebSocket protocol contracts so build and preview state stay scoped and debuggable.
 import { z } from "zod";
 
 const RequestIdSchema = z.string().uuid();
 const ProjectNameSchema = z.string().min(1);
-const AppStatusSchema = z.enum([
+const BuildIdSchema = z.string().uuid();
+export const ProjectStatusSchema = z.enum([
   "idle",
   "planning",
   "scaffolding",
@@ -14,10 +15,32 @@ const AppStatusSchema = z.enum([
   "ready",
   "error",
 ]);
+export const PreviewStatusSchema = z.enum([
+  "stopped",
+  "starting",
+  "ready",
+  "error",
+]);
 
-const ScopedMessageSchema = z.object({
+const RequestScopedMessageSchema = z.object({
+  requestId: RequestIdSchema,
+});
+
+const OperationScopedMessageSchema = RequestScopedMessageSchema.extend({
+  projectName: ProjectNameSchema.optional(),
+});
+
+const LooseOperationScopedMessageSchema = z.object({
   projectName: ProjectNameSchema.optional(),
   requestId: RequestIdSchema.optional(),
+});
+
+const ProjectScopedMessageSchema = RequestScopedMessageSchema.extend({
+  projectName: ProjectNameSchema,
+});
+
+const BuildScopedMessageSchema = ProjectScopedMessageSchema.extend({
+  buildId: BuildIdSchema,
 });
 
 const UserAssistantMessageSchema = z.object({
@@ -33,156 +56,167 @@ export const ConnectedMessageSchema = z.object({
 
 export const StatusMessageSchema = z.object({
   type: z.literal("status"),
-  status: AppStatusSchema,
-}).merge(ScopedMessageSchema);
+  status: ProjectStatusSchema,
+  previewStatus: PreviewStatusSchema.optional(),
+  buildId: BuildIdSchema.optional(),
+}).merge(OperationScopedMessageSchema);
 
 export const PlanChunkMessageSchema = z.object({
   type: z.literal("plan_chunk"),
   chunk: z.string(),
-}).merge(ScopedMessageSchema);
+}).merge(OperationScopedMessageSchema);
 
 export const PlanCompleteMessageSchema = z.object({
   type: z.literal("plan_complete"),
   plan: z.record(z.string(), z.unknown()),
-}).merge(ScopedMessageSchema);
+}).merge(OperationScopedMessageSchema);
 
 export const ScaffoldCompleteMessageSchema = z.object({
   type: z.literal("scaffold_complete"),
-  projectName: ProjectNameSchema,
-  requestId: RequestIdSchema.optional(),
-});
+}).merge(ProjectScopedMessageSchema);
 
 export const FileGeneratingMessageSchema = z.object({
   type: z.literal("file_generating"),
   filepath: z.string(),
   progress: z.number(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const CodeChunkMessageSchema = z.object({
   type: z.literal("code_chunk"),
   chunk: z.string(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const FileCompleteMessageSchema = z.object({
   type: z.literal("file_complete"),
   filepath: z.string(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const GenerationCompleteMessageSchema = z.object({
   type: z.literal("generation_complete"),
   filesCount: z.number(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const BuildEventMessageSchema = z.object({
   type: z.literal("build_event"),
   eventType: z.string(),
   message: z.string().optional(),
   error: z.string().optional(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+  previewStatus: PreviewStatusSchema.optional(),
+}).merge(OperationScopedMessageSchema);
+
+export const PreviewStatusMessageSchema = z.object({
+  type: z.literal("preview_status"),
+  previewStatus: PreviewStatusSchema,
+  error: z.string().optional(),
+}).merge(BuildScopedMessageSchema);
 
 export const PreviewReadyMessageSchema = z.object({
   type: z.literal("preview_ready"),
-  projectName: ProjectNameSchema,
   port: z.number(),
   proxyUrl: z.string(),
-  requestId: RequestIdSchema.optional(),
-});
+}).merge(BuildScopedMessageSchema);
 
 export const ThinkingMessageSchema = z.object({
   type: z.literal("thinking"),
   content: z.string(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const AnalysisCompleteMessageSchema = z.object({
   type: z.literal("analysis_complete"),
   files: z.array(z.string()).optional(),
   thinking: z.string().optional(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const FileDiffMessageSchema = z.object({
   type: z.literal("file_diff"),
   filepath: z.string(),
   before: z.string(),
   after: z.string(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const BlockAppliedMessageSchema = z.object({
   type: z.literal("block_applied"),
   filepath: z.string(),
   blockType: z.string().optional(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const IterationCompleteMessageSchema = z.object({
   type: z.literal("iteration_complete"),
   applied: z.number(),
   failed: z.number(),
   errors: z.array(z.string()).optional(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const VersionCreatedMessageSchema = z.object({
   type: z.literal("version_created"),
   version: z.number(),
   hash: z.string(),
   description: z.string(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const AutofixStartMessageSchema = z.object({
   type: z.literal("autofix_start"),
   file: z.string().optional(),
   error: z.string(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+}).merge(ProjectScopedMessageSchema);
 
 export const AutofixSuccessMessageSchema = z.object({
   type: z.literal("autofix_success"),
   attempts: z.number(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+}).merge(ProjectScopedMessageSchema);
 
 export const AutofixFailedMessageSchema = z.object({
   type: z.literal("autofix_failed"),
   attempts: z.number(),
   error: z.string().optional(),
   file: z.string().optional(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+}).merge(ProjectScopedMessageSchema);
 
 export const ReloadingPreviewMessageSchema = z.object({
   type: z.literal("reloading_preview"),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const SystemErrorMessageSchema = z.object({
   type: z.literal("system_error"),
   error: z.string(),
   file: z.string().optional(),
   step: z.string().optional(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+}).merge(LooseOperationScopedMessageSchema);
 
 export const GenerationAbortedMessageSchema = z.object({
   type: z.literal("generation_aborted"),
-}).merge(ScopedMessageSchema);
+}).merge(OperationScopedMessageSchema);
 
 export const ProjectCreatedMessageSchema = z.object({
   type: z.literal("project_created"),
-  projectName: ProjectNameSchema,
   port: z.number(),
   plan: z.record(z.string(), z.unknown()).optional(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const IterationResultMessageSchema = z.object({
   type: z.literal("iteration_result"),
   appliedBlocks: z.number().optional(),
   failedBlocks: z.number().optional(),
   errors: z.array(z.string()).optional(),
-}).merge(ScopedMessageSchema);
+}).merge(ProjectScopedMessageSchema);
 
 export const AutofixAttemptMessageSchema = z.object({
   type: z.literal("autofix_attempt"),
   attempt: z.number(),
   maxAttempts: z.number(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+}).merge(ProjectScopedMessageSchema);
 
 export const AutofixBlockMessageSchema = z.object({
   type: z.literal("autofix_block"),
   filepath: z.string(),
-}).merge(ScopedMessageSchema);
+  buildId: BuildIdSchema.optional(),
+}).merge(ProjectScopedMessageSchema);
 
 export const LlmServerStatusMessageSchema = z.object({
   type: z.enum(["lm_studio_status", "llm_server_status"]),
@@ -200,6 +234,7 @@ export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
   FileCompleteMessageSchema,
   GenerationCompleteMessageSchema,
   BuildEventMessageSchema,
+  PreviewStatusMessageSchema,
   PreviewReadyMessageSchema,
   ThinkingMessageSchema,
   AnalysisCompleteMessageSchema,
@@ -221,6 +256,8 @@ export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type IncomingWsMessage = z.infer<typeof IncomingWsMessageSchema>;
+export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+export type PreviewStatus = z.infer<typeof PreviewStatusSchema>;
 
 const OutgoingScopedMessageSchema = z.object({
   requestId: RequestIdSchema,

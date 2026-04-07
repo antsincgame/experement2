@@ -1,18 +1,14 @@
-// Defines shared project store types so slices and handlers can evolve without circular imports.
+// Defines shared project and preview store types so protocol changes stay explicit across slices.
 import type { StoreApi } from "zustand";
 import type { ChatMessage } from "@/features/chat/schemas/message.schema";
-import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
+import type {
+  IncomingWsMessage,
+  PreviewStatus as PreviewRuntimeStatus,
+  ProjectStatus,
+} from "@/shared/schemas/ws-messages";
 
-export type AppStatus =
-  | "idle"
-  | "planning"
-  | "scaffolding"
-  | "generating"
-  | "building"
-  | "analyzing"
-  | "validating"
-  | "ready"
-  | "error";
+export type AppStatus = ProjectStatus;
+export type PreviewStatus = PreviewRuntimeStatus;
 
 export interface FileNode {
   name: string;
@@ -52,6 +48,7 @@ export interface ProjectStateData {
   projectName: string | null;
   projectList: ProjectEntry[];
   status: AppStatus;
+  previewStatus: PreviewStatus;
   plan: Record<string, unknown> | null;
   messages: ChatMessage[];
   fileTree: FileNode[];
@@ -62,6 +59,9 @@ export interface ProjectStateData {
   currentVersion: number;
   previewUrl: string | null;
   previewPort: number | null;
+  previewBuildId: string | null;
+  previewRevision: number;
+  lastPreviewError: string | null;
   generationProgress: number;
   currentGeneratingFile: string | null;
   isConnected: boolean;
@@ -87,6 +87,11 @@ export interface ProjectStateActions {
   addVersion: (version: Version) => void;
   setCurrentVersion: (num: number) => void;
   setPreview: (url: string | null, port: number | null) => void;
+  setPreviewStatus: (
+    status: PreviewStatus,
+    options?: { error?: string | null; buildId?: string | null }
+  ) => void;
+  bumpPreviewRevision: () => void;
   setGenerationProgress: (progress: number, file: string | null) => void;
   setConnected: (connected: boolean) => void;
   setLmStudioStatus: (status: "connected" | "disconnected" | "checking") => void;

@@ -1,6 +1,7 @@
-// Isolates file tree and preview mutations so workspace state can evolve independently from project metadata.
+// Isolates file tree and preview mutations so workspace and preview runtime can evolve independently.
 import type {
   FileNode,
+  PreviewStatus,
   ProjectStoreSet,
 } from "../project-store.types";
 import {
@@ -87,11 +88,25 @@ export const createProjectWorkspaceSlice = (set: ProjectStoreSet) => ({
     set((state) => ({
       previewUrl,
       previewPort,
+      ...(previewUrl ? { lastPreviewError: null } : {}),
       projectChats: saveProjectChatPatch(state.projectChats, state.projectName, {
         previewUrl,
         previewPort,
       }),
     })),
+
+  setPreviewStatus: (
+    previewStatus: PreviewStatus,
+    options?: { error?: string | null; buildId?: string | null }
+  ) =>
+    set({
+      previewStatus,
+      lastPreviewError: options?.error ?? null,
+      previewBuildId: options?.buildId ?? null,
+    }),
+
+  bumpPreviewRevision: () =>
+    set((state) => ({ previewRevision: state.previewRevision + 1 })),
 
   setGenerationProgress: (
     generationProgress: number,

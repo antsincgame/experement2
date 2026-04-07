@@ -30,6 +30,10 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
   const isGenerating = !["idle", "ready", "error"].includes(status);
   const visibleMessages = messages.filter((m) => !m.isHidden);
   const hasStreaming = isGenerating && (streamingContent || currentFile);
+  const lastVisibleMessage = visibleMessages.at(-1);
+  const lastVisibleSignature = lastVisibleMessage
+    ? `${lastVisibleMessage.id}:${lastVisibleMessage.content.length}:${lastVisibleMessage.status}`
+    : "none";
 
   // Auto-scroll on new messages AND streaming content
   useEffect(() => {
@@ -37,7 +41,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 50);
     return () => clearTimeout(timer);
-  }, [visibleMessages.length, hasStreaming, currentFile]);
+  }, [lastVisibleSignature, hasStreaming, currentFile]);
 
   const handleFixError = useCallback(
     (errorContent: string, errorDetails?: string, errorFile?: string) => {
@@ -52,11 +56,11 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
   );
 
   return (
-    <View className="flex-1" style={{ backgroundColor: "rgba(255,255,255,0.4)" }}>
+    <View className="flex-1" style={{ backgroundColor: "rgba(18,18,31,0.6)" }}>
       {/* Header */}
       <View
         className="h-10 px-4 flex-row items-center justify-between"
-        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" }}
+        style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}
       >
         <View className="flex-row items-center">
           <MessageSquare size={13} color="#7C4DFF" strokeWidth={1.5} />
@@ -67,7 +71,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
         {isGenerating && (
           <View className="flex-row items-center gap-1.5">
             <ActivityIndicator size={10} color="#00E5FF" />
-            <Text style={{ fontSize: 9, color: "#00BCD4", fontWeight: "600" }}>
+            <Text style={{ fontSize: 9, color: "#00E5FF", fontWeight: "600" }}>
               {STATUS_LABELS[status] ?? status}
             </Text>
           </View>
@@ -114,7 +118,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
               >
                 <Cpu size={12} color="#00E5FF" strokeWidth={1.5} />
               </View>
-              <Text className="text-xs font-semibold" style={{ color: "#00BCD4" }}>
+              <Text className="text-xs font-semibold" style={{ color: "#00E5FF" }}>
                 AI Working
               </Text>
               <ActivityIndicator size={10} color="#00E5FF" />
@@ -132,13 +136,13 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
                       </Text>
                     </View>
                   )}
-                  <Text style={{ fontSize: 9, color: "#888", fontWeight: "600" }}>
+                  <Text style={{ fontSize: 9, color: "#8888AA", fontWeight: "600" }}>
                     {Math.round(generationProgress * 100)}%
                   </Text>
                 </View>
                 <View
                   className="rounded-full overflow-hidden"
-                  style={{ height: 3, backgroundColor: "rgba(0,0,0,0.06)" }}
+                  style={{ height: 3, backgroundColor: "rgba(255,255,255,0.06)" }}
                 >
                   <View
                     style={{
@@ -161,13 +165,13 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
               </View>
             ) : currentFile ? (
               <View className="ml-8">
-                <Text style={{ fontSize: 12, color: "#888", fontStyle: "italic" }}>
+                <Text style={{ fontSize: 12, color: "#8888AA", fontStyle: "italic" }}>
                   Processing {currentFile}...
                 </Text>
               </View>
             ) : (
               <View className="ml-8">
-                <Text style={{ fontSize: 12, color: "#888", fontStyle: "italic" }}>
+                <Text style={{ fontSize: 12, color: "#8888AA", fontStyle: "italic" }}>
                   {STATUS_LABELS[status] ?? "Working..."}
                 </Text>
               </View>

@@ -1,7 +1,8 @@
-﻿// Composes typed domain slices so project state stays predictable across multi-project workspace flows.
+﻿// Composes typed project and preview state so lifecycle and preview runtime can evolve independently.
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { apiClient } from "@/shared/lib/api-client";
+import { useSettingsStore } from "./settings-store";
 import { createPersistStorage } from "@/shared/lib/storage/persist-storage";
 import {
   applyProjectFileSnapshot,
@@ -31,6 +32,7 @@ const initialState = {
   projectName: null,
   projectList: [],
   status: "idle" as AppStatus,
+  previewStatus: "stopped" as const,
   plan: null,
   messages: [],
   fileTree: [],
@@ -41,6 +43,9 @@ const initialState = {
   currentVersion: 0,
   previewUrl: null,
   previewPort: null,
+  previewBuildId: null,
+  previewRevision: 0,
+  lastPreviewError: null,
   generationProgress: 0,
   currentGeneratingFile: null,
   isConnected: false,
@@ -87,8 +92,8 @@ export const fetchProjectFiles = async (
       try {
         const fileData = await apiClient.getProjectFile(projectName, filePath);
         fileContents[filePath] = fileData.content;
-      } catch (error) {
-        console.warn(`[project-store] Failed to load ${filePath}`, error);
+      } catch {
+        useSettingsStore.getState().addErrorLog({ level: "warn", source: "project-store", message: `Failed to load ${filePath}` });
       }
     }
 
@@ -97,8 +102,8 @@ export const fetchProjectFiles = async (
     );
 
     return fileContents;
-  } catch (error) {
-    console.warn(`[project-store] Failed to hydrate ${projectName}`, error);
+  } catch {
+    useSettingsStore.getState().addErrorLog({ level: "warn", source: "project-store", message: `Failed to hydrate ${projectName}` });
     return null;
   }
 };

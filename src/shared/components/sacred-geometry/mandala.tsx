@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  cancelAnimation,
   Easing,
 } from "react-native-reanimated";
 
@@ -24,12 +25,16 @@ const Mandala = ({
   const rotation = useSharedValue(0);
 
   useEffect(() => {
-    if (!spinning) return;
+    if (!spinning) {
+      cancelAnimation(rotation);
+      return;
+    }
     rotation.value = withRepeat(
       withTiming(360, { duration: 20000, easing: Easing.linear }),
       -1,
       false
     );
+    return () => cancelAnimation(rotation);
   }, [spinning, rotation]);
 
   const animatedStyle = useAnimatedStyle(() => ({

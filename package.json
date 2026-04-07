@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e:web": "playwright test -c playwright.e2e.config.ts",
+    "test:e2e:mass": "node e2e/mass-test-50.mjs",
     "test:agent": "npm --prefix agent run test",
     "typecheck:agent": "npm --prefix agent run typecheck",
     "check": "npm run typecheck && npm run typecheck:agent && npm run lint && npm run test && npm run test:agent"

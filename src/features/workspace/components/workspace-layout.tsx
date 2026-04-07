@@ -59,12 +59,12 @@ const WorkspaceLayout = ({
     <View style={{ width: "25%" }}>
       <ChatPanel onSend={onSendChat} onAbort={onAbort} />
     </View>
-    <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
+    <View style={{ width: 1, backgroundColor: "rgba(255,215,0,0.1)" }} />
 
     <View className="flex-1 overflow-hidden">
       <View className="flex-1 flex-row overflow-hidden">
         {fileTreeVisible && (
-          <View style={{ width: 200, backgroundColor: "rgba(255,255,255,0.5)" }}>
+          <View style={{ width: 200, backgroundColor: "rgba(26,26,46,0.6)" }}>
             <FileTree nodes={fileTree} activeFile={activeFile} onFilePress={onOpenFile} />
           </View>
         )}
@@ -80,7 +80,7 @@ const WorkspaceLayout = ({
       </View>
       {terminalVisible && <TerminalPanel />}
     </View>
-    <View style={{ width: 1, backgroundColor: "rgba(0,0,0,0.08)" }} />
+    <View style={{ width: 1, backgroundColor: "rgba(255,215,0,0.1)" }} />
 
     <View style={{ width: "25%" }}>
       <PreviewPanel />

@@ -1,4 +1,4 @@
-// Locks scoped event delivery so project metadata and client targeting do not regress.
+// Locks scoped event delivery so explicit scope metadata and client targeting do not regress.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   broadcast,
@@ -62,6 +62,36 @@ describe("event-bus", () => {
       requestId: "1f4f0f3b-8d07-47c8-8681-5a5a9afcb1f1",
     });
     expect(clientB.send).not.toHaveBeenCalled();
+  });
+
+  it("uses explicit scope for async-style deliveries without relying on AsyncLocalStorage", () => {
+    const clientA = createMockSocket();
+    const clientB = createMockSocket();
+
+    registerClient("client-a", clientA as never);
+    registerClient("client-b", clientB as never);
+
+    broadcast(
+      {
+        type: "preview_status",
+        previewStatus: "starting",
+        buildId: "11111111-1111-4111-8111-111111111111",
+      },
+      {
+        clientId: "client-b",
+        projectName: "demo-app",
+        requestId: "1f4f0f3b-8d07-47c8-8681-5a5a9afcb1f1",
+      }
+    );
+
+    expect(clientA.send).not.toHaveBeenCalled();
+    expect(JSON.parse(clientB.send.mock.calls[0]?.[0] ?? "{}")).toEqual({
+      type: "preview_status",
+      previewStatus: "starting",
+      buildId: "11111111-1111-4111-8111-111111111111",
+      projectName: "demo-app",
+      requestId: "1f4f0f3b-8d07-47c8-8681-5a5a9afcb1f1",
+    });
   });
 
   it("rejects preview requests without a project name", () => {

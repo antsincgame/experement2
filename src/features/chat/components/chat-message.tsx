@@ -143,8 +143,8 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
                 borderColor: "rgba(255, 255, 255, 0.1)",
               }}
             >
-              <Copy size={12} color="#888" strokeWidth={2} />
-              <Text style={{ color: "#888", fontSize: 11, fontWeight: "500" }}>
+              <Copy size={12} color="#8888AA" strokeWidth={2} />
+              <Text style={{ color: "#8888AA", fontSize: 11, fontWeight: "500" }}>
                 Copy
               </Text>
             </Pressable>
@@ -205,7 +205,7 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
 
       <View className="ml-8">
         {isUser ? (
-          <Text className="text-sm leading-6 text-ink-dark font-medium">
+          <Text className="text-sm leading-6 text-white font-medium">
             {message.content}
           </Text>
         ) : (

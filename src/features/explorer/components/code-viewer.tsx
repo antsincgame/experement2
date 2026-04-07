@@ -1,6 +1,7 @@
 import { ScrollView, Text, View } from "react-native";
 import { useWebSyntaxHighlighter } from "@/shared/hooks/use-web-syntax-highlighter";
 import { useProjectStore } from "@/stores/project-store";
+import { mixedStyle } from "@/shared/lib/web-styles";
 import MatrixRain from "./matrix-rain";
 
 interface CodeViewerProps {
@@ -15,7 +16,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   if (!filepath && status === "generating") {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#09090B" }}>
+      <View className="flex-1" style={{ backgroundColor: "#0A0A0A" }}>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ padding: 16 }}
@@ -23,7 +24,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
           <Text style={{ color: "#00E5FF", fontFamily: "monospace", fontSize: 10, opacity: 0.5, marginBottom: 8 }}>
             Generating...
           </Text>
-          <Text style={{ color: "#00FF41", fontFamily: "monospace", fontSize: 12, opacity: 0.9, lineHeight: 20 }}>
+          <Text style={{ color: "#00FF88", fontFamily: "monospace", fontSize: 12, opacity: 0.9, lineHeight: 20 }}>
             {streamingContent.length > 800 ? streamingContent.slice(-800) : streamingContent}
           </Text>
         </ScrollView>
@@ -35,10 +36,10 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     return (
       <View
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "#09090B", position: "relative" as const }}
+        style={{ backgroundColor: "#0A0A0A", position: "relative" as const }}
       >
         <MatrixRain />
-        <Text style={{ color: "#00FF41", fontSize: 12, opacity: 0.6, zIndex: 1 }}>Select a file to view</Text>
+        <Text style={{ color: "#00FF88", fontSize: 12, opacity: 0.6, zIndex: 1 }}>Select a file to view</Text>
       </View>
     );
   }
@@ -50,10 +51,10 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     return (
       <View
         className="flex-1 items-center justify-center"
-        style={{ backgroundColor: "#09090B", position: "relative" as const }}
+        style={{ backgroundColor: "#0A0A0A", position: "relative" as const }}
       >
         <MatrixRain />
-        <Text style={{ color: "#00FF41", fontSize: 12, opacity: 0.6, zIndex: 1 }}>Loading {filepath}...</Text>
+        <Text style={{ color: "#00FF88", fontSize: 12, opacity: 0.6, zIndex: 1 }}>Loading {filepath}...</Text>
       </View>
     );
   }
@@ -62,15 +63,15 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   // Safety cap: files > 80 KB or > 1000 lines skip syntax highlighting to avoid OOM
   const lineCount = content.split("\n").length;
-  const useSyntaxHighlighter =
+  const canHighlight =
     SyntaxHighlighter !== null &&
     theme !== null &&
     content.length < 80_000 &&
     lineCount < 1000;
 
-  if (useSyntaxHighlighter) {
+  if (canHighlight) {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
+      <View className="flex-1" style={{ backgroundColor: "#0A0A0A", position: "relative" as const }}>
         <MatrixRain />
         <ScrollView className="flex-1" style={{ backgroundColor: "transparent", zIndex: 1 }}>
           <SyntaxHighlighter
@@ -80,7 +81,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
             lineNumberStyle={{
               minWidth: 40,
               paddingRight: 16,
-              color: "#00FF41",
+              color: "#00FF88",
               fontSize: 12,
               userSelect: "none",
               opacity: 0.3,
@@ -110,7 +111,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
   // Fallback: plain text with line numbers
   const lines = content.split("\n");
   return (
-    <View className="flex-1" style={{ backgroundColor: "#09090B", position: "relative" as const }}>
+    <View className="flex-1" style={{ backgroundColor: "#0A0A0A", position: "relative" as const }}>
       <MatrixRain />
       <ScrollView
         className="flex-1"
@@ -122,11 +123,11 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
             <View key={i} className="flex-row" style={{ minHeight: 20 }}>
               <Text
                 className="font-mono text-xs text-right"
-                style={{ width: 40, paddingRight: 16, userSelect: "none", color: "#00FF41", opacity: 0.3 } as never}
+                style={mixedStyle({ width: 40, paddingRight: 16, userSelect: "none", color: "#00FF88", opacity: 0.3 })}
               >
                 {i + 1}
               </Text>
-              <Text className="font-mono text-xs flex-1" style={{ color: "#00FF41" }}>
+              <Text className="font-mono text-xs flex-1" style={{ color: "#00FF88" }}>
                 {line || " "}
               </Text>
             </View>
