@@ -50,6 +50,9 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 - Types (src/types/*.ts) can use named exports: \`export interface Todo { ... }\`
 - NEVER mix: if you export default, consumers MUST import WITHOUT braces: \`import useX from "@/hooks/useX"\`
 - NEVER: \`import { useX } from "@/hooks/useX"\` when hook uses \`export default\` — this CRASHES
+- ABSOLUTE RULE FOR TYPES: If you use ANY custom interface or type (e.g., Todo, Expense, User, RootStackParamList), YOU MUST IMPORT IT AT THE TOP OF THE FILE!
+  Example: \`import type { Todo, Category } from "@/types/index";\`
+  Missing type imports cause TS2304 errors and pipeline crashes!
 
 Examples:
   ✅ Hook file: \`export default function useTodos() { ... }\`

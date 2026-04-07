@@ -71,11 +71,18 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
     const skeleton = buildProjectSkeleton(projectPath);
     const fileContent = readFile(projectName, error.file) ?? "// file not found";
 
+    let errorHint = "";
+    if (error.raw.includes("TS2322") && error.raw.includes("Feather")) {
+      errorHint = "HINT: You used an invalid Feather icon name. Use generic ones like 'star', 'circle', 'square', 'list', 'check'.";
+    } else if (error.raw.includes("TS2304") || error.raw.includes("TS2552")) {
+      errorHint = "HINT: You forgot to import a type, interface, or component. Add the missing import statement at the top.";
+    }
+
     const messages = [
       { role: "system" as const, content: SYSTEM_AUTOFIX },
       {
         role: "user" as const,
-        content: `Project skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro error:\n${error.raw}\n\nFix this error with SEARCH/REPLACE blocks.`,
+        content: `Project skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro/TypeScript error:\n${error.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
       },
     ];
 
