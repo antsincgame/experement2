@@ -19,6 +19,7 @@ const cleanupQueueEntry = (key, entry) => {
 };
 export const WORKSPACE_OPERATION_QUEUE_KEY = "workspace:create";
 export const getProjectOperationQueueKey = (projectName) => `project:${projectName}`;
+const OPERATION_TIMEOUT_MS = 600_000; // 10 minutes max per operation
 export const enqueueProjectOperation = (key, operationName, task) => {
     const entry = getQueueEntry(key);
     entry.pending += 1;
@@ -26,7 +27,23 @@ export const enqueueProjectOperation = (key, operationName, task) => {
         .catch(() => undefined)
         .then(async () => {
         console.log(`[ProjectQueue] ${operationName} started (${key})`);
-        return task();
+        let timeoutId;
+        try {
+            return await Promise.race([
+                task(),
+                new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => {
+                        reject(new Error(`Operation ${operationName} timed out after ${OPERATION_TIMEOUT_MS / 1000}s`));
+                    }, OPERATION_TIMEOUT_MS);
+                    timeoutId.unref();
+                }),
+            ]);
+        }
+        finally {
+            if (timeoutId !== undefined) {
+                clearTimeout(timeoutId);
+            }
+        }
     });
     entry.tail = run
         .then(() => undefined)

@@ -1,12 +1,12 @@
 # Mass Enhance E2E Summary
 
-- Generated at: 2026-04-07T00:02:12.766Z
-- Total prompts: 12
+- Generated at: 2026-04-07T00:10:37.084Z
+- Total prompts: 17
 - Ready: 0
-- Error: 12
+- Error: 17
 - Timeout: 0
 - WS error: 0
-- Elapsed seconds: 1804
+- Elapsed seconds: 2308
 
 ## Top Categories
 
@@ -15,6 +15,10 @@
 - static_validation_failure: 1 hits across 1 projects
 - other: 1 hits across 1 projects
 - typescript_ts2339: 1 hits across 1 projects
+- typescript_ts2769: 1 hits across 1 projects
+- plan_validation: 1 hits across 1 projects
+- typescript_ts2349: 1 hits across 1 projects
+- typescript_ts2554: 1 hits across 1 projects
 
 ## Top Signatures
 
@@ -29,6 +33,10 @@
 - TS2322:src/components/QuoteCard.tsx(line,col): error TS2322: Type '"heart" | "heart-outline"' is not assignable to type '"settings" | "italic" | "bold" | "map" | "filter" | "search" | "re (1)
 - TS2339:app/(tabs)/index.tsx(line,col): error TS2339: Property 'name' does not exist on type 'never'. src/components/PrecipitationTimeline.tsx(line,col): error TS2339: Property 'hourlyFore (1)
 - TS2304:app/(tabs)/add.tsx(line,col): error TS2304: Cannot find name 'Expense'. src/components/CategoryChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n> (1)
+- TS2769:src/components/TrendChart.tsx(line,col): error TS2769: No overload matches this call. Overload <n> of <n>, '(props: AbstractChartProps & LineChartProps): LineChart', gave the follo (1)
+- generic:app/(tabs)/planner.tsx: dependency "src/components/MealPlanner.tsx" is missing from plan.files (1)
+- TS2349:src/stores/workoutStore.ts(line,col): error TS2349: This expression is not callable. Type 'Omit<Set, "id">' has no call signatures. src/stores/workoutStore.ts(line,col): error TS70 (1)
+- TS2554:src/components/DailyLogs.tsx(line,col): error TS2554: Expected <n>-<n> arguments, but got <n>. src/components/QuickLogBottomSheet.tsx(line,col): error TS2305: Module '"tamagui"' ha (1)
 
 ## Failed Projects
 
@@ -70,3 +78,17 @@ app/(tabs)/add.tsx(10,47): error TS2304: Cannot find name 'Expense'.
 src/components/CategoryChart.tsx(63,10): error TS2769: No overload matches this call.
   Overload 1 of 2, '(props: AbstractChartProps & BarChartProps): BarChart', gave the following error.
     Property 'yAxisSuf
+- 13. Habit tracker with streaks: error :: Typecheck failed:
+src/components/TrendChart.tsx(44,7): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: AbstractChartProps & LineChartProps): LineChart', gave the following error.
+    Type '{ data: { labels: string[]; datasets: { data: number[]; color: (opacity?: number) =>
+- 14. Recipe book app: error :: Plan validation failed: app/(tabs)/planner.tsx: dependency "src/components/MealPlanner.tsx" is missing from plan.files
+- 15. Workout log tracker: error :: Typecheck failed:
+src/stores/workoutStore.ts(104,9): error TS2349: This expression is not callable.
+  Type 'Omit<Set, "id">' has no call signatures.
+src/stores/workoutStore.ts(104,14): error TS7006: Parameter 'state' implicitly has an 'any' type.
+src/stores/workoutStore.ts(105,41): error TS7006: 
+- 16. Mood diary with calendar: error :: Typecheck failed:
+src/components/DailyLogs.tsx(19,6): error TS2554: Expected 0-1 arguments, but got 2.
+src/components/QuickLogBottomSheet.tsx(2,40): error TS2305: Module '"tamagui"' has no exported member 'Pressable'.
+- 17. Book reading tracker: error :: no captured error

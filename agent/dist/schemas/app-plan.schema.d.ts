@@ -29,6 +29,40 @@ export declare const NavigationScreenSchema: z.ZodObject<{
     name: string;
     icon?: string | undefined;
 }>;
+export declare const ThemeSchema: z.ZodDefault<z.ZodObject<{
+    style: z.ZodDefault<z.ZodString>;
+    background: z.ZodDefault<z.ZodString>;
+    surface: z.ZodDefault<z.ZodString>;
+    primary: z.ZodDefault<z.ZodString>;
+    primaryText: z.ZodDefault<z.ZodString>;
+    secondaryText: z.ZodDefault<z.ZodString>;
+    accent: z.ZodDefault<z.ZodString>;
+    cardRadius: z.ZodDefault<z.ZodNumber>;
+    buttonRadius: z.ZodDefault<z.ZodNumber>;
+    isDark: z.ZodDefault<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    style: string;
+    background: string;
+    surface: string;
+    primary: string;
+    primaryText: string;
+    secondaryText: string;
+    accent: string;
+    cardRadius: number;
+    buttonRadius: number;
+    isDark: boolean;
+}, {
+    style?: string | undefined;
+    background?: string | undefined;
+    surface?: string | undefined;
+    primary?: string | undefined;
+    primaryText?: string | undefined;
+    secondaryText?: string | undefined;
+    accent?: string | undefined;
+    cardRadius?: number | undefined;
+    buttonRadius?: number | undefined;
+    isDark?: boolean | undefined;
+}>>;
 export declare const AppPlanSchema: z.ZodObject<{
     name: z.ZodEffects<z.ZodString, string, string>;
     displayName: z.ZodString;
@@ -50,6 +84,40 @@ export declare const AppPlanSchema: z.ZodObject<{
         dependencies?: string[] | undefined;
     }>, "many">;
     extraDependencies: z.ZodDefault<z.ZodArray<z.ZodString, "many">>;
+    theme: z.ZodDefault<z.ZodObject<{
+        style: z.ZodDefault<z.ZodString>;
+        background: z.ZodDefault<z.ZodString>;
+        surface: z.ZodDefault<z.ZodString>;
+        primary: z.ZodDefault<z.ZodString>;
+        primaryText: z.ZodDefault<z.ZodString>;
+        secondaryText: z.ZodDefault<z.ZodString>;
+        accent: z.ZodDefault<z.ZodString>;
+        cardRadius: z.ZodDefault<z.ZodNumber>;
+        buttonRadius: z.ZodDefault<z.ZodNumber>;
+        isDark: z.ZodDefault<z.ZodBoolean>;
+    }, "strip", z.ZodTypeAny, {
+        style: string;
+        background: string;
+        surface: string;
+        primary: string;
+        primaryText: string;
+        secondaryText: string;
+        accent: string;
+        cardRadius: number;
+        buttonRadius: number;
+        isDark: boolean;
+    }, {
+        style?: string | undefined;
+        background?: string | undefined;
+        surface?: string | undefined;
+        primary?: string | undefined;
+        primaryText?: string | undefined;
+        secondaryText?: string | undefined;
+        accent?: string | undefined;
+        cardRadius?: number | undefined;
+        buttonRadius?: number | undefined;
+        isDark?: boolean | undefined;
+    }>>;
     navigation: z.ZodOptional<z.ZodObject<{
         type: z.ZodDefault<z.ZodEnum<["stack", "tabs"]>>;
         screens: z.ZodDefault<z.ZodArray<z.ZodObject<{
@@ -91,6 +159,18 @@ export declare const AppPlanSchema: z.ZodObject<{
         dependencies: string[];
     }[];
     extraDependencies: string[];
+    theme: {
+        style: string;
+        background: string;
+        surface: string;
+        primary: string;
+        primaryText: string;
+        secondaryText: string;
+        accent: string;
+        cardRadius: number;
+        buttonRadius: number;
+        isDark: boolean;
+    };
     navigation?: {
         type: "stack" | "tabs";
         screens: {
@@ -110,6 +190,18 @@ export declare const AppPlanSchema: z.ZodObject<{
         dependencies?: string[] | undefined;
     }[];
     extraDependencies?: string[] | undefined;
+    theme?: {
+        style?: string | undefined;
+        background?: string | undefined;
+        surface?: string | undefined;
+        primary?: string | undefined;
+        primaryText?: string | undefined;
+        secondaryText?: string | undefined;
+        accent?: string | undefined;
+        cardRadius?: number | undefined;
+        buttonRadius?: number | undefined;
+        isDark?: boolean | undefined;
+    } | undefined;
     navigation?: {
         type?: "stack" | "tabs" | undefined;
         screens?: {

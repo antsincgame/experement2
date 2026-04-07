@@ -5,60 +5,69 @@ import { spawn, spawnSync } from "child_process";
 import { findFreePort } from "../lib/port-finder.js";
 import { watchProcess } from "./log-watcher.js";
 const activeProcesses = new Map();
-// Max concurrent expo processes to prevent OOM
-const MAX_ACTIVE_EXPO = 3;
-const evictOldestIfNeeded = () => {
-    if (activeProcesses.size < MAX_ACTIVE_EXPO)
-        return;
-    // Kill the oldest process (first inserted into the Map)
-    const [oldestName, oldest] = activeProcesses.entries().next().value;
-    console.log(`[process-manager] Evicting oldest expo process: ${oldestName} (limit: ${MAX_ACTIVE_EXPO})`);
-    killProcess(oldest.process);
-    oldest.cleanup();
-    activeProcesses.delete(oldestName);
-};
+// Singleton Metro: only 1 bundler at a time to prevent OOM and browser freezes
 const isWindows = process.platform === "win32";
 const runWindowsTaskkill = (pid) => {
     const result = spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
         stdio: "ignore",
         windowsHide: true,
+        timeout: 10_000,
     });
     if (result.error) {
         throw result.error;
     }
+    if (result.status !== 0 && result.status !== null) {
+        console.warn(`[ProcessManager] taskkill exit code ${result.status} for PID ${pid} — process may already be dead`);
+    }
 };
 const killProcess = (cp) => {
-    if (!cp.pid)
+    const pid = cp.pid;
+    if (!pid)
         return;
     try {
         if (isWindows) {
-            runWindowsTaskkill(cp.pid);
+            // /T kills the process tree (all children)
+            runWindowsTaskkill(pid);
             return;
         }
-        cp.kill("SIGTERM");
-        setTimeout(() => {
-            if (!cp.killed)
-                cp.kill("SIGKILL");
+        // Kill entire process group on Unix (negative PID = process group)
+        try {
+            process.kill(-pid, "SIGTERM");
+        }
+        catch {
+            cp.kill("SIGTERM");
+        }
+        const forceKillTimer = setTimeout(() => {
+            try {
+                if (!cp.killed)
+                    process.kill(-pid, "SIGKILL");
+            }
+            catch { /* already dead */ }
         }, 5000);
+        forceKillTimer.unref();
+        const clearForceKillTimer = () => {
+            clearTimeout(forceKillTimer);
+        };
+        cp.once("exit", clearForceKillTimer);
+        cp.once("close", clearForceKillTimer);
     }
     catch {
         // The process may have already exited before cleanup completed.
     }
 };
-export const startExpo = async (projectName, projectPath, onLog) => {
-    const existing = activeProcesses.get(projectName);
-    if (existing) {
-        killProcess(existing.process);
-        existing.cleanup();
-        activeProcesses.delete(projectName);
-    }
-    evictOldestIfNeeded();
+export const startExpo = async (projectName, projectPath, onLog, clearCache = false) => {
+    // Singleton: kill ALL running bundlers before starting a new one
+    killAll();
     const port = await findFreePort();
     const npxCmd = isWindows ? "npx.cmd" : "npx";
-    const child = spawn(npxCmd, ["expo", "start", "--web", "--port", String(port)], {
+    const args = ["expo", "start", "--web", "--port", String(port)];
+    if (clearCache)
+        args.push("--clear");
+    const child = spawn(npxCmd, args, {
         cwd: projectPath,
         env: { ...process.env, BROWSER: "none" },
         shell: isWindows,
+        detached: !isWindows, // Unix: create process group so kill(-pid) works
         stdio: ["ignore", "pipe", "pipe"],
     });
     const cleanup = watchProcess(child, onLog);
@@ -79,18 +88,14 @@ export const startExpo = async (projectName, projectPath, onLog) => {
     return { port, process: child };
 };
 export const startExpoClearCache = async (projectName, projectPath, port, onLog) => {
-    const existing = activeProcesses.get(projectName);
-    if (existing) {
-        killProcess(existing.process);
-        existing.cleanup();
-        activeProcesses.delete(projectName);
-    }
-    evictOldestIfNeeded();
+    // Singleton: kill ALL running bundlers before starting a new one
+    killAll();
     const npxCmd = isWindows ? "npx.cmd" : "npx";
     const child = spawn(npxCmd, ["expo", "start", "--web", "--port", String(port), "-c"], {
         cwd: projectPath,
         env: { ...process.env, BROWSER: "none" },
         shell: isWindows,
+        detached: !isWindows,
         stdio: ["ignore", "pipe", "pipe"],
     });
     const cleanup = watchProcess(child, onLog);
@@ -118,22 +123,35 @@ export const killExpo = (projectName) => {
     managed.cleanup();
     activeProcesses.delete(projectName);
 };
+const NPM_INSTALL_TIMEOUT_MS = 300_000; // 5 minutes (Tamagui is large)
 export const npmInstall = async (projectPath, packages) => {
     const npmCmd = isWindows ? "npm.cmd" : "npm";
     const args = packages?.length
         ? ["install", ...packages]
         : ["install"];
     return new Promise((resolve, reject) => {
+        let settled = false;
         const child = spawn(npmCmd, args, {
             cwd: projectPath,
             shell: isWindows,
             stdio: ["ignore", "pipe", "pipe"],
         });
+        const timeout = setTimeout(() => {
+            if (settled)
+                return;
+            settled = true;
+            killProcess(child);
+            reject(new Error(`npm install timed out after ${NPM_INSTALL_TIMEOUT_MS / 1000}s`));
+        }, NPM_INSTALL_TIMEOUT_MS);
         let stderr = "";
         child.stderr?.on("data", (data) => {
             stderr += data.toString();
         });
         child.on("exit", (code) => {
+            if (settled)
+                return;
+            settled = true;
+            clearTimeout(timeout);
             if (code === 0) {
                 resolve();
             }
@@ -141,11 +159,18 @@ export const npmInstall = async (projectPath, packages) => {
                 reject(new Error(`npm install failed (code ${code}): ${stderr.slice(0, 500)}`));
             }
         });
-        child.on("error", reject);
+        child.on("error", (err) => {
+            if (settled)
+                return;
+            settled = true;
+            clearTimeout(timeout);
+            reject(err);
+        });
     });
 };
 export const runProjectCommand = async (projectPath, command, args, timeoutMs = 120000) => {
     return new Promise((resolve) => {
+        let timeout;
         const child = spawn(command, args, {
             cwd: projectPath,
             env: { ...process.env, CI: "1", BROWSER: "none" },
@@ -160,7 +185,7 @@ export const runProjectCommand = async (projectPath, command, args, timeoutMs = 
                 return;
             }
             settled = true;
-            if (timeout) {
+            if (timeout !== undefined) {
                 clearTimeout(timeout);
             }
             resolve({
@@ -182,7 +207,7 @@ export const runProjectCommand = async (projectPath, command, args, timeoutMs = 
             stderr += error.message;
             finish(1);
         });
-        const timeout = setTimeout(() => {
+        timeout = setTimeout(() => {
             killProcess(child);
             stderr += `\nCommand timed out after ${timeoutMs}ms`;
             finish(124, true);
@@ -201,7 +226,7 @@ export const runNativeSmoke = async (projectPath, platform) => {
     const npxCmd = isWindows ? "npx.cmd" : "npx";
     const nativeDir = path.join(projectPath, platform);
     try {
-        return await runProjectCommand(projectPath, npxCmd, ["expo", "prebuild", "--platform", platform, "--no-install", "--non-interactive"], 180000);
+        return await runProjectCommand(projectPath, npxCmd, ["expo", "prebuild", "--platform", platform, "--no-install", "--clean"], 180000);
     }
     finally {
         fs.rmSync(nativeDir, { recursive: true, force: true });
@@ -214,8 +239,13 @@ export const getActivePort = (projectName) => {
 export const isRunning = (projectName) => activeProcesses.has(projectName);
 export const killAll = () => {
     for (const [name, managed] of activeProcesses) {
-        killProcess(managed.process);
-        managed.cleanup();
+        try {
+            killProcess(managed.process);
+            managed.cleanup();
+        }
+        catch (err) {
+            console.warn(`[ProcessManager] Failed to kill ${name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
         activeProcesses.delete(name);
     }
 };

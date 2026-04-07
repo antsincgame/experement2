@@ -4,6 +4,7 @@ import path from "path";
 import { getWorkspaceRoot, copyDirectory, getProjectPath } from "./file-manager.js";
 import { npmInstall } from "./process-manager.js";
 import { TEMPLATE_PACKAGE_DEPENDENCIES, TEMPLATE_PACKAGE_DEV_DEPENDENCIES, TEMPLATE_PACKAGE_SCRIPTS, } from "../lib/generation-contract.js";
+import { validateDependencies } from "../lib/dependency-validator.js";
 const TEMPLATE_DIR_NAME = "template_cache";
 const BOILERPLATE_FILES = {
     "app.json": JSON.stringify({
@@ -32,6 +33,7 @@ const BOILERPLATE_FILES = {
         extends: "expo/tsconfig.base",
         compilerOptions: {
             strict: true,
+            skipLibCheck: true,
             paths: { "@/*": ["./src/*"] },
         },
         include: ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
@@ -39,36 +41,38 @@ const BOILERPLATE_FILES = {
     "babel.config.js": `module.exports = function (api) {
   api.cache(true);
   return {
-    presets: [
-      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
-      "nativewind/babel",
+    presets: ["babel-preset-expo"],
+    plugins: [
+      [
+        "@tamagui/babel-plugin",
+        {
+          components: ["tamagui"],
+          config: "./tamagui.config.ts",
+          logTimings: true,
+        },
+      ],
+      "react-native-reanimated/plugin",
     ],
-    plugins: ["react-native-reanimated/plugin"],
   };
 };
 `,
+    "tamagui.config.ts": `import { config } from '@tamagui/config/v3'
+import { createTamagui } from 'tamagui'
+
+const tamaguiConfig = createTamagui(config)
+
+export type AppConfig = typeof tamaguiConfig
+
+declare module 'tamagui' {
+  interface TamaguiCustomConfig extends AppConfig {}
+}
+
+export default tamaguiConfig
+`,
     "metro.config.js": `const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
-
-const config = getDefaultConfig(__dirname);
-
-module.exports = withNativeWind(config, { input: "./src/global.css" });
-`,
-    "tailwind.config.js": `/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: ["./src/**/*.{js,jsx,ts,tsx}", "./app/**/*.{js,jsx,ts,tsx}"],
-  presets: [require("nativewind/preset")],
-  theme: { extend: {} },
-  plugins: [],
-};
-`,
-    "nativewind-env.d.ts": `/// <reference types="nativewind/types" />
+module.exports = getDefaultConfig(__dirname);
 `,
     "expo-env.d.ts": `/// <reference types="expo/types" />
-`,
-    "src/global.css": `@tailwind base;
-@tailwind components;
-@tailwind utilities;
 `,
     ".gitignore": `node_modules/
 .expo/
@@ -113,8 +117,10 @@ export const createProjectFromCache = async (projectName, appDisplayName, extraD
     }
     const templatePath = getTemplatePath();
     const projectPath = getProjectPath(projectName);
+    // Clean slate: remove any existing project directory to prevent contamination
     if (fs.existsSync(projectPath)) {
-        throw new Error(`Project "${projectName}" already exists`);
+        console.log(`[TemplateCache] Cleaning existing project: ${projectName}`);
+        fs.rmSync(projectPath, { recursive: true, force: true });
     }
     console.log(`[TemplateCache] Copying template -> ${projectName}...`);
     copyDirectory(templatePath, projectPath);
@@ -123,8 +129,28 @@ export const createProjectFromCache = async (projectName, appDisplayName, extraD
     appJson.expo.slug = projectName;
     fs.writeFileSync(path.join(projectPath, "app.json"), JSON.stringify(appJson, null, 2), "utf-8");
     if (extraDependencies?.length) {
-        console.log(`[TemplateCache] Installing extra deps: ${extraDependencies.join(", ")}...`);
-        await npmInstall(projectPath, extraDependencies);
+        const { valid, rejected } = await validateDependencies(extraDependencies);
+        if (rejected.length > 0) {
+            console.warn(`[TemplateCache] Rejected dependencies (not found on npm): ${rejected.join(", ")}`);
+        }
+        if (valid.length > 0) {
+            console.log(`[TemplateCache] Installing extra deps: ${valid.join(", ")}...`);
+            try {
+                await npmInstall(projectPath, valid);
+            }
+            catch (err) {
+                // Fallback: install one by one, skip failures
+                console.warn(`[TemplateCache] Batch install failed, trying individually...`);
+                for (const dep of valid) {
+                    try {
+                        await npmInstall(projectPath, [dep]);
+                    }
+                    catch {
+                        console.warn(`[TemplateCache] Failed to install ${dep}, skipping`);
+                    }
+                }
+            }
+        }
     }
     return projectPath;
 };

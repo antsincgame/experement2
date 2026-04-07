@@ -9,7 +9,7 @@ import { npmInstall } from "../services/process-manager.js";
 import { safeJsonParse } from "./json-repair.js";
 import { applySearchReplace } from "./search-replace.js";
 export const editProject = async (options) => {
-    const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens, onThinking, onBlock, onAnalysis, } = options;
+    const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens, onThinking, onBlock, onDiff, onAnalysis, } = options;
     const projectPath = getProjectPath(projectName);
     const skeleton = buildProjectSkeleton(projectPath);
     const recentChat = chatHistory.slice(-5);
@@ -19,7 +19,7 @@ export const editProject = async (options) => {
         ...recentChat.map((m) => ({ role: m.role, content: m.content })),
         {
             role: "user",
-            content: `Project skeleton:\n${skeleton.summary}\n\nUser request: ${userRequest}`,
+            content: `/no_think\nProject skeleton:\n${skeleton.summary}\n\nUser request: ${userRequest}`,
         },
     ];
     let actionJson = "";
@@ -47,6 +47,31 @@ export const editProject = async (options) => {
     if (action.action === "no_changes_needed") {
         return { action, appliedBlocks: 0, failedBlocks: 0, errors: [] };
     }
+    // Handle install_package: install deps first, then read files and generate changes
+    if (action.action === "install_package" && action.newDependencies.length > 0) {
+        const { validateDependencies } = await import("./dependency-validator.js");
+        const { valid, rejected } = await validateDependencies(action.newDependencies);
+        if (rejected.length > 0) {
+            console.warn(`[Editor] Rejected deps: ${rejected.join(", ")}`);
+        }
+        if (valid.length > 0) {
+            try {
+                await npmInstall(getProjectPath(projectName), valid);
+            }
+            catch {
+                for (const dep of valid) {
+                    try {
+                        await npmInstall(getProjectPath(projectName), [dep]);
+                    }
+                    catch { /* skip */ }
+                }
+            }
+        }
+        // If there are also files to edit, continue; otherwise treat as done
+        if (action.files.length === 0) {
+            return { action, appliedBlocks: 0, failedBlocks: 0, errors: [] };
+        }
+    }
     // ── Read target files ─────────────────────────────────
     const targetFiles = {};
     for (const filepath of action.files) {
@@ -69,7 +94,7 @@ export const editProject = async (options) => {
     ];
     const generateGen = await streamCompletion(generateMessages, {
         temperature: temperature ?? 0.4,
-        maxTokens: maxTokens ?? 32768,
+        maxTokens: maxTokens ?? 65536,
         lmStudioUrl,
         model,
     });
@@ -92,6 +117,7 @@ export const editProject = async (options) => {
             }
             const { result, error } = applySearchReplace(currentContent, block.search, block.replace);
             if (result) {
+                onDiff?.(block.filepath, currentContent, result);
                 writeFile(projectName, block.filepath, result);
                 appliedBlocks++;
             }
@@ -101,6 +127,7 @@ export const editProject = async (options) => {
             }
         }
         else if (block.type === "new_file" && block.content) {
+            onDiff?.(block.filepath, "", block.content);
             writeFile(projectName, block.filepath, block.content);
             appliedBlocks++;
         }

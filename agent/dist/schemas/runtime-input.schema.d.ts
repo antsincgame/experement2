@@ -82,9 +82,13 @@ export declare const LlmCompleteBodySchema: z.ZodObject<{
 }>;
 export declare const WsAbortGenerationSchema: z.ZodObject<{
     type: z.ZodLiteral<"abort_generation">;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    requestId: string;
     type: "abort_generation";
 }, {
+    requestId: string;
     type: "abort_generation";
 }>;
 export declare const WsCreateProjectSchema: z.ZodObject<{
@@ -92,21 +96,28 @@ export declare const WsCreateProjectSchema: z.ZodObject<{
     description: z.ZodString;
     lmStudioUrl: z.ZodEffects<z.ZodOptional<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>>, string | undefined, unknown>;
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
+    plannerModel: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
     temperature: z.ZodOptional<z.ZodNumber>;
     maxTokens: z.ZodOptional<z.ZodNumber>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    requestId: string;
     type: "create_project";
     description: string;
     model?: string | undefined;
     lmStudioUrl?: string | undefined;
     temperature?: number | undefined;
+    plannerModel?: string | undefined;
     maxTokens?: number | undefined;
 }, {
+    requestId: string;
     type: "create_project";
     description: string;
     model?: unknown;
     lmStudioUrl?: unknown;
     temperature?: number | undefined;
+    plannerModel?: unknown;
     maxTokens?: number | undefined;
 }>;
 export declare const WsIterateSchema: z.ZodObject<{
@@ -127,9 +138,12 @@ export declare const WsIterateSchema: z.ZodObject<{
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
     temperature: z.ZodOptional<z.ZodNumber>;
     maxTokens: z.ZodOptional<z.ZodNumber>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "iterate";
     projectName: string;
+    requestId: string;
+    type: "iterate";
     userRequest: string;
     chatHistory: {
         content: string;
@@ -140,8 +154,9 @@ export declare const WsIterateSchema: z.ZodObject<{
     temperature?: number | undefined;
     maxTokens?: number | undefined;
 }, {
-    type: "iterate";
     projectName: string;
+    requestId: string;
+    type: "iterate";
     userRequest: string;
     model?: unknown;
     lmStudioUrl?: unknown;
@@ -157,14 +172,18 @@ export declare const WsStartPreviewSchema: z.ZodObject<{
     projectName: z.ZodEffects<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>, string, string>;
     lmStudioUrl: z.ZodEffects<z.ZodOptional<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>>, string | undefined, unknown>;
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "start_preview";
     projectName: string;
+    requestId: string;
+    type: "start_preview";
     model?: string | undefined;
     lmStudioUrl?: string | undefined;
 }, {
-    type: "start_preview";
     projectName: string;
+    requestId: string;
+    type: "start_preview";
     model?: unknown;
     lmStudioUrl?: unknown;
 }>;
@@ -174,45 +193,60 @@ export declare const WsRevertVersionSchema: z.ZodObject<{
     commitHash: z.ZodString;
     lmStudioUrl: z.ZodEffects<z.ZodOptional<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>>, string | undefined, unknown>;
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "revert_version";
     projectName: string;
+    requestId: string;
+    type: "revert_version";
     commitHash: string;
     model?: string | undefined;
     lmStudioUrl?: string | undefined;
 }, {
-    type: "revert_version";
     projectName: string;
+    requestId: string;
+    type: "revert_version";
     commitHash: string;
     model?: unknown;
     lmStudioUrl?: unknown;
 }>;
 export declare const WsMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     type: z.ZodLiteral<"abort_generation">;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    requestId: string;
     type: "abort_generation";
 }, {
+    requestId: string;
     type: "abort_generation";
 }>, z.ZodObject<{
     type: z.ZodLiteral<"create_project">;
     description: z.ZodString;
     lmStudioUrl: z.ZodEffects<z.ZodOptional<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>>, string | undefined, unknown>;
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
+    plannerModel: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
     temperature: z.ZodOptional<z.ZodNumber>;
     maxTokens: z.ZodOptional<z.ZodNumber>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
+    requestId: string;
     type: "create_project";
     description: string;
     model?: string | undefined;
     lmStudioUrl?: string | undefined;
     temperature?: number | undefined;
+    plannerModel?: string | undefined;
     maxTokens?: number | undefined;
 }, {
+    requestId: string;
     type: "create_project";
     description: string;
     model?: unknown;
     lmStudioUrl?: unknown;
     temperature?: number | undefined;
+    plannerModel?: unknown;
     maxTokens?: number | undefined;
 }>, z.ZodObject<{
     type: z.ZodLiteral<"iterate">;
@@ -232,9 +266,12 @@ export declare const WsMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
     temperature: z.ZodOptional<z.ZodNumber>;
     maxTokens: z.ZodOptional<z.ZodNumber>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "iterate";
     projectName: string;
+    requestId: string;
+    type: "iterate";
     userRequest: string;
     chatHistory: {
         content: string;
@@ -245,8 +282,9 @@ export declare const WsMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     temperature?: number | undefined;
     maxTokens?: number | undefined;
 }, {
-    type: "iterate";
     projectName: string;
+    requestId: string;
+    type: "iterate";
     userRequest: string;
     model?: unknown;
     lmStudioUrl?: unknown;
@@ -261,14 +299,18 @@ export declare const WsMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     projectName: z.ZodEffects<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>, string, string>;
     lmStudioUrl: z.ZodEffects<z.ZodOptional<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>>, string | undefined, unknown>;
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "start_preview";
     projectName: string;
+    requestId: string;
+    type: "start_preview";
     model?: string | undefined;
     lmStudioUrl?: string | undefined;
 }, {
-    type: "start_preview";
     projectName: string;
+    requestId: string;
+    type: "start_preview";
     model?: unknown;
     lmStudioUrl?: unknown;
 }>, z.ZodObject<{
@@ -277,15 +319,19 @@ export declare const WsMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     commitHash: z.ZodString;
     lmStudioUrl: z.ZodEffects<z.ZodOptional<z.ZodEffects<z.ZodEffects<z.ZodString, string, string>, string, string>>, string | undefined, unknown>;
     model: z.ZodEffects<z.ZodOptional<z.ZodString>, string | undefined, unknown>;
+} & {
+    requestId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "revert_version";
     projectName: string;
+    requestId: string;
+    type: "revert_version";
     commitHash: string;
     model?: string | undefined;
     lmStudioUrl?: string | undefined;
 }, {
-    type: "revert_version";
     projectName: string;
+    requestId: string;
+    type: "revert_version";
     commitHash: string;
     model?: unknown;
     lmStudioUrl?: unknown;

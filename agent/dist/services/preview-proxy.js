@@ -1,9 +1,8 @@
 import { createProxyMiddleware } from "http-proxy-middleware";
-export const createPreviewProxy = (targetPort) => createProxyMiddleware({
+export const createPreviewProxy = (targetPort, projectName) => createProxyMiddleware({
     target: `http://127.0.0.1:${targetPort}`,
     changeOrigin: true,
     ws: false, // CRITICAL: ws:true hijacks ALL WebSocket connections including agent WS!
-    pathRewrite: { "^/preview": "" },
     on: {
         proxyRes(proxyRes) {
             delete proxyRes.headers["x-frame-options"];
@@ -14,12 +13,13 @@ export const createPreviewProxy = (targetPort) => createProxyMiddleware({
             proxyRes.headers["access-control-allow-headers"] = "Content-Type";
         },
         error(err, _req, res) {
-            console.error("[PreviewProxy] Error:", err.message);
+            const label = projectName ? `[PreviewProxy:${projectName}]` : "[PreviewProxy]";
+            console.error(`${label} Error:`, err.message);
             if ("writeHead" in res && typeof res.writeHead === "function") {
                 res.writeHead(502, {
                     "Content-Type": "text/plain",
                 });
-                res.end("Preview not available. Metro may still be starting...");
+                res.end(`Preview not available for ${projectName ?? "project"}. Metro may still be starting...`);
             }
         },
     },

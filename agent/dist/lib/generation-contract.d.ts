@@ -7,8 +7,8 @@ export declare const PATH_ALIAS: {
 };
 export declare const ICON_CONTRACT: {
     readonly packageName: "@expo/vector-icons";
-    readonly defaultImportName: "Ionicons";
-    readonly defaultImportPath: "@expo/vector-icons/Ionicons";
+    readonly defaultImportName: "Feather";
+    readonly defaultImportPath: "@expo/vector-icons/Feather";
 };
 export declare const VECTOR_ICON_IMPORT_PATHS: Record<string, string>;
 export declare const TEMPLATE_PACKAGE_SCRIPTS: {
@@ -31,16 +31,21 @@ export declare const TEMPLATE_PACKAGE_DEPENDENCIES: {
     readonly "react-native-screens": "~4.23.0";
     readonly "react-native-gesture-handler": "~2.30.0";
     readonly "react-native-reanimated": "4.2.1";
-    readonly nativewind: "^4.0.0";
-    readonly tailwindcss: "^3.4.0";
     readonly "@expo/vector-icons": "^14.0.0";
+    readonly "@react-native-async-storage/async-storage": "2.2.0";
+    readonly tamagui: "^1.114.0";
+    readonly "@tamagui/config": "^1.114.0";
+    readonly "@tamagui/core": "^1.114.0";
 };
 export declare const TEMPLATE_PACKAGE_DEV_DEPENDENCIES: {
     readonly "@types/react": "~19.2.2";
     readonly typescript: "~5.9.2";
+    readonly "@tamagui/babel-plugin": "^1.114.0";
 };
-export declare const REQUIRED_TEMPLATE_FILES: readonly ["app.json", "tsconfig.json", "babel.config.js", "metro.config.js", "tailwind.config.js", "nativewind-env.d.ts", "expo-env.d.ts", "src/global.css", ".gitignore", "app/_layout.tsx"];
+export declare const REQUIRED_TEMPLATE_FILES: readonly ["app.json", "tsconfig.json", "babel.config.js", "metro.config.js", "tamagui.config.ts", "expo-env.d.ts", ".gitignore", "app/_layout.tsx"];
 export declare const AUTO_GENERATED_PLAN_FILES: readonly ["app/_layout.tsx", "app/(tabs)/_layout.tsx"];
+/** Known-safe extra dependencies that LLM can request. Anything else gets verified against npm registry. */
+export declare const SAFE_EXTRA_DEPENDENCIES: Set<string>;
 export declare const MAX_DEPENDENCY_CONTEXT_FILES = 12;
 export declare const MAX_DEPENDENCY_CONTEXT_CHARS = 18000;
 export declare const isSupportedNavigationType: (value: string) => value is SupportedNavigationType;

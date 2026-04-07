@@ -7,7 +7,7 @@ export interface CommandResult {
     stderr: string;
     combinedOutput: string;
 }
-export declare const startExpo: (projectName: string, projectPath: string, onLog: LogCallback) => Promise<{
+export declare const startExpo: (projectName: string, projectPath: string, onLog: LogCallback, clearCache?: boolean) => Promise<{
     port: number;
     process: ChildProcess;
 }>;

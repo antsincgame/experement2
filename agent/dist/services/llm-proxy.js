@@ -49,10 +49,9 @@ const getDefaultModel = async (baseUrl) => {
             }
             const data = await resp.json();
             const models = data.data ?? [];
-            const preferred = models.find((model) => model.id.includes("qwen3-coder"));
-            const resolvedModel = preferred?.id ?? models[0]?.id ?? null;
+            const resolvedModel = models[0]?.id ?? null;
             setCachedModelId(baseUrl, resolvedModel, resolvedModel ? SUCCESS_MODEL_CACHE_TTL_MS : FAILED_MODEL_CACHE_TTL_MS);
-            console.log(`[LLM] Auto-detected model for ${baseUrl}: ${resolvedModel}`);
+            // Model auto-detected silently
             return resolvedModel;
         }
         catch {
@@ -67,7 +66,13 @@ const getDefaultModel = async (baseUrl) => {
     return fetchPromise;
 };
 const activeControllers = new Map();
+const MAX_CONCURRENT_LLM_REQUESTS = 3;
+let activeRequestCount = 0;
 export const streamCompletion = async (messages, options = {}) => {
+    if (activeRequestCount >= MAX_CONCURRENT_LLM_REQUESTS) {
+        throw new Error(`Too many concurrent LLM requests (max ${MAX_CONCURRENT_LLM_REQUESTS})`);
+    }
+    activeRequestCount++;
     const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
     const controller = new AbortController();
     const taskId = options.taskId ?? crypto.randomUUID();
@@ -76,37 +81,129 @@ export const streamCompletion = async (messages, options = {}) => {
     const body = {
         messages,
         temperature: options.temperature ?? 0.4,
-        max_tokens: options.maxTokens ?? 32768,
+        max_tokens: options.maxTokens ?? 65536,
         stream: true,
         ...(resolvedModel ? { model: resolvedModel } : {}),
     };
     if (options.responseFormat) {
         body.response_format = options.responseFormat;
     }
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-    });
-    if (!response.ok) {
+    // Guard: prevent absurdly large payloads from crashing fetch
+    const payloadSize = JSON.stringify(body).length;
+    if (payloadSize > 5_000_000) {
+        // Truncate messages content to fit
+        for (const m of body.messages) {
+            if (m.content.length > 50_000) {
+                m.content = m.content.slice(0, 50_000) + "\n... [truncated]";
+            }
+        }
+    }
+    // Auto-retry with exponential backoff (3 attempts: 2s, 4s, 8s)
+    const MAX_RETRIES = 3;
+    const BACKOFF_BASE = 2000;
+    let response;
+    let lastError = "";
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            response = await fetch(`${baseUrl}/v1/chat/completions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+            break; // success — exit retry loop
+        }
+        catch (fetchError) {
+            const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            lastError = msg;
+            if (msg.includes("abort") || msg.includes("cancel")) {
+                // User aborted — don't retry
+                activeControllers.delete(taskId);
+                activeRequestCount = Math.max(0, activeRequestCount - 1);
+                throw new Error(`LLM request aborted`);
+            }
+            if (attempt < MAX_RETRIES) {
+                const delay = BACKOFF_BASE * Math.pow(2, attempt); // 2s, 4s, 8s
+                console.log(`[LLM] Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms (${msg})`);
+                await new Promise((r) => setTimeout(r, delay));
+                continue;
+            }
+            // All retries exhausted
+            activeControllers.delete(taskId);
+            activeRequestCount = Math.max(0, activeRequestCount - 1);
+            if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
+                throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl} after ${MAX_RETRIES} retries. Check that LM Studio is running.`);
+            }
+            throw new Error(`LLM_NETWORK_ERROR: ${msg}`);
+        }
+    }
+    if (!response) {
         activeControllers.delete(taskId);
+        activeRequestCount = Math.max(0, activeRequestCount - 1);
+        throw new Error(`LLM_SERVER_DOWN: No response after ${MAX_RETRIES} retries. Last error: ${lastError}`);
+    }
+    if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`LM Studio error (${response.status}): ${errorText}`);
+        // If model not found (404) — clear cache and retry with auto-detected model
+        if (response.status === 404 && errorText.includes("not found") && resolvedModel) {
+            clearModelCache(baseUrl);
+            const fallbackModel = await getDefaultModel(baseUrl);
+            if (fallbackModel && fallbackModel !== resolvedModel) {
+                console.log(`[LLM] Model '${resolvedModel}' not found, falling back to '${fallbackModel}'`);
+                body.model = fallbackModel;
+                try {
+                    const retryResp = await fetch(`${baseUrl}/v1/chat/completions`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                        signal: controller.signal,
+                    });
+                    if (retryResp.ok && retryResp.body) {
+                        response = retryResp;
+                    }
+                }
+                catch { /* fall through to error */ }
+            }
+        }
+        if (!response.ok) {
+            activeControllers.delete(taskId);
+            activeRequestCount = Math.max(0, activeRequestCount - 1);
+            throw new Error(`LLM error (${response.status}): ${errorText}`);
+        }
     }
     if (!response.body) {
         activeControllers.delete(taskId);
+        activeRequestCount = Math.max(0, activeRequestCount - 1);
+        throw new Error("LM Studio returned no body");
+    }
+    const streamResponse = response;
+    const responseBody = streamResponse.body;
+    if (!responseBody) {
+        activeControllers.delete(taskId);
+        activeRequestCount = Math.max(0, activeRequestCount - 1);
         throw new Error("LM Studio returned no body");
     }
     async function* parseSSE() {
-        const reader = response.body.getReader();
+        const reader = responseBody.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        const IDLE_TIMEOUT_MS = 60_000;
+        let idleTimer = null;
+        const resetIdleTimer = () => {
+            if (idleTimer)
+                clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                console.warn(`[LLM] Idle timeout ${IDLE_TIMEOUT_MS}ms — no chunks received, aborting stream`);
+                controller.abort();
+            }, IDLE_TIMEOUT_MS);
+        };
         try {
+            resetIdleTimer();
             while (true) {
                 const { done, value } = await reader.read();
                 if (done)
                     break;
+                resetIdleTimer();
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split("\n");
                 buffer = lines.pop() ?? "";
@@ -130,37 +227,68 @@ export const streamCompletion = async (messages, options = {}) => {
             }
         }
         finally {
+            if (idleTimer)
+                clearTimeout(idleTimer);
             reader.releaseLock();
             activeControllers.delete(taskId);
+            activeRequestCount = Math.max(0, activeRequestCount - 1);
         }
     }
     return parseSSE();
 };
+const NON_STREAMING_TIMEOUT_MS = 120_000;
+const NON_STREAMING_MAX_RETRIES = 3;
 export const completeNonStreaming = async (messages, options = {}) => {
     const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
     const resolvedModel = options.model || await getDefaultModel(baseUrl);
+    if (!resolvedModel) {
+        throw new Error("No LLM model available — check that LM Studio is running and has a model loaded");
+    }
     const body = {
         messages,
         temperature: options.temperature ?? 0.3,
-        max_tokens: options.maxTokens ?? 32768,
+        max_tokens: options.maxTokens ?? 65536,
         stream: false,
-        ...(resolvedModel ? { model: resolvedModel } : {}),
+        model: resolvedModel,
     };
     if (options.responseFormat) {
         body.response_format = options.responseFormat;
     }
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`LM Studio error (${response.status}): ${errorText}`);
+    let lastError = null;
+    for (let attempt = 0; attempt <= NON_STREAMING_MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), NON_STREAMING_TIMEOUT_MS);
+        try {
+            const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`LM Studio error (${response.status}): ${errorText}`);
+            }
+            const json = await response.json();
+            return json.choices?.[0]?.message?.content ?? "";
+        }
+        catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            if (lastError.name === "AbortError") {
+                throw new Error(`LM Studio request timed out after ${NON_STREAMING_TIMEOUT_MS}ms`);
+            }
+            if (attempt < NON_STREAMING_MAX_RETRIES) {
+                await new Promise((resolve) => setTimeout(resolve, 5_000));
+                continue;
+            }
+        }
+        finally {
+            clearTimeout(timeout);
+        }
     }
-    const json = await response.json();
-    return json.choices?.[0]?.message?.content ?? "";
+    throw lastError ?? new Error("completeNonStreaming failed after retries");
 };
+export const getActiveRequestCount = () => activeRequestCount;
 export const abortTask = (taskId) => {
     const controller = activeControllers.get(taskId);
     if (!controller)

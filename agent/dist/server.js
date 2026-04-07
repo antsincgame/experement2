@@ -1,8 +1,8 @@
-// Orchestrates HTTP, WebSocket, and preview runtime state via a shared event bus to avoid circular imports.
+// Orchestrates HTTP, WebSocket, and preview runtime state with explicit build scope for each client flow.
 import express from "express";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
-import { broadcast, handlePreviewRequest, registerClient, sendToClient, setPreviewPort, unregisterClient, } from "./lib/event-bus.js";
+import { broadcast, handlePreviewRequest, registerClient, runWithEventScope, sendToClient, setPreviewPort, unregisterClient, } from "./lib/event-bus.js";
 import { formatZodError } from "./lib/request-validation.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { projectRouter } from "./routes/project.js";
@@ -15,18 +15,59 @@ import { parseMetroError } from "./services/log-watcher.js";
 import { attachOperationToQueueKey, enqueueProjectOperation, getProjectOperationQueueKey, WORKSPACE_OPERATION_QUEUE_KEY, } from "./services/project-operation-lock.js";
 import { killAll, startExpo, getActivePort } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
+const waitForMetroReady = async (port, maxRetries = 40) => {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            const resp = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(2000) });
+            if (resp.ok)
+                return true;
+        }
+        catch { /* Metro not ready yet */ }
+        await new Promise((r) => setTimeout(r, 750));
+    }
+    return false;
+};
 const PORT = Number(process.env.AGENT_PORT ?? 3100);
+const HOST = process.env.AGENT_HOST?.trim() || "127.0.0.1";
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
+const MAX_WS_PAYLOAD_BYTES = 1024 * 1024;
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({
+    server,
+    maxPayload: MAX_WS_PAYLOAD_BYTES,
+    perMessageDeflate: false,
+});
 let lmStudioInterval = null;
 let isShuttingDown = false;
+let currentLlmServerUrl = DEFAULT_LM_STUDIO_URL;
 app.use(express.json({ limit: "10mb" }));
-app.use((_req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
+const ALLOWED_ORIGINS = (process.env.AGENT_ALLOWED_ORIGINS
+    ?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    ?? ["http://localhost:8081", "http://localhost:8082", "http://127.0.0.1:8081"]);
+const ALLOWED_HEADERS = ["Content-Type", "X-App-Factory-Confirm"];
+const importModule = new Function("specifier", "return import(specifier);");
+const loadArchiver = async () => {
+    try {
+        return await importModule("archiver");
+    }
+    catch {
+        return null;
+    }
+};
+app.use((req, res, next) => {
+    const origin = req.headers.origin ?? "";
+    if (ALLOWED_ORIGINS.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type");
+    res.header("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
+    if (req.method === "OPTIONS") {
+        res.sendStatus(204);
+        return;
+    }
     next();
 });
 app.get("/health", (_req, res) => {
@@ -50,7 +91,7 @@ app.get("/api/projects/:name/export", async (req, res) => {
         res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
         return;
     }
-    const archiver = await import("archiver").catch(() => null);
+    const archiver = await loadArchiver();
     if (!archiver) {
         const files = listAllFiles(name);
         const contents = {};
@@ -67,28 +108,63 @@ app.get("/api/projects/:name/export", async (req, res) => {
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${name}.zip"`);
     const archive = archiver.default("zip", { zlib: { level: 6 } });
+    let archiveFailed = false;
+    const handleArchiveError = (error) => {
+        if (archiveFailed) {
+            return;
+        }
+        archiveFailed = true;
+        const message = error instanceof Error ? error.message : "Failed to export project archive";
+        if (!res.headersSent) {
+            res.status(500).json({ error: message, code: "EXPORT_FAILED" });
+            return;
+        }
+        res.destroy(error instanceof Error ? error : undefined);
+    };
+    archive.once("error", handleArchiveError);
+    res.once("error", handleArchiveError);
+    res.once("close", () => {
+        if (!res.writableEnded) {
+            archive.abort();
+        }
+    });
     archive.pipe(res);
     archive.directory(projectPath, name, {
         ignore: ["node_modules/**", ".expo/**", ".git/**"],
     });
-    archive.finalize();
+    try {
+        await archive.finalize();
+    }
+    catch (error) {
+        handleArchiveError(error);
+    }
 });
 app.use("/preview", handlePreviewRequest);
 // в”Ђв”Ђ WebSocket в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-const sendSystemErrorToClient = (clientId, error, step) => {
+const sendSystemErrorToClient = (clientId, error, step, scope, extra = {}) => {
     sendToClient(clientId, {
         type: "system_error",
         error,
         step,
-    });
+        ...extra,
+    }, scope);
 };
-const runQueuedOperation = (clientId, queueKey, operationName, step, task, onSuccess) => {
-    enqueueProjectOperation(queueKey, operationName, task)
+const runQueuedOperation = (clientId, queueKey, operationName, step, task, onSuccess, scope = {}) => {
+    const eventScope = {
+        clientId,
+        projectName: scope.projectName,
+        requestId: scope.requestId,
+    };
+    enqueueProjectOperation(queueKey, operationName, () => runWithEventScope(eventScope, task))
         .then((result) => {
-        onSuccess?.(result);
+        runWithEventScope(eventScope, () => {
+            onSuccess?.(result);
+        });
     })
         .catch((error) => {
-        sendSystemErrorToClient(clientId, error instanceof Error ? error.message : "Unknown error", step);
+        runWithEventScope(eventScope, () => {
+            sendSystemErrorToClient(clientId, error instanceof Error ? error.message : "Unknown error", step, eventScope);
+        });
     });
 };
 wss.on("connection", (ws) => {
@@ -119,23 +195,33 @@ wss.on("connection", (ws) => {
     ws.send(JSON.stringify({ type: "connected", clientId, timestamp: Date.now() }));
 });
 const handleWsMessage = (clientId, message) => {
+    // Track active LLM server URL for health checks
+    if ("lmStudioUrl" in message && typeof message.lmStudioUrl === "string" && message.lmStudioUrl) {
+        updateLlmServerUrl(message.lmStudioUrl);
+    }
     switch (message.type) {
         case "abort_generation":
             console.log("[WS] Abort requested");
-            abortAll();
-            broadcast({ type: "generation_aborted" });
+            runWithEventScope({ clientId, requestId: message.requestId }, () => {
+                abortAll();
+                sendToClient(clientId, { type: "generation_aborted" });
+            });
             return;
         case "create_project": {
             console.log("[WS] Create project:", message.description);
             let createOperation = null;
+            const eventScope = { requestId: message.requestId };
             runQueuedOperation(clientId, WORKSPACE_OPERATION_QUEUE_KEY, "create_project", "create_project", () => {
                 createOperation = createProject({
                     description: message.description,
                     lmStudioUrl: message.lmStudioUrl,
                     model: message.model,
+                    plannerModel: message.plannerModel,
                     temperature: message.temperature,
                     maxTokens: message.maxTokens,
+                    requestId: message.requestId,
                     onProjectNameResolved: (projectName) => {
+                        eventScope.projectName = projectName;
                         if (createOperation) {
                             attachOperationToQueueKey(getProjectOperationQueueKey(projectName), `create_project:${projectName}`, createOperation);
                         }
@@ -143,8 +229,8 @@ const handleWsMessage = (clientId, message) => {
                 });
                 return createOperation;
             }, (result) => {
-                broadcast({ type: "project_created", ...result });
-            });
+                sendToClient(clientId, { type: "project_created", ...result });
+            }, eventScope);
             return;
         }
         case "iterate":
@@ -157,19 +243,88 @@ const handleWsMessage = (clientId, message) => {
                 model: message.model,
                 temperature: message.temperature,
                 maxTokens: message.maxTokens,
+                requestId: message.requestId,
             }), (result) => {
-                broadcast({ type: "iteration_result", ...result });
-            });
+                sendToClient(clientId, { type: "iteration_result", ...result });
+            }, { projectName: message.projectName, requestId: message.requestId });
             return;
         case "start_preview": {
             console.log("[WS] Start preview:", message.projectName);
-            // Fast path: if project is already running, just switch the proxy
-            const existingPort = getActivePort(message.projectName);
+            const buildId = crypto.randomUUID();
+            const previewEventScope = {
+                clientId,
+                projectName: message.projectName,
+                requestId: message.requestId,
+            };
+            const emitPreviewEvent = (payload) => {
+                broadcast({
+                    ...payload,
+                    projectName: message.projectName,
+                    requestId: message.requestId,
+                }, previewEventScope);
+            };
+            const emitBuildScopedEvent = (payload) => {
+                emitPreviewEvent({ ...payload, buildId });
+            };
+            // Fast path: if project is already running, health-check then register
+            const pName = message.projectName;
+            const existingPort = getActivePort(pName);
             if (existingPort) {
-                console.log(`[WS] Project ${message.projectName} already running on port ${existingPort}, switching proxy`);
-                setPreviewPort(existingPort);
-                broadcast({ type: "preview_ready", port: existingPort, proxyUrl: "/preview/" });
-                broadcast({ type: "status", status: "ready" });
+                console.log(`[WS] Project ${pName} running on port ${existingPort}, verifying...`);
+                emitBuildScopedEvent({
+                    type: "preview_status",
+                    previewStatus: "starting",
+                });
+                waitForMetroReady(existingPort, 5)
+                    .then((healthy) => runWithEventScope(previewEventScope, () => {
+                    if (healthy) {
+                        setPreviewPort(pName, existingPort);
+                        emitBuildScopedEvent({
+                            type: "preview_ready",
+                            port: existingPort,
+                            proxyUrl: `/preview/${encodeURIComponent(pName)}/`,
+                        });
+                        emitBuildScopedEvent({
+                            type: "preview_status",
+                            previewStatus: "ready",
+                        });
+                        emitBuildScopedEvent({
+                            type: "status",
+                            status: "ready",
+                            previewStatus: "ready",
+                        });
+                    }
+                    else {
+                        console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
+                        sendSystemErrorToClient(clientId, `Metro is not responding on port ${existingPort}`, "start_preview", previewEventScope, { buildId });
+                        emitBuildScopedEvent({
+                            type: "preview_status",
+                            previewStatus: "error",
+                            error: `Metro is not responding on port ${existingPort}`,
+                        });
+                        emitBuildScopedEvent({
+                            type: "status",
+                            status: "error",
+                            previewStatus: "error",
+                        });
+                    }
+                }))
+                    .catch((error) => runWithEventScope(previewEventScope, () => {
+                    const errorMessage = error instanceof Error
+                        ? error.message
+                        : "Failed to verify preview health";
+                    sendSystemErrorToClient(clientId, errorMessage, "start_preview", previewEventScope, { buildId });
+                    emitBuildScopedEvent({
+                        type: "preview_status",
+                        previewStatus: "error",
+                        error: errorMessage,
+                    });
+                    emitBuildScopedEvent({
+                        type: "status",
+                        status: "error",
+                        previewStatus: "error",
+                    });
+                }));
                 return;
             }
             runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `start_preview:${message.projectName}`, "start_preview", async () => {
@@ -177,13 +332,22 @@ const handleWsMessage = (clientId, message) => {
                     throw new Error(`Project not found: ${message.projectName}`);
                 }
                 const projectPath = getProjectPath(message.projectName);
-                broadcast({ type: "status", status: "building" });
+                emitBuildScopedEvent({
+                    type: "status",
+                    status: "building",
+                    previewStatus: "starting",
+                });
+                emitBuildScopedEvent({
+                    type: "preview_status",
+                    previewStatus: "starting",
+                });
                 const { port } = await startExpo(message.projectName, projectPath, (event) => {
-                    broadcast({
+                    emitBuildScopedEvent({
                         type: "build_event",
                         eventType: event.type,
                         message: event.message,
                         error: event.error,
+                        previewStatus: "starting",
                     });
                     if (event.type === "build_error" && event.error) {
                         const parsed = parseMetroError(event.error);
@@ -198,13 +362,14 @@ const handleWsMessage = (clientId, message) => {
                                     raw: parsed.raw,
                                 },
                                 lmStudioUrl: message.lmStudioUrl,
+                                model: message.model,
                                 maxAttempts: 3,
-                                onAttempt: (attempt, max) => broadcast({
+                                onAttempt: (attempt, max) => emitBuildScopedEvent({
                                     type: "autofix_attempt",
                                     attempt,
                                     maxAttempts: max,
                                 }),
-                                onFix: (block) => broadcast({
+                                onFix: (block) => emitBuildScopedEvent({
                                     type: "autofix_block",
                                     filepath: block.filepath,
                                 }),
@@ -214,20 +379,20 @@ const handleWsMessage = (clientId, message) => {
                                     return;
                                 }
                                 if (result.success) {
-                                    broadcast({
+                                    emitBuildScopedEvent({
                                         type: "autofix_success",
                                         attempts: result.attempts,
                                     });
                                     return;
                                 }
-                                broadcast({
+                                emitBuildScopedEvent({
                                     type: "autofix_failed",
                                     attempts: result.attempts,
                                     error: result.lastError,
                                 });
                             })
                                 .catch((error) => {
-                                broadcast({
+                                emitBuildScopedEvent({
                                     type: "system_error",
                                     error: error instanceof Error
                                         ? error.message
@@ -238,33 +403,66 @@ const handleWsMessage = (clientId, message) => {
                         }
                     }
                 });
-                setPreviewPort(port);
-                broadcast({ type: "preview_ready", port, proxyUrl: "/preview/" });
-                broadcast({ type: "status", status: "ready" });
-            });
+                // Wait for Metro to actually accept requests before announcing preview
+                const healthy = await waitForMetroReady(port, 40);
+                if (healthy) {
+                    setPreviewPort(message.projectName, port);
+                    emitBuildScopedEvent({
+                        type: "preview_ready",
+                        port,
+                        proxyUrl: `/preview/${encodeURIComponent(message.projectName)}/`,
+                    });
+                    emitBuildScopedEvent({
+                        type: "preview_status",
+                        previewStatus: "ready",
+                    });
+                    emitBuildScopedEvent({
+                        type: "status",
+                        status: "ready",
+                        previewStatus: "ready",
+                    });
+                }
+                else {
+                    const errorMessage = `Metro did not become healthy on port ${port}`;
+                    sendSystemErrorToClient(clientId, errorMessage, "start_preview", previewEventScope, { buildId });
+                    emitBuildScopedEvent({
+                        type: "preview_status",
+                        previewStatus: "error",
+                        error: errorMessage,
+                    });
+                    emitBuildScopedEvent({
+                        type: "status",
+                        status: "error",
+                        previewStatus: "error",
+                    });
+                }
+            }, undefined, { projectName: message.projectName, requestId: message.requestId });
             return;
         }
         case "revert_version":
             console.log("[WS] Revert:", message.projectName, message.commitHash);
-            runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `revert_version:${message.projectName}`, "revert", () => revertVersion(message.projectName, message.commitHash, message.lmStudioUrl));
+            runQueuedOperation(clientId, getProjectOperationQueueKey(message.projectName), `revert_version:${message.projectName}`, "revert", () => revertVersion(message.projectName, message.commitHash, message.lmStudioUrl, message.requestId), undefined, { projectName: message.projectName, requestId: message.requestId });
             return;
     }
 };
 // в”Ђв”Ђ LM Studio Health Check в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
-const checkLmStudio = async () => {
+export const updateLlmServerUrl = (url) => {
+    currentLlmServerUrl = url.trim() || DEFAULT_LM_STUDIO_URL;
+};
+const checkLlmServer = async () => {
     try {
-        const resp = await fetch(`${DEFAULT_LM_STUDIO_URL}/v1/models`);
+        const resp = await fetch(`${currentLlmServerUrl}/v1/models`);
         if (resp.ok) {
-            broadcast({ type: "lm_studio_status", status: "connected" });
+            broadcast({ type: "llm_server_status", status: "connected" });
         }
         else {
-            clearModelCache(DEFAULT_LM_STUDIO_URL);
-            broadcast({ type: "lm_studio_status", status: "disconnected" });
+            clearModelCache(currentLlmServerUrl);
+            broadcast({ type: "llm_server_status", status: "disconnected" });
         }
     }
     catch {
-        clearModelCache(DEFAULT_LM_STUDIO_URL);
-        broadcast({ type: "lm_studio_status", status: "disconnected" });
+        clearModelCache(currentLlmServerUrl);
+        broadcast({ type: "llm_server_status", status: "disconnected" });
     }
 };
 // в”Ђв”Ђ Startup в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -290,16 +488,16 @@ const shutdown = () => {
     });
     setTimeout(() => process.exit(0), 1000).unref();
 };
-server.listen(PORT, async () => {
-    console.log(`[Agent] Server: http://localhost:${PORT}`);
-    console.log(`[Agent] WebSocket: ws://localhost:${PORT}`);
+server.listen(PORT, HOST, async () => {
+    console.log(`[Agent] Server: http://${HOST}:${PORT}`);
+    console.log(`[Agent] WebSocket: ws://${HOST}:${PORT}`);
     initTemplateCache().catch((err) => {
         console.error("[Agent] Template cache init failed:", err);
     });
-    await checkLmStudio();
+    await checkLlmServer();
     clearLmStudioInterval();
     lmStudioInterval = setInterval(() => {
-        void checkLmStudio();
+        void checkLlmServer();
     }, 15000);
 });
 process.on("SIGINT", shutdown);

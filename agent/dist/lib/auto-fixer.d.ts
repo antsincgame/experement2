@@ -9,6 +9,7 @@ interface AutoFixOptions {
     projectName: string;
     error: MetroError;
     lmStudioUrl?: string;
+    model?: string;
     maxAttempts?: number;
     onAttempt?: (attempt: number, maxAttempts: number) => void;
     onFix?: (block: SearchReplaceBlock) => void;

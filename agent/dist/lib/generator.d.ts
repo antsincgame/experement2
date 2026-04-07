@@ -1,4 +1,6 @@
+import { type ExportContract } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
+import type { ContractViolation } from "./project-validator.js";
 interface GeneratorOptions {
     projectName: string;
     projectPath: string;
@@ -12,5 +14,10 @@ interface GeneratorOptions {
     onFileComplete?: (filepath: string) => void;
 }
 export declare const generateFiles: (options: GeneratorOptions) => Promise<string[]>;
+export declare const regenerateFileWithContracts: (projectName: string, _projectPath: string, filePath: string, violations: ContractViolation[], contracts: Record<string, ExportContract[]>, options?: {
+    lmStudioUrl?: string;
+    model?: string;
+    maxTokens?: number;
+}) => Promise<string | null>;
 export {};
 //# sourceMappingURL=generator.d.ts.map
