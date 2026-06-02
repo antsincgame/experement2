@@ -124,8 +124,24 @@ const handleSocketMessage = (payload: string): void => {
   }
 };
 
+// Caps the offline queue so a long disconnect (with retries) cannot grow it
+// without bound; the newest intent is the most relevant, so the oldest is dropped.
+const MAX_QUEUED_MESSAGES = 100;
+
 const enqueueMessage = (payload: string): void => {
-  getRuntime().messageQueue?.push(payload);
+  const queue = getRuntime().messageQueue;
+  if (!queue) {
+    return;
+  }
+
+  queue.push(payload);
+  if (queue.length > MAX_QUEUED_MESSAGES) {
+    const dropped = queue.splice(0, queue.length - MAX_QUEUED_MESSAGES).length;
+    logWarn(
+      "websocket",
+      `Outgoing queue exceeded ${MAX_QUEUED_MESSAGES}; dropped ${dropped} oldest message(s)`
+    );
+  }
 };
 
 const ensureConnected = (): void => {

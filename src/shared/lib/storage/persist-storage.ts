@@ -35,7 +35,14 @@ const webStorage: StateStorage = {
       }
 
       globalThis.localStorage.setItem(name, value);
-    } catch {
+    } catch (error) {
+      // Usually QuotaExceededError. Fall back to in-memory so the app keeps
+      // working, but warn: persisted state will not survive a reload.
+      console.warn(
+        `[persist-storage] localStorage.setItem("${name}") failed (${
+          error instanceof Error ? error.name : "unknown error"
+        }); using in-memory fallback — persisted state will be lost on reload.`
+      );
       memoryStorage.setItem(name, value);
     }
   },
