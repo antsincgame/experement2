@@ -1,7 +1,12 @@
-# Ignores local dependency trees and browser E2E artifacts so CI/test runs do not pollute the repo status.
+# Ignores local dependency trees, build output, and E2E/test artifacts so CI/test runs do not pollute the repo status.
 node_modules/
+agent/node_modules/
+agent/dist/
+.expo/
 test-results/
 playwright-report/
 workspace/e2e-existing-project/
 tools/e2e-results.json
+e2e/*.json
+e2e/*.md
 .vite/

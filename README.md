@@ -35,7 +35,8 @@ Open http://localhost:8081 and start building.
 
 | Layer | Tech |
 |-------|------|
-| Frontend | Expo 55 + React Native Web + NativeWind |
+| Shell (this app) | Expo 55 + React Native Web + NativeWind |
+| Generated apps | Expo 55 + Tamagui v1 + @expo/vector-icons |
 | Backend | Express + WebSocket + ts-morph |
 | LLM | LM Studio (OpenAI-compatible local API) |
 | State | Zustand |
