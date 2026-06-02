@@ -125,7 +125,7 @@ const ChatInput = ({
           value={text}
           onChangeText={setText}
           placeholder={placeholder}
-          placeholderTextColor="#4A4A6A"
+          placeholderTextColor="#A0A8C0"
           multiline
           className="flex-1 text-white text-sm px-4 py-3 max-h-32"
           style={mixedStyle({ fontFamily: "Inter, system-ui, sans-serif", outlineStyle: "none" })}

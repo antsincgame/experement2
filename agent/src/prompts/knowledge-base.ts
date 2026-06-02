@@ -21,7 +21,8 @@ export const KNOWLEDGE_BASE = {
 1. INPUTS: <Input placeholder="Type..." bw={1} bc="$borderColor" /> or <TextArea />.
 2. SWITCH: MUST use 'checked' and 'onCheckedChange' (NOT value/onChange).
    <Switch size="$4" checked={val} onCheckedChange={setVal}><Switch.Thumb animation="bouncy" /></Switch>
-3. SLIDER: <Slider defaultValue={[50]} max={100} step={1}><Slider.Track><Slider.TrackActive /></Slider.Track><Slider.Thumb index={0} /></Slider>
+3. SLIDER: from "@/ui" — pass simple props, NEVER children. value is a number[].
+   <Slider value={[amount]} min={0} max={5000} step={10} onValueChange={(v) => setAmount(v[0])} />
 4. RADIO/CHECKBOX: Use native Tamagui <RadioGroup> or <Checkbox>.
 5. DATE: NEVER use DatePickerIOS/Android. Use a formatted <Input placeholder="YYYY-MM-DD" />.`,
 
@@ -69,6 +70,20 @@ export const KNOWLEDGE_BASE = {
 8. SKELETONS/EMPTY STATES: use subtle borders, muted text, and one strong CTA rather than noisy gradients everywhere.
 9. DO NOT dump giant template blobs. Adapt a template block to the requested feature and keep the class list intentional.`,
 
+  persistence: `## 📚 RAG DOCS: LOCAL-FIRST DATA LAYER ("@/services/db")
+Persist user data so it survives reloads. Cross-platform (web preview + native), zero backend.
+import { createCollection, kv } from "@/services/db";
+1. COLLECTION (records with a string id):
+   const todos = createCollection<Todo>("todos");
+   await todos.save(todo);            // insert or update by id
+   const all = await todos.getAll();  // Promise<Todo[]>
+   await todos.remove(id); await todos.clear();
+2. KV (single object / settings):
+   await kv.set("settings", settings); const s = await kv.get<Settings>("settings");
+3. ASYNC: every method returns a Promise — await inside useEffect/handlers, then push into Zustand/useState.
+4. PATTERN: on mount load getAll() into state; on each mutation call save/remove AND update state.
+NEVER hand-write SQL or call a remote API for local data — use this layer.`,
+
   sqlite: `## 📚 RAG DOCS: EXPO-SQLITE (MODERN API SDK 51+)
 NEVER use .transaction() or .executeSql(). They WILL CRASH.
 1. INIT: \`const db = SQLite.openDatabaseSync('db.db');\`
@@ -92,6 +107,7 @@ export const getRelevantDocs = (description: string, dependencies: string[]): st
   if (text.match(/animat|bouncy|toggle|interactive|pressstyle|motion|smooth/)) docs.push(KNOWLEDGE_BASE.animations);
   if (text.match(/alpine|x-data|x-show|x-transition|accordion|dropdown|modal web|micro-?interaction/)) docs.push(KNOWLEDGE_BASE.alpineWeb);
   if (text.match(/tailwind|tailwindcss|hero|landing|marketing|template|dashboard|admin|card grid|pricing|auth form/)) docs.push(KNOWLEDGE_BASE.tailwindTemplates);
+  if (text.match(/save|persist|store|data|list|todo|note|task|track|history|favorite|expense|budget|item|record|crud|collection/)) docs.push(KNOWLEDGE_BASE.persistence);
   if (text.match(/sqlite|database|db|sql|offline/)) docs.push(KNOWLEDGE_BASE.sqlite);
   if (text.match(/chart|stat|analytic|graph/)) docs.push(KNOWLEDGE_BASE.charts);
 

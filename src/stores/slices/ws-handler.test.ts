@@ -64,6 +64,7 @@ const createHarness = () => {
     openFiles: [],
     activeFile: null,
     fileContents: {},
+    fileDrafts: {},
     versions: [],
     currentVersion: 0,
     previewUrl: null,
@@ -73,6 +74,7 @@ const createHarness = () => {
     lastPreviewError: null,
     generationProgress: 0,
     currentGeneratingFile: null,
+    generationFiles: [],
     isConnected: true,
     lmStudioStatus: "connected",
     pendingProjectName: null,
@@ -92,6 +94,17 @@ const createHarness = () => {
     setFileContent: (path, content) => setState((current) => ({
       fileContents: { ...current.fileContents, [path]: content },
     })),
+    setFileDraft: (path, content) => setState((current) => ({
+      fileDrafts: { ...current.fileDrafts, [path]: content },
+    })),
+    revertFileDraft: (path) => setState((current) => {
+      const { [path]: _removed, ...fileDrafts } = current.fileDrafts;
+      return { fileDrafts };
+    }),
+    clearFileDraft: (path) => setState((current) => {
+      const { [path]: _removed, ...fileDrafts } = current.fileDrafts;
+      return { fileDrafts };
+    }),
     addVersion: (version) => setState((current) => ({ versions: [...current.versions, version] })),
     setCurrentVersion: (currentVersion) => setState({ currentVersion }),
     setPreview: (previewUrl, previewPort) => setState({ previewUrl, previewPort }),
@@ -108,6 +121,24 @@ const createHarness = () => {
     setPendingProjectName: (pendingProjectName) => setState({ pendingProjectName }),
     appendStreamingContent: (chunk) => setState((current) => ({ streamingContent: current.streamingContent + chunk })),
     clearStreamingContent: () => setState({ streamingContent: "" }),
+    startGenerationFile: (path) => setState((current) => ({
+      generationFiles: current.generationFiles.some((f) => f.path === path)
+        ? current.generationFiles
+        : [...current.generationFiles, { path, code: "", status: "streaming" as const }],
+    })),
+    appendGenerationCode: (chunk) => setState((current) => {
+      if (current.generationFiles.length === 0) return {};
+      const files = [...current.generationFiles];
+      const last = files[files.length - 1];
+      files[files.length - 1] = { ...last, code: last.code + chunk };
+      return { generationFiles: files };
+    }),
+    completeGenerationFile: (path) => setState((current) => ({
+      generationFiles: current.generationFiles.map((f) =>
+        f.path === path ? { ...f, status: "done" as const } : f
+      ),
+    })),
+    resetGenerationFiles: () => setState({ generationFiles: [] }),
     toggleFileTree: () => undefined,
     toggleTerminal: () => undefined,
     addProject: (entry) => setState((current) => ({ projectList: [...current.projectList, entry] })),

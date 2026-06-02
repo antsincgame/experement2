@@ -13,6 +13,9 @@ export interface ChatMessage {
   isError?: boolean;
   errorFile?: string;
   errorDetails?: string;
+  diffFilepath?: string;
+  diffBefore?: string;
+  diffAfter?: string;
 }
 
 export const createUserMessage = (content: string): ChatMessage => ({
@@ -33,6 +36,34 @@ export const createAssistantMessage = (
   timestamp: Date.now(),
   status,
 });
+
+export const createReasoningMessage = (thinking: string): ChatMessage => ({
+  id: crypto.randomUUID(),
+  role: "assistant",
+  content: "",
+  thinking,
+  timestamp: Date.now(),
+  status: "complete",
+});
+
+export const createDiffMessage = (
+  filepath: string,
+  before: string,
+  after: string
+): ChatMessage => {
+  const addedLines = after.split("\n").length - before.split("\n").length;
+  const sign = addedLines >= 0 ? "+" : "";
+  return {
+    id: crypto.randomUUID(),
+    role: "system",
+    content: `Updated ${filepath} (${sign}${addedLines} lines)`,
+    diffFilepath: filepath,
+    diffBefore: before,
+    diffAfter: after,
+    timestamp: Date.now(),
+    status: "complete",
+  };
+};
 
 export const createSystemMessage = (
   content: string,

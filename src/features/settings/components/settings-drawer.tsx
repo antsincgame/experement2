@@ -1,7 +1,7 @@
 // Keeps the settings drawer LM Studio-only so the UI no longer exposes legacy secondary-provider paths.
 import { useState, useEffect, useCallback } from "react";
 import { View, Text, TextInput, Pressable, Modal, Platform, ScrollView } from "react-native";
-import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info } from "lucide-react-native";
+import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info, RotateCcw } from "lucide-react-native";
 import { apiClient, type LmModel } from "@/shared/lib/api-client";
 import { mixedStyle } from "@/shared/lib/web-styles";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -158,21 +158,25 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           {/* Model Selectors */}
           <ModelSelector
             label="Generation Model (Code)"
+            hint="Used for all code generation. Leave on auto to use whichever model is first loaded in LM Studio."
             models={models}
             loading={modelsLoading}
             open={modelDropdownOpen}
             onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); }}
             onSelect={(id) => { setModel(id); setModelDropdownOpen(false); }}
-            currentModel={model || models[0]?.id || "auto (first loaded)"}
+            savedModel={model}
+            autoLabel="auto (first loaded in LM Studio)"
           />
           <ModelSelector
             label="Planner Model (Architecture)"
+            hint="Used only for the planning step. A smaller/faster model works well here."
             models={models}
             loading={modelsLoading}
             open={plannerDropdownOpen}
             onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEnhancerDropdownOpen(false); }}
             onSelect={(id) => { setPlannerModel(id); setPlannerDropdownOpen(false); }}
-            currentModel={plannerModel || "same as generation"}
+            savedModel={plannerModel}
+            autoLabel="same as generation"
           />
 
           <View className="flex-row gap-4">
@@ -208,9 +212,10 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               models={models}
               loading={modelsLoading}
               open={enhancerDropdownOpen}
-              onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); }}
+              onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); }}
               onSelect={(id) => { setEnhancerModel(id); setEnhancerDropdownOpen(false); }}
-              currentModel={enhancerModel || "same as generation"}
+              savedModel={enhancerModel}
+              autoLabel="same as generation"
             />
           </View>
 
@@ -225,69 +230,165 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 // ── Model Selector Dropdown ──
 interface ModelSelectorProps {
   label: string;
+  hint?: string;
   models: LmModel[];
   loading: boolean;
   open: boolean;
   onToggle: () => void;
   onSelect: (id: string) => void;
-  currentModel: string;
+  /** The currently saved model ID (empty string = auto). */
+  savedModel: string;
+  /** Placeholder shown when savedModel is empty. */
+  autoLabel: string;
 }
 
-const ModelSelector = ({ label, models, loading, open, onToggle, onSelect, currentModel }: ModelSelectorProps) => (
-  <View>
-    <Text className="text-ink-faint text-[10px] uppercase tracking-wider mb-1.5 font-medium">{label}</Text>
-    <Pressable
-      onPress={onToggle}
-      className="flex-row items-center justify-between px-3 py-2.5 rounded-xl"
-      style={{
-        backgroundColor: "rgba(26,26,46,0.6)",
-        borderWidth: 1,
-        borderColor: open ? "rgba(255,215,0,0.4)" : "rgba(255,255,255,0.08)",
-      }}
-    >
-      <Text style={{ fontSize: 12, color: "#C0C0D0", flex: 1 }} numberOfLines={1}>
-        {loading ? "Loading models..." : currentModel}
-      </Text>
-      <ChevronDown size={12} color="#8888AA" strokeWidth={1.5} />
-    </Pressable>
-    {open && models.length > 0 && (
-      <View
-        className="mt-1 rounded-xl overflow-hidden"
-        style={mixedStyle({
-          backgroundColor: "rgba(18,18,31,0.95)",
+const ModelSelector = ({
+  label,
+  hint,
+  models,
+  loading,
+  open,
+  onToggle,
+  onSelect,
+  savedModel,
+  autoLabel,
+}: ModelSelectorProps) => {
+  const [manualInput, setManualInput] = useState(savedModel);
+
+  const displayLabel = loading
+    ? "Loading models…"
+    : savedModel || autoLabel;
+
+  const handleManualCommit = () => {
+    const trimmed = manualInput.trim();
+    onSelect(trimmed);
+  };
+
+  return (
+    <View>
+      <View className="flex-row items-center justify-between mb-1.5">
+        <Text className="text-ink-faint text-[10px] uppercase tracking-wider font-medium">{label}</Text>
+        {savedModel ? (
+          <Pressable
+            onPress={() => { onSelect(""); setManualInput(""); }}
+            className="flex-row items-center gap-1 px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: "rgba(255,51,102,0.1)" }}
+          >
+            <RotateCcw size={8} color="#FF3366" strokeWidth={2} />
+            <Text style={{ fontSize: 8, color: "#FF3366", fontWeight: "600" }}>reset to auto</Text>
+          </Pressable>
+        ) : (
+          <Text style={{ fontSize: 9, color: "#4A4A6A" }}>{autoLabel}</Text>
+        )}
+      </View>
+
+      {/* Dropdown trigger */}
+      <Pressable
+        onPress={onToggle}
+        className="flex-row items-center justify-between px-3 py-2.5 rounded-xl"
+        style={{
+          backgroundColor: "rgba(26,26,46,0.6)",
           borderWidth: 1,
-          borderColor: "rgba(255,215,0,0.15)",
-          ...(Platform.OS === "web" ? { boxShadow: "0 4px 16px rgba(0,0,0,0.4)" } : {}),
-          maxHeight: 150,
-        })}
+          borderColor: open ? "rgba(255,215,0,0.4)" : savedModel ? "rgba(0,229,255,0.25)" : "rgba(255,255,255,0.08)",
+        }}
       >
-        <ScrollView>
-          {models.map((m) => (
-            <Pressable
-              key={m.id}
-              onPress={() => onSelect(m.id)}
-              className="px-3 py-2.5"
-              style={{
-                borderBottomWidth: 1,
-                borderBottomColor: "rgba(255,255,255,0.04)",
-                backgroundColor: m.id === currentModel ? "rgba(255,215,0,0.1)" : "transparent",
-              }}
-            >
-              <Text style={{ fontSize: 11, color: m.id === currentModel ? "#FFD700" : "#C0C0D0" }} numberOfLines={1}>
-                {m.id}
+        <Text style={{ fontSize: 12, color: savedModel ? "#00E5FF" : "#6A6A8A", flex: 1 }} numberOfLines={1}>
+          {displayLabel}
+        </Text>
+        <ChevronDown size={12} color="#8888AA" strokeWidth={1.5} />
+      </Pressable>
+
+      {/* Expanded panel */}
+      {open && (
+        <View
+          className="mt-1 rounded-xl overflow-hidden"
+          style={mixedStyle({
+            backgroundColor: "rgba(18,18,31,0.97)",
+            borderWidth: 1,
+            borderColor: "rgba(255,215,0,0.15)",
+            ...(Platform.OS === "web" ? { boxShadow: "0 4px 16px rgba(0,0,0,0.5)" } : {}),
+          })}
+        >
+          {/* Manual entry */}
+          <View
+            className="px-3 py-2.5"
+            style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}
+          >
+            <Text style={{ fontSize: 9, color: "#8888AA", marginBottom: 6, fontWeight: "600" }}>
+              ENTER MODEL ID MANUALLY
+            </Text>
+            <View className="flex-row items-center gap-2">
+              <TextInput
+                value={manualInput}
+                onChangeText={setManualInput}
+                placeholder="e.g. qwen2.5-coder-7b-instruct"
+                placeholderTextColor="#4A4A6A"
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  color: "#C0C0D0",
+                  backgroundColor: "rgba(255,255,255,0.04)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                }}
+                onSubmitEditing={handleManualCommit}
+              />
+              <Pressable
+                onPress={handleManualCommit}
+                className="px-3 py-1.5 rounded-lg"
+                style={{ backgroundColor: "rgba(0,229,255,0.12)", borderWidth: 1, borderColor: "rgba(0,229,255,0.25)" }}
+              >
+                <Text style={{ fontSize: 10, color: "#00E5FF", fontWeight: "700" }}>Set</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Fetched models list */}
+          {models.length > 0 ? (
+            <ScrollView style={{ maxHeight: 140 }}>
+              {models.map((m) => (
+                <Pressable
+                  key={m.id}
+                  onPress={() => { onSelect(m.id); setManualInput(m.id); }}
+                  className="px-3 py-2.5"
+                  style={{
+                    borderBottomWidth: 1,
+                    borderBottomColor: "rgba(255,255,255,0.04)",
+                    backgroundColor: m.id === savedModel ? "rgba(255,215,0,0.1)" : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: 11, color: m.id === savedModel ? "#FFD700" : "#C0C0D0" }}
+                    numberOfLines={1}
+                  >
+                    {m.id}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : loading ? (
+            <View className="px-3 py-3">
+              <Text style={{ fontSize: 10, color: "#8888AA" }}>Loading models from LM Studio…</Text>
+            </View>
+          ) : (
+            <View className="px-3 py-3">
+              <Text style={{ fontSize: 10, color: "#FF8844" }}>
+                No models found via API — enter the model ID manually above, or load a model in LM Studio first.
               </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-    )}
-    {open && models.length === 0 && !loading && (
-      <View className="mt-1 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(255,51,102,0.06)" }}>
-        <Text style={{ fontSize: 10, color: "#FF3366" }}>No models loaded in LM Studio</Text>
-      </View>
-    )}
-  </View>
-);
+            </View>
+          )}
+        </View>
+      )}
+
+      {hint && (
+        <Text style={{ fontSize: 9, color: "#4A4A6A", marginTop: 4, lineHeight: 13 }}>{hint}</Text>
+      )}
+    </View>
+  );
+};
 
 // ── Status Badge ──
 interface StatusBadgeProps {

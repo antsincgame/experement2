@@ -67,13 +67,15 @@ export const groupDiagnosticsByFile = (
 
 /**
  * A generated file is safe to auto-fix only if it lives under app/ or src/ and is
- * not part of the scaffold we control (the UI kit) or the auto-generated layouts.
+ * not part of the scaffold we control (the UI kit, the data layer) or the
+ * auto-generated layouts.
  */
 export const isFixableProjectFile = (filePath: string): boolean => {
   const normalized = filePath.replace(/\\/g, "/");
   if (!isProjectFilePath(normalized)) return false;
   if (!/\.(ts|tsx)$/.test(normalized)) return false;
   if (normalized.startsWith("src/ui/")) return false;
+  if (normalized === "src/services/db.ts") return false;
   return true;
 };
 

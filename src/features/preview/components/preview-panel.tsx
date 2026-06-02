@@ -39,23 +39,25 @@ const PreviewPanel = () => {
   const lastPreviewError = useProjectStore((state) => state.lastPreviewError);
   const bumpPreviewRevision = useProjectStore((state) => state.bumpPreviewRevision);
 
-  // Reactive iframe src: render immediately when port + project are available
-  const iframeSrc = previewPort && projectName && previewStatus === "ready"
-    ? `${apiClient.getPreviewProxyUrl(projectName)}?v=${previewPort}-${previewRevision}`
+  // Serve the preview straight from Metro's origin: Expo emits absolute asset
+  // paths that break when proxied under /preview/<project>/. The cache-busting
+  // query forces an iframe reload on manual refresh and port changes.
+  const previewBaseUrl = previewPort ? apiClient.getPreviewDirectUrl(previewPort) : "";
+  const iframeSrc = previewBaseUrl && projectName && previewStatus === "ready"
+    ? `${previewBaseUrl}?v=${previewPort}-${previewRevision}`
     : "";
 
   const isLoading = ["planning", "scaffolding", "generating", "building", "analyzing", "validating"].includes(status);
   const isPreviewStarting = previewStatus === "starting";
   const isError = previewStatus === "error";
-  const proxyUrl = projectName ? apiClient.getPreviewProxyUrl(projectName) : "";
 
   const handleRefresh = useCallback(() => {
     bumpPreviewRevision();
   }, [bumpPreviewRevision]);
 
   const handleOpenExternal = useCallback(() => {
-    if (proxyUrl) void Linking.openURL(proxyUrl);
-  }, [proxyUrl]);
+    if (previewBaseUrl) void Linking.openURL(previewBaseUrl);
+  }, [previewBaseUrl]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: "rgba(18,18,31,0.6)" }}>

@@ -48,6 +48,25 @@ describe("openProjectWorkspace", () => {
     expect(onMissingProject).not.toHaveBeenCalled();
   });
 
+  it("skips file fetch for the in-flight creation route", async () => {
+    const switchProject = vi.fn();
+    const fetchProjectFiles = vi.fn();
+    const startPreview = vi.fn();
+
+    await openProjectWorkspace({
+      currentProjectName: null,
+      projectName: "__creating__",
+      switchProject,
+      fetchProjectFiles,
+      startPreview,
+      onMissingProject: vi.fn(),
+    });
+
+    expect(switchProject).toHaveBeenCalledWith("__creating__");
+    expect(fetchProjectFiles).not.toHaveBeenCalled();
+    expect(startPreview).not.toHaveBeenCalled();
+  });
+
   it("redirects when project files cannot be loaded", async () => {
     const startPreview = vi.fn();
     const onMissingProject = vi.fn();

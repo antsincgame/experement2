@@ -9,11 +9,13 @@ import {
 import { parseOrRespond } from "../lib/request-validation.js";
 import {
   ProjectFileQuerySchema,
+  ProjectFileWriteSchema,
   ProjectParamsSchema,
 } from "../schemas/runtime-input.schema.js";
 import {
   getFileTree,
   readFile,
+  writeFile,
   listAllFiles,
   projectExists,
   getWorkspaceRoot,
@@ -85,6 +87,29 @@ projectRouter.get("/:name/files", (req, res) => {
   } catch (error) {
     res.status(400).json({
       error: error instanceof Error ? error.message : "Invalid project path",
+      code: "INVALID_INPUT",
+    });
+  }
+});
+
+projectRouter.put("/:name/file", (req, res) => {
+  const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+  const body = parseOrRespond(ProjectFileWriteSchema, req.body, res);
+  if (!params || !body) {
+    return;
+  }
+
+  if (!projectExists(params.name)) {
+    res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
+    return;
+  }
+
+  try {
+    writeFile(params.name, body.path, body.content);
+    res.json({ data: { path: body.path } });
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Invalid file path",
       code: "INVALID_INPUT",
     });
   }

@@ -162,6 +162,23 @@ class ApiClient {
     return response.data;
   }
 
+  async putData<T>(
+    pathname: string,
+    body: unknown,
+    timeoutMs?: number
+  ): Promise<T> {
+    const url = this.buildUrl(this.getAgentUrl(), pathname);
+    const response = await this.fetchJson(url, {
+      method: "PUT",
+      body,
+      timeoutMs,
+    });
+    if (!isDataEnvelope<T>(response)) {
+      throw new Error(`Invalid response envelope from ${url}`);
+    }
+    return response.data;
+  }
+
   async deleteData<T>(
     pathname: string,
     headers?: HeadersInit
@@ -197,6 +214,22 @@ class ApiClient {
       ? `/preview/${encodeURIComponent(projectName)}/`
       : "/preview/";
     return this.buildUrl(this.getAgentUrl(), path);
+  }
+
+  // Expo's dev server emits absolute asset paths (/node_modules, /_expo, /index.bundle),
+  // so the preview must be served from Metro's own origin. Subpath proxying via
+  // /preview/<project>/ breaks those paths (they resolve to the agent root and 404).
+  // We reuse the agent hostname and swap in Metro's port so this works for both
+  // localhost and LAN-hosted agents.
+  getPreviewDirectUrl(port: number): string {
+    try {
+      const url = new URL(this.getAgentUrl());
+      url.port = String(port);
+      url.pathname = "/";
+      return url.toString();
+    } catch {
+      return `http://127.0.0.1:${port}/`;
+    }
   }
 
   getProjectExportUrl(projectName: string): string {
@@ -240,6 +273,18 @@ class ApiClient {
     return this.getData<ProjectFilePayload>(
       `/api/projects/${encodeURIComponent(projectName)}/file`,
       { path: filePath }
+    );
+  }
+
+  saveProjectFile(
+    projectName: string,
+    filePath: string,
+    content: string
+  ): Promise<{ path: string }> {
+    return this.putData<{ path: string }>(
+      `/api/projects/${encodeURIComponent(projectName)}/file`,
+      { path: filePath, content },
+      30_000
     );
   }
 

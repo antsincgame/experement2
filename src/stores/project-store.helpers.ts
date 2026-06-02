@@ -1,4 +1,5 @@
 // Keeps project and preview store transitions pure so lifecycle changes remain testable.
+import { CREATING_PROJECT_SLUG, isCreatingRoute } from "@/shared/lib/creation-flow";
 import type {
   ProjectChat,
   ProjectState,
@@ -135,6 +136,7 @@ export const buildProjectRemovalState = (
     openFiles: nextChat.openFiles,
     activeFile: nextChat.activeFile,
     fileContents: nextChat.fileContents,
+    fileDrafts: {},
     versions: nextChat.versions,
     streamingContent: nextChat.streamingContent,
     previewUrl: nextChat.previewUrl,
@@ -145,13 +147,40 @@ export const buildProjectRemovalState = (
   };
 };
 
+export const migrateCreatingChatToProject = (
+  projectChats: Record<string, ProjectChat>,
+  targetName: string,
+  state: ProjectState
+): Record<string, ProjectChat> => {
+  const { [CREATING_PROJECT_SLUG]: creatingChat, ...rest } = projectChats;
+  const base = creatingChat ?? createEmptyChat();
+  return {
+    ...rest,
+    [targetName]: {
+      ...base,
+      messages: state.messages.length > 0 ? state.messages : base.messages,
+      streamingContent: state.streamingContent || base.streamingContent,
+    },
+  };
+};
+
 export const buildProjectSwitchState = (
   state: ProjectState,
   projectName: string
 ): Partial<ProjectState> => {
   const projectChats = persistCurrentProjectSnapshot(state);
-  const nextChat = projectChats[projectName] ?? EMPTY_CHAT;
-  const nextStatus = state.projectList.find((project) => project.name === projectName)?.status ?? "ready";
+  const creating = isCreatingRoute(projectName);
+  const storedChat = projectChats[projectName] ?? EMPTY_CHAT;
+  const nextChat = creating
+    ? {
+      ...storedChat,
+      messages: state.messages.length > 0 ? state.messages : storedChat.messages,
+      streamingContent: state.streamingContent || storedChat.streamingContent,
+    }
+    : storedChat;
+  const nextStatus = creating
+    ? state.status
+    : state.projectList.find((project) => project.name === projectName)?.status ?? "ready";
 
   return {
     projectName,
@@ -163,8 +192,10 @@ export const buildProjectSwitchState = (
     openFiles: nextChat.openFiles,
     activeFile: nextChat.activeFile,
     fileContents: nextChat.fileContents,
+    fileDrafts: {},
     versions: nextChat.versions,
     streamingContent: nextChat.streamingContent,
+    generationFiles: [],
     previewUrl: null,
     previewPort: null,
     previewBuildId: null,
@@ -173,6 +204,13 @@ export const buildProjectSwitchState = (
   };
 };
 
+// Diff payloads can be large; drop them from persisted history so localStorage
+// stays within quota. The summary text remains, and disk is the source of truth.
+const stripHeavyMessageFields = (
+  messages: ProjectChat["messages"]
+): ProjectChat["messages"] =>
+  messages.map(({ diffBefore: _b, diffAfter: _a, diffFilepath: _f, ...rest }) => rest);
+
 export const buildPersistedProjectChats = (
   projectChats: Record<string, ProjectChat>
 ): Record<string, ProjectChat> =>
@@ -180,7 +218,7 @@ export const buildPersistedProjectChats = (
     Object.entries(projectChats).map(([name, chat]) => [
       name,
       {
-        messages: chat.messages.slice(-50),
+        messages: stripHeavyMessageFields(chat.messages.slice(-50)),
         versions: chat.versions,
         fileTree: chat.fileTree,
         openFiles: chat.openFiles,

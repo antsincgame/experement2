@@ -10,12 +10,20 @@ import {
 } from "../lib/generation-contract.js";
 import { validateDependencies } from "../lib/dependency-validator.js";
 import { SCAFFOLD_UI_FILES } from "../lib/scaffold-ui.js";
+import { SCAFFOLD_DB_FILES } from "../lib/scaffold-db.js";
 
 const TEMPLATE_DIR_NAME = "template_cache";
 
-/** Write the shared UI kit (src/ui/*) into a project or template root. Idempotent. */
+/** The blessed source surfaces (UI kit + data layer) every project receives. */
+const SCAFFOLD_FILES: Record<string, string> = {
+  ...SCAFFOLD_UI_FILES,
+  ...SCAFFOLD_DB_FILES,
+};
+
+/** Write the shared UI kit (src/ui/*) and data layer (src/services/*) into a
+ *  project or template root. Idempotent. */
 const writeScaffoldUiFiles = (root: string): void => {
-  for (const [relPath, content] of Object.entries(SCAFFOLD_UI_FILES)) {
+  for (const [relPath, content] of Object.entries(SCAFFOLD_FILES)) {
     const fullPath = path.join(root, relPath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
     fs.writeFileSync(fullPath, content, "utf-8");
@@ -180,8 +188,9 @@ export const createProjectFromCache = async (
   console.log(`[TemplateCache] Copying template -> ${projectName}...`);
   copyDirectory(templatePath, projectPath);
 
-  // Always (re)write the UI kit so projects copied from an older warm cache
-  // still receive the safe <Icon> wrapper and the "@/ui" barrel.
+  // Always (re)write the scaffold surfaces so projects copied from an older warm
+  // cache still receive the safe <Icon> wrapper, the "@/ui" barrel, and the
+  // "@/services/db" data layer.
   writeScaffoldUiFiles(projectPath);
 
   const appJson = JSON.parse(

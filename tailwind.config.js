@@ -47,9 +47,9 @@ module.exports = {
         ink: {
           dark: "#0B0D17",
           base: "#1A1A2E",
-          muted: "#4A4A6A",
-          light: "#8888AA",
-          faint: "#C0C0D0",
+          muted: "#72728A",
+          light: "#A0A8C0",
+          faint: "#D8D8EC",
         },
         border: {
           subtle: "rgba(82, 82, 91, 0.4)",

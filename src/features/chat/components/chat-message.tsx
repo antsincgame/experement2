@@ -6,6 +6,7 @@ import {
 } from "lucide-react-native";
 import type { ChatMessage as Msg } from "../schemas/message.schema";
 import MarkdownRenderer from "./markdown-renderer";
+import DiffView from "./diff-view";
 
 interface ChatMessageProps {
   message: Msg;
@@ -13,12 +14,24 @@ interface ChatMessageProps {
 }
 
 const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
-  const [thinkingOpen, setThinkingOpen] = useState(false);
+  const isReasoningOnly = message.content.trim() === "" && !!message.thinking;
+  const [thinkingOpen, setThinkingOpen] = useState(isReasoningOnly);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   if (message.isHidden) return null;
 
   if (message.role === "system") {
+    if (message.diffFilepath && message.diffBefore !== undefined && message.diffAfter !== undefined) {
+      return (
+        <View className="py-1 animate-fade-in">
+          <DiffView
+            filepath={message.diffFilepath}
+            before={message.diffBefore}
+            after={message.diffAfter}
+          />
+        </View>
+      );
+    }
     return (
       <View className="px-4 py-1.5 animate-fade-in">
         <Text className="text-ink-light text-xs">{message.content}</Text>
@@ -192,7 +205,9 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
           ) : (
             <ChevronRight size={12} color="#7C4DFF" strokeWidth={1.5} />
           )}
-          <Text className="text-neon-violet text-xs italic">Thinking...</Text>
+          <Text className="text-neon-violet text-xs italic">
+            {isReasoningOnly ? "Reasoning" : "Thinking..."}
+          </Text>
         </Pressable>
       )}
       {message.thinking && thinkingOpen && (
@@ -203,15 +218,17 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
         </View>
       )}
 
-      <View className="ml-8">
-        {isUser ? (
-          <Text className="text-sm leading-6 text-white font-medium">
-            {message.content}
-          </Text>
-        ) : (
-          <MarkdownRenderer content={message.content} />
-        )}
-      </View>
+      {message.content.trim() !== "" && (
+        <View className="ml-8">
+          {isUser ? (
+            <Text className="text-sm leading-6 text-white font-medium">
+              {message.content}
+            </Text>
+          ) : (
+            <MarkdownRenderer content={message.content} />
+          )}
+        </View>
+      )}
     </View>
   );
 };

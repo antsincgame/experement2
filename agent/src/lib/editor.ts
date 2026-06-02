@@ -19,6 +19,21 @@ import { safeJsonParse } from "./json-repair.js";
 import { applySearchReplace } from "./search-replace.js";
 import { collectStream } from "./stream-collect.js";
 
+/**
+ * Guards LLM-proposed paths before they reach the file system. A malformed path
+ * (absolute, parent-traversal, or pointing into node_modules/.git/.expo/dist)
+ * must be skipped — not thrown — so one bad block never aborts the whole edit.
+ * Without this, an echoed stack-trace path (e.g. node_modules/esbuild-register)
+ * crashed the entire "Fix Error" iteration with a cryptic "Invalid file path".
+ */
+export const isUnsafeEditPath = (filepath: string): boolean => {
+  const normalized = filepath.replace(/\\/g, "/").trim();
+  if (!normalized) return true;
+  if (/^(?:[a-zA-Z]:\/|\/)/.test(normalized)) return true;
+  if (normalized.split("/").some((segment) => segment === "..")) return true;
+  return /(?:^|\/)(?:node_modules|\.git|\.expo|dist)(?:\/|$)/.test(normalized);
+};
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -132,6 +147,9 @@ export const editProject = async (
   // ── Read target files ─────────────────────────────────
   const targetFiles: Record<string, string> = {};
   for (const filepath of action.files) {
+    if (isUnsafeEditPath(filepath)) {
+      continue;
+    }
     const content = readFile(projectName, filepath);
     if (content) {
       targetFiles[filepath] = content;
@@ -172,40 +190,56 @@ export const editProject = async (
     const block = item as SearchReplaceBlock;
     onBlock?.(block);
 
-    if (block.type === "search_replace" && block.search && block.replace) {
-      const currentContent = readFile(projectName, block.filepath);
-      if (!currentContent) {
-        errors.push(`File not found: ${block.filepath}`);
-        failedBlocks++;
-        continue;
-      }
+    if (isUnsafeEditPath(block.filepath)) {
+      errors.push(`Skipped unsafe path: ${block.filepath}`);
+      failedBlocks++;
+      continue;
+    }
 
-      const { result, error } = applySearchReplace(
-        currentContent,
-        block.search,
-        block.replace
-      );
+    try {
+      if (block.type === "search_replace" && block.search && block.replace) {
+        const currentContent = readFile(projectName, block.filepath);
+        if (!currentContent) {
+          errors.push(`File not found: ${block.filepath}`);
+          failedBlocks++;
+          continue;
+        }
 
-      if (result) {
-        onDiff?.(block.filepath, currentContent, result);
-        writeFile(projectName, block.filepath, result);
+        const { result, error } = applySearchReplace(
+          currentContent,
+          block.search,
+          block.replace
+        );
+
+        if (result) {
+          onDiff?.(block.filepath, currentContent, result);
+          writeFile(projectName, block.filepath, result);
+          appliedBlocks++;
+        } else {
+          errors.push(`${block.filepath}: ${error}`);
+          failedBlocks++;
+        }
+      } else if (block.type === "new_file" && block.content) {
+        onDiff?.(block.filepath, "", block.content);
+        writeFile(projectName, block.filepath, block.content);
         appliedBlocks++;
-      } else {
-        errors.push(`${block.filepath}: ${error}`);
-        failedBlocks++;
+      } else if (block.type === "delete") {
+        deleteFile(projectName, block.filepath);
+        appliedBlocks++;
       }
-    } else if (block.type === "new_file" && block.content) {
-      onDiff?.(block.filepath, "", block.content);
-      writeFile(projectName, block.filepath, block.content);
-      appliedBlocks++;
-    } else if (block.type === "delete") {
-      deleteFile(projectName, block.filepath);
-      appliedBlocks++;
+    } catch (err) {
+      errors.push(
+        `${block.filepath}: ${err instanceof Error ? err.message : "write failed"}`
+      );
+      failedBlocks++;
     }
   }
 
   // ── Delete files the analysis flagged for removal ─────
   for (const filepath of action.filesToDelete) {
+    if (isUnsafeEditPath(filepath)) {
+      continue;
+    }
     if (deleteFile(projectName, filepath)) {
       onBlock?.({ filepath, type: "delete" });
       appliedBlocks++;

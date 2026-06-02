@@ -6,6 +6,11 @@ import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { apiClient, type ProjectListItem } from "@/shared/lib/api-client";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import {
+  CREATING_PENDING_KEY,
+  CREATING_PROJECT_SLUG,
+} from "@/shared/lib/creation-flow";
+import { isGenerationActive } from "@/shared/lib/generation-status";
 import { hydrateStoredProjects } from "./workspace-flow";
 
 export const useHomeScreenController = () => {
@@ -14,6 +19,7 @@ export const useHomeScreenController = () => {
   const projectName = useProjectStore((state) => state.projectName);
   const projectList = useProjectStore((state) => state.projectList);
   const status = useProjectStore((state) => state.status);
+  const lmStudioStatus = useProjectStore((state) => state.lmStudioStatus);
   const isConnected = useProjectStore((state) => state.isConnected);
   const addMessage = useProjectStore((state) => state.addMessage);
   const addProject = useProjectStore((state) => state.addProject);
@@ -36,17 +42,12 @@ export const useHomeScreenController = () => {
   const enhanceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (projectName && status !== "idle") {
-      router.push(`/project/${encodeURIComponent(projectName)}`);
-    }
-  }, [projectName, router, status]);
-
-  useEffect(() => {
-    if (status === "error" && pendingProjectName === "__creating__" && !projectName) {
+    if (status === "error" && pendingProjectName === CREATING_PENDING_KEY) {
       const lastError = useProjectStore.getState().messages
         .filter(m => m.isError).at(-1);
       setCreationError(lastError?.content.slice(0, 200) ?? "Project creation failed");
       setPendingProjectName(null);
+      setProjectName(null);
       setStatus("idle");
     } else if (status !== "error") {
       setCreationError(null);
@@ -117,18 +118,30 @@ export const useHomeScreenController = () => {
     }
   }, [enhanceErrorTimerRef, enhancerModel, lmStudioUrl, welcomeInput]);
 
+  const isCreating =
+    pendingProjectName === CREATING_PENDING_KEY || isGenerationActive(status);
+
   const handleCreate = useCallback((text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) {
+    if (!trimmed || isCreating) {
       return;
     }
 
-    addMessage(createUserMessage(trimmed));
-    setProjectName(null);
-    setPendingProjectName("__creating__");
+    setProjectName(CREATING_PROJECT_SLUG);
+    setPendingProjectName(CREATING_PENDING_KEY);
     setStatus("planning");
+    addMessage(createUserMessage(trimmed));
     createProject(trimmed);
-  }, [addMessage, createProject, setPendingProjectName, setProjectName, setStatus]);
+    router.push(`/project/${encodeURIComponent(CREATING_PROJECT_SLUG)}`);
+  }, [
+    addMessage,
+    createProject,
+    isCreating,
+    router,
+    setPendingProjectName,
+    setProjectName,
+    setStatus,
+  ]);
 
   const handleOpenProject = useCallback((name: string) => {
     router.push(`/project/${encodeURIComponent(name)}`);
@@ -157,6 +170,8 @@ export const useHomeScreenController = () => {
     handleOpenProject,
     inputFocused,
     isConnected,
+    isCreating,
+    lmStudioStatus,
     settingsVisible,
     setInputFocused,
     setSettingsVisible,

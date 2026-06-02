@@ -32,6 +32,14 @@ export interface ProjectEntry {
   createdAt: number;
 }
 
+export type GenerationFileStatus = "streaming" | "done";
+
+export interface GenerationFile {
+  path: string;
+  code: string;
+  status: GenerationFileStatus;
+}
+
 export interface ProjectChat {
   messages: ChatMessage[];
   versions: Version[];
@@ -55,6 +63,7 @@ export interface ProjectStateData {
   openFiles: string[];
   activeFile: string | null;
   fileContents: Record<string, string>;
+  fileDrafts: Record<string, string>;
   versions: Version[];
   currentVersion: number;
   previewUrl: string | null;
@@ -64,6 +73,7 @@ export interface ProjectStateData {
   lastPreviewError: string | null;
   generationProgress: number;
   currentGeneratingFile: string | null;
+  generationFiles: GenerationFile[];
   isConnected: boolean;
   lmStudioStatus: "connected" | "disconnected" | "checking";
   pendingProjectName: string | null;
@@ -84,6 +94,9 @@ export interface ProjectStateActions {
   closeFile: (path: string) => void;
   setActiveFile: (path: string | null) => void;
   setFileContent: (path: string, content: string) => void;
+  setFileDraft: (path: string, content: string) => void;
+  revertFileDraft: (path: string) => void;
+  clearFileDraft: (path: string) => void;
   addVersion: (version: Version) => void;
   setCurrentVersion: (num: number) => void;
   setPreview: (url: string | null, port: number | null) => void;
@@ -98,6 +111,10 @@ export interface ProjectStateActions {
   setPendingProjectName: (name: string | null) => void;
   appendStreamingContent: (chunk: string) => void;
   clearStreamingContent: () => void;
+  startGenerationFile: (path: string) => void;
+  appendGenerationCode: (chunk: string) => void;
+  completeGenerationFile: (path: string) => void;
+  resetGenerationFiles: () => void;
   toggleFileTree: () => void;
   toggleTerminal: () => void;
   addProject: (entry: ProjectEntry) => void;

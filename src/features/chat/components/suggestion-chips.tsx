@@ -1,3 +1,4 @@
+// Higher-contrast chip labels and backgrounds on the welcome screen.
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { ListTodo, Cloud, StickyNote, DollarSign, Timer, Target } from "lucide-react-native";
 import type { FC } from "react";
@@ -17,7 +18,7 @@ const SUGGESTIONS = [
 
 const SuggestionChips: FC<SuggestionChipsProps> = ({ onSelect }) => (
   <View className="mt-8 items-center">
-    <Text className="text-ink-faint text-[10px] uppercase tracking-widest mb-3 font-medium">
+    <Text className="text-ink-light text-[11px] uppercase tracking-widest mb-3 font-semibold">
       Quick start
     </Text>
     <ScrollView
@@ -33,9 +34,9 @@ const SuggestionChips: FC<SuggestionChipsProps> = ({ onSelect }) => (
             onPress={() => onSelect(s.prompt)}
             className="flex-row items-center gap-2 rounded-full px-4 py-2.5"
             style={{
-              backgroundColor: "rgba(26, 26, 46, 0.6)",
+              backgroundColor: "rgba(18, 18, 32, 0.92)",
               borderWidth: 1,
-              borderColor: "rgba(255, 215, 0, 0.12)",
+              borderColor: "rgba(255, 215, 0, 0.25)",
               shadowColor: s.color,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.1,
@@ -43,7 +44,7 @@ const SuggestionChips: FC<SuggestionChipsProps> = ({ onSelect }) => (
             }}
           >
             <Icon size={14} color={s.color} strokeWidth={1.5} />
-            <Text className="text-ink-faint text-xs font-medium">{s.label}</Text>
+            <Text className="text-white text-xs font-medium">{s.label}</Text>
           </Pressable>
         );
       })}

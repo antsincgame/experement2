@@ -16,6 +16,7 @@ import {
 import { formatZodError } from "./lib/request-validation.js";
 import { assertLlmUrl } from "./lib/llm-url.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
+import { waitForMetroReady } from "./lib/metro-ready.js";
 import { projectRouter } from "./routes/project.js";
 import { llmRouter } from "./routes/llm.js";
 import { processRouter } from "./routes/process.js";
@@ -38,19 +39,14 @@ import {
   getProjectOperationQueueKey,
   WORKSPACE_OPERATION_QUEUE_KEY,
 } from "./services/project-operation-lock.js";
-import { killAll, startExpo, getActivePort } from "./services/process-manager.js";
+import {
+  killAll,
+  killOrphanedPreviewProcesses,
+  startExpo,
+  getActivePort,
+} from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 
-const waitForMetroReady = async (port: number, maxRetries = 40): Promise<boolean> => {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const resp = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(2000) });
-      if (resp.ok) return true;
-    } catch { /* Metro not ready yet */ }
-    await new Promise((r) => setTimeout(r, 750));
-  }
-  return false;
-};
 
 const PORT = Number(process.env.AGENT_PORT ?? 3100);
 const HOST = process.env.AGENT_HOST?.trim() || "127.0.0.1";
@@ -285,10 +281,46 @@ wss.on("connection", (ws: WebSocket) => {
   ws.send(JSON.stringify({ type: "connected", clientId, timestamp: Date.now() }));
 });
 
+// Guards against duplicate mutating requests (reconnect flushes, double clicks)
+// that would otherwise enqueue several identical create/iterate operations.
+const processedMutationRequests = new Set<string>();
+const MUTATION_DEDUPE_TYPES = new Set([
+  "create_project",
+  "iterate",
+  "revert_version",
+]);
+
+const isDuplicateMutation = (message: WsMessage): boolean => {
+  if (!MUTATION_DEDUPE_TYPES.has(message.type)) {
+    return false;
+  }
+  const requestId = "requestId" in message ? message.requestId : undefined;
+  if (!requestId) {
+    return false;
+  }
+  if (processedMutationRequests.has(requestId)) {
+    return true;
+  }
+  processedMutationRequests.add(requestId);
+  // Bound memory: keep only the most recent identifiers.
+  if (processedMutationRequests.size > 200) {
+    const oldest = processedMutationRequests.values().next().value;
+    if (oldest) {
+      processedMutationRequests.delete(oldest);
+    }
+  }
+  return false;
+};
+
 const handleWsMessage = (clientId: string, message: WsMessage): void => {
   // Track active LLM server URL for health checks
   if ("lmStudioUrl" in message && typeof message.lmStudioUrl === "string" && message.lmStudioUrl) {
     updateLlmServerUrl(message.lmStudioUrl);
+  }
+
+  if (isDuplicateMutation(message)) {
+    console.log(`[WS] Ignoring duplicate ${message.type} (requestId already processed)`);
+    return;
   }
 
   switch (message.type) {
@@ -399,7 +431,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           type: "preview_status",
           previewStatus: "starting",
         });
-        waitForMetroReady(existingPort, 5)
+        // A tracked port can still be mid-bundle (Expo + Tamagui first build takes
+        // tens of seconds), so allow the full ready window instead of a quick probe.
+        waitForMetroReady(existingPort, 60)
           .then((healthy) => runWithEventScope(previewEventScope, () => {
             if (healthy) {
               setPreviewPort(pName, existingPort);
@@ -550,8 +584,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             }
           });
 
-          // Wait for Metro to actually accept requests before announcing preview
-          const healthy = await waitForMetroReady(port, 40);
+          // Wait for Metro to actually accept requests before announcing preview.
+          // First Expo + Tamagui bundle can take well over 30s on a cold start.
+          const healthy = await waitForMetroReady(port, 60);
 
           if (healthy) {
             setPreviewPort(message.projectName, port);
@@ -680,6 +715,9 @@ const shutdown = (): void => {
 server.listen(PORT, HOST, async () => {
   console.log(`[Agent] Server: http://${HOST}:${PORT}`);
   console.log(`[Agent] WebSocket: ws://${HOST}:${PORT}`);
+
+  // Reclaim preview bundlers orphaned by a previous run before accepting work.
+  killOrphanedPreviewProcesses();
 
   initTemplateCache().catch((err) => {
     console.error("[Agent] Template cache init failed:", err);

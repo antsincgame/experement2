@@ -1,4 +1,4 @@
-// Renders the welcome workspace shell while keeping the route component focused on wiring only.
+// Brighter text/placeholder/disabled colors for readable home screen contrast.
 import {
   ActivityIndicator,
   Platform,
@@ -31,6 +31,8 @@ interface HomeScreenContentProps {
   handleOpenProject: (name: string) => void;
   inputFocused: boolean;
   isConnected: boolean;
+  isCreating: boolean;
+  lmStudioStatus: "connected" | "disconnected" | "checking";
   settingsVisible: boolean;
   setInputFocused: (value: boolean) => void;
   setSettingsVisible: (value: boolean) => void;
@@ -50,12 +52,18 @@ export const HomeScreenContent = ({
   handleOpenProject,
   inputFocused,
   isConnected,
+  isCreating,
+  lmStudioStatus,
   settingsVisible,
   setInputFocused,
   setSettingsVisible,
   setWelcomeInput,
   welcomeInput,
-}: HomeScreenContentProps) => (
+}: HomeScreenContentProps) => {
+  const canGenerate =
+    welcomeInput.trim().length > 0 && isConnected && !isCreating;
+
+  return (
   <NeonBackground intensity="vivid">
     <SafeAreaView className="flex-1">
       <View className="flex-1 flex-row">
@@ -77,7 +85,7 @@ export const HomeScreenContent = ({
             >
               <View className="flex-row items-center gap-2">
                 <FolderOpen size={14} color="#FFD700" strokeWidth={1.5} />
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#C0C0D0", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#E8E8F4", letterSpacing: 0.5, textTransform: "uppercase" }}>
                   My Projects ({allProjects.length})
                 </Text>
               </View>
@@ -98,7 +106,7 @@ export const HomeScreenContent = ({
                   }}
                 >
                   <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "#00FF88" }} />
-                  <Text style={{ fontSize: 12, color: "#C0C0D0", fontWeight: "500" }} numberOfLines={1}>
+                  <Text style={{ fontSize: 12, color: "#E8E8F4", fontWeight: "500" }} numberOfLines={1}>
                     {project.displayName}
                   </Text>
                 </Pressable>
@@ -108,7 +116,11 @@ export const HomeScreenContent = ({
         )}
 
         <View className="flex-1 items-center justify-center relative overflow-hidden">
-          <View className="absolute inset-0 items-center justify-center" style={{ opacity: 0.025 }}>
+          <View
+            className="absolute inset-0 items-center justify-center"
+            style={{ opacity: 0.025 }}
+            pointerEvents="none"
+          >
             <FlowerOfLife size={700} color="#7C4DFF" opacity={1} />
           </View>
 
@@ -155,16 +167,32 @@ export const HomeScreenContent = ({
                 App Factory
               </Text>
             </View>
-            <Text className="text-ink-light text-sm">
+            <Text className="text-ink-faint text-sm">
               Describe your app. AI builds it locally.
             </Text>
           </View>
+
+          {!isConnected && (
+            <View className="w-full max-w-2xl px-6 mb-3">
+              <Text style={{ fontSize: 12, color: "#FF3366", textAlign: "center" }}>
+                Agent offline — start the backend with npm run dev
+              </Text>
+            </View>
+          )}
+
+          {isConnected && lmStudioStatus === "disconnected" && !isCreating && (
+            <View className="w-full max-w-2xl px-6 mb-3">
+              <Text style={{ fontSize: 12, color: "#FFD700", textAlign: "center" }}>
+                LM Studio is not running — start a model at http://localhost:1234
+              </Text>
+            </View>
+          )}
 
           <View className="w-full max-w-2xl px-6">
             <View
               className="rounded-2xl overflow-hidden"
               style={mixedStyle({
-                backgroundColor: "rgba(26, 26, 46, 0.8)",
+                backgroundColor: "rgba(18, 18, 32, 0.95)",
                 borderWidth: 1.5,
                 borderColor: inputFocused
                   ? "rgba(255, 215, 0, 0.5)"
@@ -187,7 +215,7 @@ export const HomeScreenContent = ({
                 onFocus={() => setInputFocused(true)}
                 onBlur={() => setInputFocused(false)}
                 placeholder="Describe the app you want to build..."
-                placeholderTextColor="#4A4A6A"
+                placeholderTextColor="#A0A8C0"
                 multiline
                 className="text-white text-base px-5 py-5"
                 style={mixedStyle({
@@ -209,49 +237,52 @@ export const HomeScreenContent = ({
                       disabled={enhancing || !welcomeInput.trim()}
                       className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl"
                       style={{
-                        backgroundColor: welcomeInput.trim() ? "rgba(124, 77, 255, 0.15)" : "rgba(255,255,255,0.03)",
+                        backgroundColor: welcomeInput.trim() ? "rgba(124, 77, 255, 0.2)" : "rgba(255,255,255,0.08)",
                         borderWidth: 1,
-                        borderColor: welcomeInput.trim() ? "rgba(124,77,255,0.3)" : "rgba(255,255,255,0.06)",
+                        borderColor: welcomeInput.trim() ? "rgba(124,77,255,0.4)" : "rgba(255,255,255,0.15)",
                       }}
                     >
                       {enhancing ? (
                         <ActivityIndicator size="small" color="#B388FF" />
                       ) : (
-                        <Sparkles size={13} color={welcomeInput.trim() ? "#B388FF" : "#4A4A6A"} strokeWidth={1.5} />
+                        <Sparkles size={13} color={welcomeInput.trim() ? "#B388FF" : "#A0A8C0"} strokeWidth={1.5} />
                       )}
-                      <Text style={{ fontSize: 11, fontWeight: "600", color: welcomeInput.trim() ? "#B388FF" : "#4A4A6A" }}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: welcomeInput.trim() ? "#B388FF" : "#A0A8C0" }}>
                         {enhancing ? "Improving..." : "Enhance"}
                       </Text>
                     </Pressable>
                   )}
                   <Pressable
                     onPress={() => handleCreate(welcomeInput)}
-                    disabled={!welcomeInput.trim() || !isConnected}
+                    disabled={!canGenerate}
                     className="flex-row items-center gap-2 px-4 py-2 rounded-xl"
                     style={mixedStyle({
-                      backgroundColor: welcomeInput.trim() && isConnected
-                        ? "#FFD700"
-                        : "rgba(255,255,255,0.04)",
-                      ...(welcomeInput.trim() && isConnected && Platform.OS === "web"
+                      backgroundColor: canGenerate ? "#FFD700" : "rgba(255,255,255,0.1)",
+                      cursor: canGenerate ? "pointer" : "not-allowed",
+                      ...(canGenerate && Platform.OS === "web"
                         ? {
                           boxShadow: "0 0 30px rgba(255, 215, 0, 0.3)",
                         }
                         : {}),
                     })}
                   >
-                    <Zap
-                      size={13}
-                      color={welcomeInput.trim() && isConnected ? "#0A0A0A" : "#4A4A6A"}
-                      strokeWidth={2}
-                    />
+                    {isCreating ? (
+                      <ActivityIndicator size="small" color="#A0A8C0" />
+                    ) : (
+                      <Zap
+                        size={13}
+                        color={canGenerate ? "#0A0A0A" : "#A0A8C0"}
+                        strokeWidth={2}
+                      />
+                    )}
                     <Text
                       style={{
                         fontSize: 12,
                         fontWeight: "700",
-                        color: welcomeInput.trim() && isConnected ? "#0A0A0A" : "#4A4A6A",
+                        color: canGenerate ? "#0A0A0A" : "#A0A8C0",
                       }}
                     >
-                      Generate
+                      {isCreating ? "Generating…" : "Generate"}
                     </Text>
                   </Pressable>
                 </View>
@@ -286,7 +317,8 @@ export const HomeScreenContent = ({
       <SettingsDrawer visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
     </SafeAreaView>
   </NeonBackground>
-);
+  );
+};
 
 const MoEIndicator = () => {
   const model = useSettingsStore((s) => s.model);
@@ -297,14 +329,14 @@ const MoEIndicator = () => {
     <View className="flex-row items-center gap-2">
       <View className="flex-row items-center gap-1">
         <Bot size={10} color="#7C4DFF" strokeWidth={1.5} />
-        <Text style={{ fontSize: 8, color: "#7C4DFF", fontWeight: "600" }}>
+        <Text style={{ fontSize: 9, color: "#B388FF", fontWeight: "600" }}>
           {shortName(plannerModel || model)}
         </Text>
       </View>
       <View style={{ width: 1, height: 10, backgroundColor: "rgba(255,215,0,0.2)" }} />
       <View className="flex-row items-center gap-1">
         <Code2 size={10} color="#00E5FF" strokeWidth={1.5} />
-        <Text style={{ fontSize: 8, color: "#00E5FF", fontWeight: "600" }}>
+        <Text style={{ fontSize: 9, color: "#80F0FF", fontWeight: "600" }}>
           {shortName(model)}
         </Text>
       </View>

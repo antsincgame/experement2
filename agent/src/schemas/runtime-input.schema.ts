@@ -61,10 +61,21 @@ export const ProjectParamsSchema = z.object({ name: ProjectNameSchema });
 
 export const ProjectFilePathSchema = trimmedString("path", 500)
   .refine((value) => !path.isAbsolute(value), "path must be relative")
-  .refine((value) => !value.includes("\0"), "path contains invalid characters");
+  .refine((value) => !value.includes("\0"), "path contains invalid characters")
+  .refine(
+    (value) => !value.split(/[/\\]/).some((segment) => segment === ".."),
+    "path must not contain parent directory segments"
+  );
 
 export const ProjectFileQuerySchema = z.object({
   path: ProjectFilePathSchema,
+});
+
+const MAX_FILE_WRITE_BYTES = 512_000;
+
+export const ProjectFileWriteSchema = z.object({
+  path: ProjectFilePathSchema,
+  content: z.string().max(MAX_FILE_WRITE_BYTES, "File content is too large"),
 });
 
 const RequestIdSchema = z.string().uuid("requestId must be a UUID");

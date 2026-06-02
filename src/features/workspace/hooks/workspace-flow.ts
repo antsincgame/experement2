@@ -1,4 +1,5 @@
 // Extracts async workspace orchestration into testable helpers so screens stay declarative.
+import { isCreatingRoute } from "@/shared/lib/creation-flow";
 import type { ProjectListItem } from "@/shared/lib/api-client";
 
 interface HydrateStoredProjectsOptions {
@@ -13,6 +14,7 @@ interface HydrateStoredProjectsOptions {
 }
 
 interface OpenProjectWorkspaceOptions {
+  allowEmptyFiles?: boolean;
   currentProjectName: string | null;
   projectName: string;
   switchProject: (name: string) => void;
@@ -37,6 +39,7 @@ export const hydrateStoredProjects = ({
 };
 
 export const openProjectWorkspace = async ({
+  allowEmptyFiles = false,
   currentProjectName,
   projectName,
   switchProject,
@@ -50,10 +53,16 @@ export const openProjectWorkspace = async ({
 
   switchProject(projectName);
 
+  if (isCreatingRoute(projectName)) {
+    return;
+  }
+
   try {
     const files = await fetchProjectFiles(projectName);
     if (!files || Object.keys(files).length === 0) {
-      onMissingProject();
+      if (!allowEmptyFiles) {
+        onMissingProject();
+      }
       return;
     }
 

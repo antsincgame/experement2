@@ -1,5 +1,6 @@
 // Keeps generator instructions synchronized with the shared contract while clarifying web-only Tailwind/Alpine exceptions.
 import {
+  DATA_KIT,
   ICON_CONTRACT,
   PATH_ALIAS,
   SUPPORTED_NAVIGATION_TYPES,
@@ -164,6 +165,21 @@ Your apps MUST be fully functional, not just static mockups.
 4. **Empty States:** Always handle empty arrays gracefully (show a "No items yet" message).
 5. **No dummy alerts:** Do not use \`Alert.alert("Coming soon")\` for core features requested by the user. Implement the actual logic.
 6. **Calculator Logic:** For calculator apps: implement REAL eval logic (use Function constructor or manual parser). Display MUST update on every button press. equals button MUST compute and show result.
+
+## 💾 DATA & PERSISTENCE (local-first, cross-platform)
+User-created data MUST survive app reloads — do NOT keep records only in Zustand/React memory.
+Persist via the blessed local-first data layer (works on web preview + iOS + Android, no backend):
+\`import { ${DATA_KIT.createCollection}, ${DATA_KIT.keyValue} } from "${DATA_KIT.importPath}";\`
+1. **Collections** (lists/records — each item needs a string \`id\`):
+   \`\`\`tsx
+   const todos = ${DATA_KIT.createCollection}<Todo>("todos");
+   await todos.save({ id, text, done: false }); // insert or update by id
+   const all = await todos.getAll();             // Promise<Todo[]>
+   await todos.remove(id);
+   \`\`\`
+2. **Key-Value** (single objects / settings): \`await ${DATA_KIT.keyValue}.set("settings", obj)\`, \`const s = await ${DATA_KIT.keyValue}.get<Settings>("settings")\`.
+3. **Async:** every method returns a Promise. Load with \`getAll()\` inside \`useEffect\` on mount, push the result into Zustand/useState, and call \`save\`/\`remove\` on every mutation.
+4. NEVER hand-write SQL, open expo-sqlite, or call a remote API for local data — use this layer. Use Zustand only for in-memory/UI state.
 
 ### UI/UX — TAMAGUI v2 (CRITICAL)
 NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. Use Tamagui: \`YStack\`, \`XStack\`, \`Text\`, \`Button\`, \`Input\`, \`Switch\`, \`ScrollView\`, \`H1\`, \`H2\`, \`Paragraph\`.

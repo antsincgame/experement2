@@ -1,3 +1,4 @@
+// Darker gradient + scrim overlay so text stays readable on web.
 import { View, Platform } from "react-native";
 import type { ReactNode } from "react";
 
@@ -13,13 +14,20 @@ const GRADIENT_STYLES = {
     backgroundSize: "200% 200%",
   },
   medium: {
-    backgroundImage:
-      "linear-gradient(135deg, #0A0A0A 0%, rgba(0,229,255,0.08) 25%, #0D0D1A 50%, rgba(255,215,0,0.06) 75%, #0A0A0A 100%)",
+    backgroundImage: [
+      "radial-gradient(ellipse at 15% 40%, rgba(0,229,255,0.07) 0%, transparent 55%)",
+      "radial-gradient(ellipse at 85% 60%, rgba(124,77,255,0.06) 0%, transparent 55%)",
+      "linear-gradient(135deg, #0A0A0A 0%, #0D0D1A 50%, #0A0A0A 100%)",
+    ].join(", "),
     backgroundSize: "200% 200%",
   },
   vivid: {
-    backgroundImage:
-      "linear-gradient(135deg, #0A0A0A 0%, rgba(0,229,255,0.15) 25%, rgba(124,77,255,0.12) 50%, rgba(255,215,0,0.1) 75%, #0A0A0A 100%)",
+    backgroundImage: [
+      "radial-gradient(ellipse at 10% 20%, rgba(0,229,255,0.1) 0%, transparent 50%)",
+      "radial-gradient(ellipse at 90% 80%, rgba(124,77,255,0.08) 0%, transparent 50%)",
+      "radial-gradient(ellipse at 50% 50%, rgba(255,215,0,0.05) 0%, transparent 45%)",
+      "linear-gradient(160deg, #0A0A0A 0%, #0D0D1A 45%, #0A0A0A 100%)",
+    ].join(", "),
     backgroundSize: "200% 200%",
   },
 };
@@ -51,11 +59,19 @@ const NeonBackground = ({
         style={{
           position: "absolute",
           inset: 0,
+          backgroundColor: "rgba(10, 10, 10, 0.45)",
+          zIndex: 1,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
           opacity: 0.03,
           backgroundImage:
             'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAE0lEQVQI12P4z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg=")',
           backgroundSize: "64px 64px",
-          zIndex: 1,
+          zIndex: 2,
         }}
       />
       <View style={{ flex: 1, zIndex: 2, position: "relative" }}>

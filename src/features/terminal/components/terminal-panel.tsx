@@ -1,18 +1,32 @@
+// Terminal under the code view: shows a code-free, human-readable activity log (phase + per-file
+// meaning). Raw code never appears here — it lives only in the code generator (CodeViewer).
 import { useRef, useEffect } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { Terminal } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
 import { mixedStyle } from "@/shared/lib/web-styles";
+import { buildTerminalLines, type TerminalLineTone } from "@/shared/lib/generation-narration";
+
+const TONE_COLOR: Record<TerminalLineTone, string> = {
+  phase: "#FFD700",
+  active: "#00E5FF",
+  done: "#00FF88",
+  muted: "#7C84A8",
+};
 
 const TerminalPanel = () => {
   const scrollRef = useRef<ScrollView>(null);
-  const streamingContent = useProjectStore((s) => s.streamingContent);
+  const status = useProjectStore((s) => s.status);
+  const files = useProjectStore((s) => s.generationFiles);
+  const plan = useProjectStore((s) => s.plan);
   const generationProgress = useProjectStore((s) => s.generationProgress);
   const currentFile = useProjectStore((s) => s.currentGeneratingFile);
 
+  const lines = buildTerminalLines(status, files, plan);
+
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
-  }, [streamingContent]);
+  }, [lines.length]);
 
   return (
     <View style={{
@@ -26,7 +40,7 @@ const TerminalPanel = () => {
         <View className="flex-row items-center gap-2">
           <Terminal size={11} color="#00E5FF" strokeWidth={1.5} />
           <Text style={{ color: "#00E5FF", fontSize: 9, letterSpacing: 2, fontWeight: "600", textTransform: "uppercase" }}>
-            Terminal
+            Activity
           </Text>
         </View>
         {currentFile && (
@@ -50,23 +64,21 @@ const TerminalPanel = () => {
       )}
 
       <ScrollView ref={scrollRef} style={{ height: 120 }} contentContainerStyle={{ padding: 12 }}>
-        {streamingContent ? (
-          <Text style={{ color: "#00E5FF", fontFamily: "monospace", fontSize: 11, lineHeight: 18 }}>
-            {streamingContent.split("\n").map((line, i) => {
-              const lower = line.toLowerCase();
-              const isError = (lower.includes("error:") || lower.includes("error ") || lower.startsWith("error")) && !lower.includes("0 error");
-              const isRag = line.includes("🧠 RAG");
-              const isHealing = line.includes("🔄 Auto-Healing");
-              const isMoe = line.includes("[MoE]");
-              const isRetryOk = lower.includes("retry") && lower.includes("ok");
-              const lineColor = isError ? "#FF3366" : isMoe ? "#FFD700" : isRag ? "#B388FF" : isHealing ? "#00FF88" : isRetryOk ? "#00E5FF" : undefined;
-              return (
-                <Text key={i} style={{ color: lineColor, fontWeight: isRag || isHealing || isMoe ? "700" : undefined }}>
-                  {line}{"\n"}
-                </Text>
-              );
-            })}
-          </Text>
+        {lines.length > 0 ? (
+          lines.map((line) => (
+            <Text
+              key={line.key}
+              style={{
+                color: TONE_COLOR[line.tone],
+                fontFamily: "monospace",
+                fontSize: 11,
+                lineHeight: 18,
+                fontWeight: line.tone === "phase" ? "700" : "400",
+              }}
+            >
+              {line.text}
+            </Text>
+          ))
         ) : (
           <Text style={{ color: "#4A4A6A", fontFamily: "monospace", fontSize: 11 }}>
             $ awaiting commands...

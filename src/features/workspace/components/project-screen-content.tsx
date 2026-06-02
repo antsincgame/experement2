@@ -7,6 +7,9 @@ import SettingsDrawer from "@/features/settings/components/settings-drawer";
 import LotusToast from "@/shared/components/effects/lotus-toast";
 import NeonBackground from "@/shared/components/effects/neon-background";
 import WorkspaceLayout from "@/features/workspace/components/workspace-layout";
+import { isCreatingRoute } from "@/shared/lib/creation-flow";
+import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
+import type { ProjectStatus } from "@/shared/schemas/ws-messages";
 import { mixedStyle } from "@/shared/lib/web-styles";
 import type { FileNode, ProjectEntry } from "@/stores/project-store";
 
@@ -34,7 +37,7 @@ interface ProjectScreenContentProps {
   settingsVisible: boolean;
   setShowLotusToast: (value: boolean) => void;
   showLotusToast: boolean;
-  status: string;
+  status: ProjectStatus;
   terminalVisible: boolean;
 }
 
@@ -89,7 +92,9 @@ export const ProjectScreenContent = ({
             <Zap size={12} color="#0A0A0A" strokeWidth={2} />
           </View>
           <Text className="text-white text-sm font-semibold">
-            {routeProjectName ?? "App Factory"}
+            {isCreatingRoute(routeProjectName)
+              ? "New project"
+              : routeProjectName ?? "App Factory"}
           </Text>
           <View
             className="w-2 h-2 rounded-full"
@@ -102,7 +107,7 @@ export const ProjectScreenContent = ({
             }}
           />
           <Text className="text-ink-faint text-[10px] uppercase tracking-wider font-medium">
-            {status}
+            {GENERATION_STATUS_LABELS[status] ?? status}
           </Text>
           {currentGeneratingFile && !["idle", "ready", "error"].includes(status) && (
             <Text style={{ fontSize: 10, color: "#00E5FF", fontFamily: "monospace", marginLeft: 6 }} numberOfLines={1}>

@@ -23,6 +23,7 @@ import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { validateGeneratedProject, validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
+import { waitForMetroReady } from "./metro-ready.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
 import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
@@ -255,10 +256,22 @@ export const createProject = async (
   try {
     return await _createProjectInner(options, ctx);
   } catch (error) {
+    const scope = options.requestId ? { requestId: options.requestId } : {};
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const isLlmDown =
+      rawMessage.includes("LLM_SERVER_DOWN") ||
+      rawMessage.includes("LLM_NETWORK_ERROR");
+    // Surface the actual failure reason to the chat before flipping status,
+    // otherwise the client only sees a bare "error" with no explanation.
+    ctx.broadcast({
+      type: "system_error",
+      error: isLlmDown ? `AI server disconnected: ${rawMessage}` : rawMessage,
+      ...scope,
+    });
     ctx.broadcast({
       type: "status",
       status: "error",
-      ...(options.requestId ? { requestId: options.requestId } : {}),
+      ...scope,
     });
     throw error;
   }
@@ -340,7 +353,7 @@ const _createProjectInner = async (
     plan.extraDependencies
   );
 
-  emitOperation({ type: "scaffold_complete" });
+  emitOperation({ type: "scaffold_complete", projectName: projectSlug });
 
   // ── Step 3: Generate files ────────────────────────────
   emitOperation({ type: "status", status: "generating" });
@@ -649,15 +662,9 @@ const _createProjectInner = async (
   }
 
   if (buildSuccess && expoPort) {
-    // Wait for Metro to actually accept requests before announcing preview
-    let metroReady = false;
-    for (let i = 0; i < 40; i++) {
-      try {
-        const resp = await fetch(`http://127.0.0.1:${expoPort}`, { signal: AbortSignal.timeout(2000) });
-        if (resp.ok) { metroReady = true; break; }
-      } catch { /* not ready */ }
-      await new Promise((r) => setTimeout(r, 750));
-    }
+    // Wait for Metro to serve AND compile the bundle before announcing preview,
+    // so the iframe renders immediately instead of showing a blank page.
+    const metroReady = await waitForMetroReady(expoPort, 60, fetch);
     if (metroReady) {
       setPreviewPort(projectSlug, expoPort);
       emitBuildScoped(buildId, {

@@ -6,6 +6,12 @@ import { createUserMessage } from "@/features/chat/schemas/message.schema";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { apiClient } from "@/shared/lib/api-client";
 import { fetchProjectFiles, useProjectStore } from "@/stores/project-store";
+import {
+  CREATING_PROJECT_SLUG,
+  isCreatingRoute,
+  isCreationSession,
+} from "@/shared/lib/creation-flow";
+import { isGenerationActive } from "@/shared/lib/generation-status";
 import { openProjectWorkspace } from "./workspace-flow";
 
 export const useProjectScreenController = (routeProjectName: string | null) => {
@@ -28,11 +34,14 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const closeFile = useProjectStore((state) => state.closeFile);
   const removeProject = useProjectStore((state) => state.removeProject);
   const setActiveFile = useProjectStore((state) => state.setActiveFile);
+  const setPendingProjectName = useProjectStore((state) => state.setPendingProjectName);
+  const pendingProjectName = useProjectStore((state) => state.pendingProjectName);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
   const previousPreviewStatus = useRef(previewStatus);
   const previousPreviewBuildId = useRef<string | null>(previewBuildId);
   const activeProjectRef = useRef<string | null>(null);
+  const previewRequestedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const hasFreshPreview = previewBuildId !== null && previewBuildId !== previousPreviewBuildId.current;
@@ -58,18 +67,65 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
 
     activeProjectRef.current = routeProjectName;
 
+    const storeSnapshot = useProjectStore.getState();
+    const requestedPreviews = previewRequestedRef.current;
     void openProjectWorkspace({
-      currentProjectName: useProjectStore.getState().projectName,
+      allowEmptyFiles:
+        isCreatingRoute(routeProjectName) ||
+        isCreationSession({
+          projectName: storeSnapshot.projectName,
+          pendingProjectName: storeSnapshot.pendingProjectName,
+        }) ||
+        isGenerationActive(storeSnapshot.status),
+      currentProjectName: storeSnapshot.projectName,
       projectName: routeProjectName,
-      switchProject: useProjectStore.getState().switchProject,
+      switchProject: storeSnapshot.switchProject,
       fetchProjectFiles,
-      startPreview,
+      startPreview: (name) => {
+        if (requestedPreviews.has(name)) {
+          return;
+        }
+        requestedPreviews.add(name);
+        startPreview(name);
+      },
       onMissingProject: () => {
         activeProjectRef.current = null;
         router.replace("/");
       },
     });
   }, [routeProjectName, router, startPreview]);
+
+  // After planning resolves the real slug, replace the temporary /project/__creating__ route.
+  useEffect(() => {
+    if (!projectName || isCreatingRoute(projectName)) {
+      return;
+    }
+
+    if (routeProjectName === projectName) {
+      return;
+    }
+
+    if (routeProjectName === CREATING_PROJECT_SLUG || isCreationSession({
+      projectName: routeProjectName,
+      pendingProjectName,
+    })) {
+      activeProjectRef.current = projectName;
+      router.replace(`/project/${encodeURIComponent(projectName)}`);
+    }
+  }, [pendingProjectName, projectName, routeProjectName, router]);
+
+  // On generation failure during creation, keep the user in the workspace so the
+  // error message stays visible in chat. Only clear the in-flight marker so the
+  // chat input re-enables and a retry can be started — never silently bounce home.
+  useEffect(() => {
+    if (
+      status === "error" &&
+      isCreationSession({ projectName, pendingProjectName }) &&
+      pendingProjectName
+    ) {
+      setPendingProjectName(null);
+    }
+  }, [pendingProjectName, projectName, setPendingProjectName, status]);
 
   const handleChatSend = useCallback((text: string) => {
     addMessage(createUserMessage(text));

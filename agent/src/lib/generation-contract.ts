@@ -26,6 +26,18 @@ export const UI_KIT = {
   iconComponent: "Icon",
 } as const;
 
+/**
+ * Scaffolded local-first data layer (see scaffold-db.ts). Generated apps persist
+ * user data through this one stable surface instead of hand-writing SQL or remote
+ * calls. Backed by AsyncStorage, so persistence works on web preview + native and
+ * the instant preview keeps running.
+ */
+export const DATA_KIT = {
+  importPath: "@/services/db",
+  createCollection: "createCollection",
+  keyValue: "kv",
+} as const;
+
 export const VECTOR_ICON_IMPORT_PATHS: Record<string, string> = {
   Ionicons: "@expo/vector-icons/Ionicons",
   MaterialIcons: "@expo/vector-icons/MaterialIcons",

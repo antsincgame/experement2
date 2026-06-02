@@ -59,11 +59,16 @@ describe("isFixableProjectFile", () => {
     expect(isFixableProjectFile("src/hooks/useThing.ts")).toBe(true);
   });
 
-  it("rejects the scaffolded UI kit, non-project paths, and non-TS files", () => {
+  it("rejects the scaffolded UI kit, the data layer, non-project paths, and non-TS files", () => {
     expect(isFixableProjectFile("src/ui/Icon.tsx")).toBe(false);
     expect(isFixableProjectFile("src/ui/index.ts")).toBe(false);
+    expect(isFixableProjectFile("src/services/db.ts")).toBe(false);
     expect(isFixableProjectFile("node_modules/tamagui/index.ts")).toBe(false);
     expect(isFixableProjectFile("app/styles.css")).toBe(false);
+  });
+
+  it("still auto-fixes app-authored service files other than the blessed db layer", () => {
+    expect(isFixableProjectFile("src/services/api.ts")).toBe(true);
   });
 });
 

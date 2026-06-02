@@ -328,6 +328,48 @@ export const getActivePort = (projectName: string): number | null => {
 export const isRunning = (projectName: string): boolean =>
   activeProcesses.has(projectName);
 
+// Kills preview bundlers left behind by a previous agent run (e.g. after a
+// dev-server restart). Matches only node processes that launched Expo from the
+// workspace directory, so the App Factory web shell (started from the repo root)
+// is never affected.
+export const killOrphanedPreviewProcesses = (): void => {
+  try {
+    if (isWindows) {
+      const script =
+        "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | " +
+        "Where-Object { $_.CommandLine -match 'workspace' -and $_.CommandLine -match 'expo' } | " +
+        "ForEach-Object { $_.ProcessId }";
+      const result = spawnSync(
+        "powershell",
+        ["-NoProfile", "-NonInteractive", "-Command", script],
+        { encoding: "utf8", windowsHide: true, timeout: 10_000 }
+      );
+      const pids = (result.stdout ?? "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => /^\d+$/.test(line));
+      for (const pid of pids) {
+        try {
+          runWindowsTaskkill(Number(pid));
+        } catch {
+          // Process may have already exited; ignore.
+        }
+      }
+      if (pids.length > 0) {
+        console.log(`[ProcessManager] Cleaned up ${pids.length} orphaned preview process(es)`);
+      }
+      return;
+    }
+
+    // Unix: kill node processes running Expo from any workspace path.
+    spawnSync("pkill", ["-f", "workspace/.*expo.*start"], { timeout: 10_000 });
+  } catch (err) {
+    console.warn(
+      `[ProcessManager] Orphan cleanup failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+};
+
 export const killAll = (): void => {
   for (const [name, managed] of activeProcesses) {
     try {

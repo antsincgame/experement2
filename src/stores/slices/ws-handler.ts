@@ -1,6 +1,10 @@
 // Maps validated WebSocket events onto store actions so project lifecycle and preview runtime stay in sync.
+import { isCreationSession, isPendingCreation } from "@/shared/lib/creation-flow";
+import { createEmptyChat, migrateCreatingChatToProject } from "@/stores/project-store.helpers";
 import {
   createAssistantMessage,
+  createReasoningMessage,
+  createDiffMessage,
   createSystemMessage,
   createErrorMessage,
 } from "@/features/chat/schemas/message.schema";
@@ -38,7 +42,12 @@ const matchesActiveProject = (
   }
 
   const messageProjectName = getMessageProjectName(msg);
-  const currentProjectName = store().projectName;
+  const state = store();
+  const currentProjectName = state.projectName;
+
+  if (isCreationSession(state)) {
+    return true;
+  }
 
   if (!currentProjectName) {
     return true;
@@ -110,6 +119,9 @@ export const createWsHandler = (
         break;
       }
       store.setStatus(msg.status);
+      if (msg.status === "planning") {
+        store.resetGenerationFiles();
+      }
       if (msg.previewStatus) {
         applyPreviewStatus(store, msg.previewStatus, {
           buildId: msg.buildId ?? null,
@@ -134,19 +146,51 @@ export const createWsHandler = (
       break;
     }
 
-    case "plan_complete":
+    case "plan_complete": {
       if (!matchesActiveProject(get, msg)) break;
-      set({ plan: msg.plan });
+      const pending = get().pendingProjectName;
+      const plan = msg.plan;
+      const planName = typeof plan.name === "string" ? plan.name : null;
+      const displayName =
+        typeof plan.displayName === "string" ? plan.displayName : planName;
+
+      if (isPendingCreation(pending) && planName) {
+        const current = get();
+        const projectChats = migrateCreatingChatToProject(
+          current.projectChats,
+          planName,
+          current
+        );
+        const nextChat = projectChats[planName] ?? createEmptyChat();
+        set({
+          plan,
+          projectName: planName,
+          projectChats,
+          messages: nextChat.messages,
+          streamingContent: nextChat.streamingContent,
+        });
+        store.addProject({
+          name: planName,
+          displayName: displayName ?? planName,
+          status: current.status,
+          port: null,
+          createdAt: Date.now(),
+        });
+      } else {
+        set({ plan: msg.plan });
+      }
+
       store.clearStreamingContent();
       store.addMessage(createSystemMessage("Plan created [ok]", false));
       log({ level: "info", source: "pipeline", message: "Plan complete" });
       break;
+    }
 
     case "scaffold_complete": {
       const projectName = msg.projectName;
       const pending = get().pendingProjectName;
-      // Only switch if user is actively creating (pending="__creating__" accepts any, or exact match)
-      if (pending && pending !== "__creating__" && pending !== projectName) {
+      // Only switch if user is actively creating (pending creation accepts any, or exact match)
+      if (pending && !isPendingCreation(pending) && pending !== projectName) {
         log({ level: "warn", source: "pipeline", message: `Ignoring scaffold_complete for ${projectName} (pending: ${pending})` });
         break;
       }
@@ -161,6 +205,7 @@ export const createWsHandler = (
       });
       store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
+      void fetchProjectFiles(projectName);
       break;
     }
 
@@ -170,6 +215,7 @@ export const createWsHandler = (
         generationProgress: msg.progress,
         currentGeneratingFile: msg.filepath,
       });
+      store.startGenerationFile(msg.filepath);
       break;
 
     case "code_chunk": {
@@ -177,12 +223,14 @@ export const createWsHandler = (
       const codeStatus = get().status;
       if (codeStatus === "generating" || codeStatus === "analyzing") {
         store.appendStreamingContent(msg.chunk);
+        store.appendGenerationCode(msg.chunk);
       }
       break;
     }
 
     case "file_complete":
       if (!matchesActiveProject(get, msg)) break;
+      store.completeGenerationFile(msg.filepath);
       store.addMessage(createSystemMessage(`File created: ${msg.filepath}`, true));
       log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
       break;
@@ -262,7 +310,7 @@ export const createWsHandler = (
       if (!matchesActiveProject(get, msg)) {
         break;
       }
-      store.addMessage(createAssistantMessage(msg.content));
+      store.addMessage(createReasoningMessage(msg.content));
       break;
 
     case "analysis_complete": {
@@ -270,7 +318,7 @@ export const createWsHandler = (
         break;
       }
       const thinking = msg.thinking;
-      if (thinking) store.addMessage(createAssistantMessage(thinking));
+      if (thinking) store.addMessage(createReasoningMessage(thinking));
       const { files } = msg;
       if (files?.length) store.addMessage(createSystemMessage(`Analyzing: ${files.join(", ")}`, true));
       break;
@@ -281,13 +329,8 @@ export const createWsHandler = (
         break;
       }
       const { filepath, before, after } = msg;
-      // Show compact diff in chat
-      const addedLines = after.split("\n").length - before.split("\n").length;
-      const sign = addedLines >= 0 ? "+" : "";
-      store.addMessage(createSystemMessage(
-        `📝 ${filepath} (${sign}${addedLines} lines)`,
-        false,
-      ));
+      store.addMessage(createDiffMessage(filepath, before, after));
+      store.setFileContent(filepath, after);
       break;
     }
 

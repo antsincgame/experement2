@@ -76,12 +76,31 @@ export const createProjectWorkspaceSlice = (set: ProjectStoreSet) => ({
   setFileContent: (path: string, content: string) =>
     set((state) => {
       const fileContents = buildTrimmedFileContents(state.fileContents, path, content);
+      const { [path]: _removed, ...fileDrafts } = state.fileDrafts;
       return {
         fileContents,
+        fileDrafts,
         projectChats: saveProjectChatPatch(state.projectChats, state.projectName, {
           fileContents,
         }),
       };
+    }),
+
+  setFileDraft: (path: string, content: string) =>
+    set((state) => ({
+      fileDrafts: { ...state.fileDrafts, [path]: content },
+    })),
+
+  revertFileDraft: (path: string) =>
+    set((state) => {
+      const { [path]: _removed, ...fileDrafts } = state.fileDrafts;
+      return { fileDrafts };
+    }),
+
+  clearFileDraft: (path: string) =>
+    set((state) => {
+      const { [path]: _removed, ...fileDrafts } = state.fileDrafts;
+      return { fileDrafts };
     }),
 
   setPreview: (previewUrl: string | null, previewPort: number | null) =>

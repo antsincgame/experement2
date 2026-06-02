@@ -1,47 +1,42 @@
 import { useRef, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
-import { MessageSquare, Cpu, FileCode } from "lucide-react-native";
+import { MessageSquare } from "lucide-react-native";
+import { GENERATION_STATUS_LABELS, isGenerationActive } from "@/shared/lib/generation-status";
 import { useProjectStore } from "@/stores/project-store";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
+import GenerationActivity from "./generation-activity";
 
 interface ChatPanelProps {
   onSend: (text: string) => void;
   onAbort: () => void;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  planning: "Planning app architecture...",
-  scaffolding: "Scaffolding project...",
-  generating: "Generating code...",
-  building: "Building with Metro...",
-  analyzing: "Analyzing codebase...",
-  validating: "Running quality checks...",
-};
-
 const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
   const scrollRef = useRef<ScrollView>(null);
   const messages = useProjectStore((s) => s.messages);
   const status = useProjectStore((s) => s.status);
-  const streamingContent = useProjectStore((s) => s.streamingContent);
-  const generationProgress = useProjectStore((s) => s.generationProgress);
-  const currentFile = useProjectStore((s) => s.currentGeneratingFile);
+  const generationFiles = useProjectStore((s) => s.generationFiles);
 
-  const isGenerating = !["idle", "ready", "error"].includes(status);
+  const isGenerating = isGenerationActive(status);
   const visibleMessages = messages.filter((m) => !m.isHidden);
-  const hasStreaming = isGenerating && (streamingContent || currentFile);
+  const hasActivity = isGenerating || generationFiles.length > 0;
+  const streamingFile = generationFiles.find((f) => f.status === "streaming");
+  const activitySignature = streamingFile
+    ? `${streamingFile.path}:${streamingFile.code.length}`
+    : `${status}:${generationFiles.length}`;
   const lastVisibleMessage = visibleMessages.at(-1);
   const lastVisibleSignature = lastVisibleMessage
     ? `${lastVisibleMessage.id}:${lastVisibleMessage.content.length}:${lastVisibleMessage.status}`
     : "none";
 
-  // Auto-scroll on new messages AND streaming content
+  // Auto-scroll on new messages AND live generation output.
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 50);
     return () => clearTimeout(timer);
-  }, [lastVisibleSignature, hasStreaming, currentFile]);
+  }, [lastVisibleSignature, activitySignature]);
 
   const handleFixError = useCallback(
     (errorContent: string, errorDetails?: string, errorFile?: string) => {
@@ -72,7 +67,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
           <View className="flex-row items-center gap-1.5">
             <ActivityIndicator size={10} color="#00E5FF" />
             <Text style={{ fontSize: 9, color: "#00E5FF", fontWeight: "600" }}>
-              {STATUS_LABELS[status] ?? status}
+              {GENERATION_STATUS_LABELS[status] ?? status}
             </Text>
           </View>
         )}
@@ -84,7 +79,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
         className="flex-1"
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 8 }}
       >
-        {visibleMessages.length === 0 && !hasStreaming && (
+        {visibleMessages.length === 0 && !hasActivity && (
           <View className="items-center justify-center py-20 px-6">
             <View
               className="w-12 h-12 rounded-2xl items-center justify-center mb-3"
@@ -103,81 +98,8 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
           <ChatMessage key={msg.id} message={msg} onFixError={handleFixError} />
         ))}
 
-        {/* Streaming bubble — live AI output */}
-        {hasStreaming && (
-          <View className="px-4 py-3 animate-fade-in">
-            {/* AI header */}
-            <View className="flex-row items-center gap-2 mb-1.5">
-              <View
-                className="w-6 h-6 rounded-lg items-center justify-center"
-                style={{
-                  backgroundColor: "rgba(0, 229, 255, 0.1)",
-                  borderWidth: 1,
-                  borderColor: "rgba(0, 229, 255, 0.2)",
-                }}
-              >
-                <Cpu size={12} color="#00E5FF" strokeWidth={1.5} />
-              </View>
-              <Text className="text-xs font-semibold" style={{ color: "#00E5FF" }}>
-                AI Working
-              </Text>
-              <ActivityIndicator size={10} color="#00E5FF" />
-            </View>
-
-            {/* Progress bar */}
-            {generationProgress > 0 && generationProgress < 1 && (
-              <View className="ml-8 mb-2">
-                <View className="flex-row items-center gap-2 mb-1">
-                  {currentFile && (
-                    <View className="flex-row items-center gap-1 flex-1">
-                      <FileCode size={10} color="#7C4DFF" strokeWidth={1.5} />
-                      <Text style={{ fontSize: 10, color: "#7C4DFF", fontFamily: "monospace" }} numberOfLines={1}>
-                        {currentFile}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={{ fontSize: 9, color: "#8888AA", fontWeight: "600" }}>
-                    {Math.round(generationProgress * 100)}%
-                  </Text>
-                </View>
-                <View
-                  className="rounded-full overflow-hidden"
-                  style={{ height: 3, backgroundColor: "rgba(255,255,255,0.06)" }}
-                >
-                  <View
-                    style={{
-                      height: "100%",
-                      width: `${generationProgress * 100}%`,
-                      backgroundColor: "#00E5FF",
-                      borderRadius: 999,
-                    }}
-                  />
-                </View>
-              </View>
-            )}
-
-            {/* Streaming text content */}
-            {streamingContent ? (
-              <View className="ml-8">
-                <Text style={{ color: "#4A4A6A", fontSize: 12, fontFamily: "monospace", lineHeight: 18 }} numberOfLines={8}>
-                  {streamingContent.slice(-500)}
-                </Text>
-              </View>
-            ) : currentFile ? (
-              <View className="ml-8">
-                <Text style={{ fontSize: 12, color: "#8888AA", fontStyle: "italic" }}>
-                  Processing {currentFile}...
-                </Text>
-              </View>
-            ) : (
-              <View className="ml-8">
-                <Text style={{ fontSize: 12, color: "#8888AA", fontStyle: "italic" }}>
-                  {STATUS_LABELS[status] ?? "Working..."}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+        {/* Live "watch it build" panel — phases + per-file streaming code */}
+        <GenerationActivity />
       </ScrollView>
 
       <ChatInput onSend={onSend} onAbort={onAbort} isGenerating={isGenerating} />
