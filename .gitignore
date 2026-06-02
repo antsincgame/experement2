@@ -7,6 +7,8 @@ test-results/
 playwright-report/
 workspace/e2e-existing-project/
 workspace/vitest-*/
+# Regenerated at runtime by initTemplateCache (node_modules already ignored above)
+workspace/template_cache/src/
 tools/e2e-results.json
 e2e/*.json
 e2e/*.md
