@@ -183,7 +183,10 @@ export const npmInstall = async (
     const child = spawn(npmCmd, args, {
       cwd: projectPath,
       shell: isWindows,
-      stdio: ["ignore", "pipe", "pipe"],
+      // stdout is ignored on purpose: npm progress output can exceed the ~64KB
+      // OS pipe buffer, and nothing drains stdout here, which would deadlock the
+      // child until the timeout. Failures are reported via stderr below.
+      stdio: ["ignore", "ignore", "pipe"],
     });
 
     const timeout = setTimeout(() => {

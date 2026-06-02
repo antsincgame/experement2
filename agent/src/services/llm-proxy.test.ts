@@ -39,16 +39,16 @@ describe("llm-proxy model caching", () => {
     await expect(
       completeNonStreaming(
         [{ role: "user", content: "hello" }],
-        { lmStudioUrl: "http://lm-studio.test" }
+        { lmStudioUrl: "http://127.0.0.1:1234" }
       )
     ).rejects.toThrow("No LLM model available");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    clearModelCache("http://lm-studio.test");
+    clearModelCache("http://127.0.0.1:1234");
 
     await completeNonStreaming(
       [{ role: "user", content: "hello again" }],
-      { lmStudioUrl: "http://lm-studio.test" }
+      { lmStudioUrl: "http://127.0.0.1:1234" }
     );
 
     const secondCompletionBody = JSON.parse(

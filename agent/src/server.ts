@@ -14,6 +14,7 @@ import {
   unregisterClient,
 } from "./lib/event-bus.js";
 import { formatZodError } from "./lib/request-validation.js";
+import { assertLlmUrl } from "./lib/llm-url.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { projectRouter } from "./routes/project.js";
 import { llmRouter } from "./routes/llm.js";
@@ -618,7 +619,19 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
 // в”Ђв”Ђ LM Studio Health Check в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 export const updateLlmServerUrl = (url: string): void => {
-  currentLlmServerUrl = url.trim() || DEFAULT_LM_STUDIO_URL;
+  const trimmed = url.trim();
+  if (!trimmed) {
+    currentLlmServerUrl = DEFAULT_LM_STUDIO_URL;
+    return;
+  }
+  try {
+    currentLlmServerUrl = assertLlmUrl(trimmed);
+  } catch (err) {
+    // Reject SSRF-style URLs from clients; keep the current (trusted) value.
+    console.warn(
+      `[server] Ignoring disallowed LLM URL: ${err instanceof Error ? err.message : err}`
+    );
+  }
 };
 
 const checkLlmServer = async (): Promise<void> => {

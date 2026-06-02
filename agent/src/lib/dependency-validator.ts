@@ -2,6 +2,11 @@ import { SAFE_EXTRA_DEPENDENCIES, TEMPLATE_PACKAGE_DEPENDENCIES } from "./genera
 
 const REGISTRY_TIMEOUT_MS = 5000;
 
+// npm package naming rules: optional @scope/, lowercase-ish, no leading dash.
+// Rejecting non-matching names BEFORE the registry check blocks CLI-flag
+// injection (e.g. "--save-dev", "--registry=...") into `npm install`.
+const VALID_PACKAGE_NAME = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
+
 const checkNpmPackageExists = async (packageName: string): Promise<boolean> => {
   try {
     const controller = new AbortController();
@@ -37,7 +42,7 @@ export const validateDependencies = async (
   for (const dep of deps) {
     const name = dep.replace(/@[\^~]?\d.*$/, "").trim();
 
-    if (!name || name.length < 2) {
+    if (!name || name.length < 2 || name.length > 214 || !VALID_PACKAGE_NAME.test(name)) {
       rejected.push(dep);
       continue;
     }

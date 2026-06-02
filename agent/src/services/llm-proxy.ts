@@ -2,6 +2,7 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
+import { assertLlmUrl } from "../lib/llm-url.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
@@ -124,12 +125,12 @@ export const streamCompletion = async (
     taskId?: string;
   } = {}
 ): Promise<AsyncGenerator<string>> => {
+  const baseUrl = assertLlmUrl(options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL);
+
   if (activeRequestCount >= MAX_CONCURRENT_LLM_REQUESTS) {
     throw new Error(`Too many concurrent LLM requests (max ${MAX_CONCURRENT_LLM_REQUESTS})`);
   }
   activeRequestCount++;
-
-  const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
   const controller = new AbortController();
   const taskId = options.taskId ?? crypto.randomUUID();
 
@@ -320,7 +321,7 @@ export const completeNonStreaming = async (
     lmStudioUrl?: string;
   } = {}
 ): Promise<string> => {
-  const baseUrl = options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL;
+  const baseUrl = assertLlmUrl(options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL);
   const resolvedModel = options.model || await getDefaultModel(baseUrl);
 
   if (!resolvedModel) {

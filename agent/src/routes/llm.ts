@@ -3,6 +3,7 @@ import { Router } from "express";
 import { parseOrRespond } from "../lib/request-validation.js";
 import { LlmEnhanceBodySchema } from "../schemas/runtime-input.schema.js";
 import { handleLLMProxyRoute, completeNonStreaming, getActiveRequestCount } from "../services/llm-proxy.js";
+import { assertLlmUrl } from "../lib/llm-url.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
@@ -90,9 +91,18 @@ llmRouter.get("/health", async (_req, res) => {
 });
 
 llmRouter.get("/models", async (req, res) => {
-  const baseUrl = typeof req.query.url === "string" && req.query.url.trim()
-    ? req.query.url.trim().replace(/\/+$/, "")
+  const rawUrl = typeof req.query.url === "string" && req.query.url.trim()
+    ? req.query.url.trim()
     : DEFAULT_LM_STUDIO_URL;
+  let baseUrl: string;
+  try {
+    baseUrl = assertLlmUrl(rawUrl);
+  } catch (err) {
+    res.json({
+      data: { models: [], status: "error", error: err instanceof Error ? err.message : "Invalid URL" },
+    });
+    return;
+  }
 
   // Return cached result during active generation to avoid hammering LM Studio
   if (
