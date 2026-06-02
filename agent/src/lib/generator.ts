@@ -24,6 +24,7 @@ import {
   VECTOR_ICON_IMPORT_PATHS,
 } from "./generation-contract.js";
 import { validateAppPlan } from "./project-validator.js";
+import { collectStream } from "./stream-collect.js";
 
 interface GeneratorOptions {
   projectName: string;
@@ -444,7 +445,6 @@ Generate the complete code for: ${fileSpec.path}`;
         },
       ];
 
-      let retryCode = "";
       const retryGen = await streamCompletion(retryMessages, {
         temperature: temperature ?? 0.3,
         maxTokens: maxTokens ?? 65536,
@@ -452,9 +452,7 @@ Generate the complete code for: ${fileSpec.path}`;
         model,
       });
 
-      for await (const chunk of retryGen) {
-        retryCode += chunk;
-      }
+      let retryCode = await collectStream(retryGen);
 
       // Strip markdown fences from continuation
       retryCode = retryCode
@@ -514,8 +512,6 @@ RULES:
     },
   ];
 
-  let fixedCode = "";
-
   const generator = await streamCompletion(messages, {
     temperature: 0.2,
     maxTokens: options.maxTokens ?? 65536,
@@ -523,26 +519,9 @@ RULES:
     model: options.model,
   });
 
-  for await (const chunk of generator) {
-    fixedCode += chunk;
-  }
+  let fixedCode = await collectStream(generator);
 
-  // Strip markdown fences and LLM preamble
-  fixedCode = fixedCode.trim()
-    .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
-    .replace(/\n?```\s*$/, "")
-    .trim();
-
-  // Strip any non-code preamble (LLM sometimes adds "Here is the fix:" etc)
-  const firstImport = fixedCode.indexOf("import ");
-  const firstExport = fixedCode.indexOf("export ");
-  const codeStart = Math.min(
-    firstImport >= 0 ? firstImport : Infinity,
-    firstExport >= 0 ? firstExport : Infinity,
-  );
-  if (codeStart > 0 && codeStart < Infinity) {
-    fixedCode = fixedCode.slice(codeStart);
-  }
+  fixedCode = stripCodePreamble(fixedCode);
 
   if (fixedCode.length < 10) return null;
 
@@ -612,16 +591,13 @@ Return the COMPLETE corrected file for ${filePath}.`,
     },
   ];
 
-  let fixedCode = "";
   const generator = await streamCompletion(messages, {
     temperature: 0.2,
     maxTokens: options.maxTokens ?? 65536,
     lmStudioUrl: options.lmStudioUrl,
     model: options.model,
   });
-  for await (const chunk of generator) {
-    fixedCode += chunk;
-  }
+  let fixedCode = await collectStream(generator);
 
   fixedCode = stripCodePreamble(fixedCode);
   if (fixedCode.length < 10) return false;

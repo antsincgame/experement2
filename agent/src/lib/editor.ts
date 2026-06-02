@@ -17,6 +17,7 @@ import {
 import { npmInstall } from "../services/process-manager.js";
 import { safeJsonParse } from "./json-repair.js";
 import { applySearchReplace } from "./search-replace.js";
+import { collectStream } from "./stream-collect.js";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -75,7 +76,6 @@ export const editProject = async (
     },
   ];
 
-  let actionJson = "";
   const analyzeGen = await streamCompletion(analyzeMessages, {
     temperature: temperature ?? 0.3,
     maxTokens: 2048,
@@ -83,9 +83,7 @@ export const editProject = async (
     model,
   });
 
-  for await (const chunk of analyzeGen) {
-    actionJson += chunk;
-  }
+  const actionJson = await collectStream(analyzeGen);
 
   let action: EditAction;
   try {
