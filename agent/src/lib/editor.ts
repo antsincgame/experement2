@@ -47,6 +47,7 @@ interface EditorOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
   /** Model-completion seam; defaults to the real streamCompletion. */
   complete?: CompleteFn;
   onThinking?: (text: string) => void;
@@ -73,6 +74,7 @@ export const editProject = async (
     model,
     temperature,
     maxTokens,
+    topP,
     complete = streamCompletion,
     onThinking,
     onBlock,
@@ -173,6 +175,7 @@ export const editProject = async (
   const generateGen = await complete(generateMessages, {
     temperature: temperature ?? 0.4,
     maxTokens: maxTokens ?? 65536,
+    topP,
     lmStudioUrl,
     model,
   });

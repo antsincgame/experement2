@@ -12,6 +12,39 @@ interface SettingsDrawerProps {
   onClose: () => void;
 }
 
+interface SamplingPreset {
+  label: string;
+  hint: string;
+  temperature: number;
+  topP: number;
+}
+
+// Quick sampling profiles. No hard ceiling — these are convenient starting points,
+// the numeric fields below still accept any value the local model allows.
+const SAMPLING_PRESETS: SamplingPreset[] = [
+  { label: "Точный", hint: "0.1", temperature: 0.1, topP: 0.9 },
+  { label: "Баланс", hint: "0.4", temperature: 0.4, topP: 1 },
+  { label: "Креатив", hint: "0.8", temperature: 0.8, topP: 0.95 },
+  { label: "Хаос", hint: "1.3", temperature: 1.3, topP: 1 },
+];
+
+const approxEqual = (a: number, b: number): boolean => Math.abs(a - b) < 0.0001;
+const clamp01 = (n: number): number => Math.min(1, Math.max(0, n));
+
+// Keep the last valid value when the input is empty/non-numeric so typing does not
+// snap to an arbitrary default; only reject negatives (invalid for both fields).
+const parseNonNegative = (raw: string, fallback: number): number => {
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+};
+
+const parsePositiveInt = (raw: string, fallback: number): number => {
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return n;
+};
+
 const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
   const setLmStudioUrl = useSettingsStore((state) => state.setLmStudioUrl);
@@ -21,6 +54,8 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const setTemperature = useSettingsStore((state) => state.setTemperature);
   const maxTokens = useSettingsStore((state) => state.maxTokens);
   const setMaxTokens = useSettingsStore((state) => state.setMaxTokens);
+  const topP = useSettingsStore((state) => state.topP);
+  const setTopP = useSettingsStore((state) => state.setTopP);
   const agentUrl = useSettingsStore((state) => state.agentUrl);
   const setAgentUrl = useSettingsStore((state) => state.setAgentUrl);
   const plannerModel = useSettingsStore((state) => state.plannerModel);
@@ -29,6 +64,10 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const setEnhancerModel = useSettingsStore((state) => state.setEnhancerModel);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const setEnhancerEnabled = useSettingsStore((state) => state.setEnhancerEnabled);
+  const embeddingModel = useSettingsStore((state) => state.embeddingModel);
+  const setEmbeddingModel = useSettingsStore((state) => state.setEmbeddingModel);
+  const semanticRagEnabled = useSettingsStore((state) => state.semanticRagEnabled);
+  const setSemanticRagEnabled = useSettingsStore((state) => state.setSemanticRagEnabled);
   const lmStatus = useProjectStore((s) => s.lmStudioStatus);
   const isConnected = useProjectStore((s) => s.isConnected);
 
@@ -37,6 +76,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [plannerDropdownOpen, setPlannerDropdownOpen] = useState(false);
   const [enhancerDropdownOpen, setEnhancerDropdownOpen] = useState(false);
+  const [embeddingDropdownOpen, setEmbeddingDropdownOpen] = useState(false);
 
   const fetchModels = useCallback(async () => {
     setModelsLoading(true);
@@ -162,7 +202,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             models={models}
             loading={modelsLoading}
             open={modelDropdownOpen}
-            onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); }}
+            onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
             onSelect={(id) => { setModel(id); setModelDropdownOpen(false); }}
             savedModel={model}
             autoLabel="auto (first loaded in LM Studio)"
@@ -173,20 +213,73 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             models={models}
             loading={modelsLoading}
             open={plannerDropdownOpen}
-            onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEnhancerDropdownOpen(false); }}
+            onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
             onSelect={(id) => { setPlannerModel(id); setPlannerDropdownOpen(false); }}
             savedModel={plannerModel}
             autoLabel="same as generation"
           />
 
-          <View className="flex-row gap-4">
-            <View className="flex-1">
-              <Field label="Temperature" value={String(temperature)} onChange={(v) => setTemperature(parseFloat(v) || 0.4)} keyboardType="numeric" />
-            </View>
-            <View className="flex-1">
-              <Field label="Max Tokens" value={String(maxTokens)} onChange={(v) => setMaxTokens(parseInt(v, 10) || 65536)} keyboardType="numeric" />
+          <View>
+            <Text className="text-ink-faint text-[10px] uppercase tracking-wider mb-1.5 font-medium">
+              Профиль сэмплинга
+            </Text>
+            <View className="flex-row gap-2">
+              {SAMPLING_PRESETS.map((preset) => {
+                const active = approxEqual(temperature, preset.temperature) && approxEqual(topP, preset.topP);
+                return (
+                  <Pressable
+                    key={preset.label}
+                    onPress={() => {
+                      setTemperature(preset.temperature);
+                      setTopP(preset.topP);
+                    }}
+                    className="flex-1 items-center px-2 py-2 rounded-xl"
+                    style={{
+                      backgroundColor: active ? "rgba(255,215,0,0.15)" : "rgba(26,26,46,0.6)",
+                      borderWidth: 1,
+                      borderColor: active ? "rgba(255,215,0,0.4)" : "rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: active ? "#FFD700" : "#C0C0D0" }}>
+                      {preset.label}
+                    </Text>
+                    <Text style={{ fontSize: 8, color: "#7C84A8", marginTop: 2 }}>{preset.hint}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
+
+          <View className="flex-row gap-4">
+            <View className="flex-1">
+              <Field
+                label="Temperature"
+                value={String(temperature)}
+                onChange={(v) => setTemperature(parseNonNegative(v, temperature))}
+                keyboardType="numeric"
+              />
+            </View>
+            <View className="flex-1">
+              <Field
+                label="Top-P"
+                value={String(topP)}
+                onChange={(v) => setTopP(clamp01(parseNonNegative(v, topP)))}
+                keyboardType="numeric"
+              />
+            </View>
+            <View className="flex-1">
+              <Field
+                label="Max Tokens"
+                value={String(maxTokens)}
+                onChange={(v) => setMaxTokens(parsePositiveInt(v, maxTokens))}
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+          <Text style={{ fontSize: 9, color: "#7C84A8", lineHeight: 14 }}>
+            Лимиты сняты: можно ставить temperature {">"} 2 и любой Max Tokens — отвечает ваша LM Studio.
+            Top-P 1 = без отсечения; ниже = только самые вероятные токены.
+          </Text>
 
           {/* Prompt Enhancer */}
           <View
@@ -212,10 +305,47 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               models={models}
               loading={modelsLoading}
               open={enhancerDropdownOpen}
-              onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); }}
+              onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
               onSelect={(id) => { setEnhancerModel(id); setEnhancerDropdownOpen(false); }}
               savedModel={enhancerModel}
               autoLabel="same as generation"
+            />
+          </View>
+
+          {/* Smart context (semantic RAG) — on by default */}
+          <View
+            className="rounded-xl px-4 py-3"
+            style={{ backgroundColor: "rgba(0, 229, 255, 0.06)", borderWidth: 1, borderColor: "rgba(0, 229, 255, 0.15)" }}
+          >
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-white text-xs font-semibold">Умный контекст</Text>
+              <Pressable
+                onPress={() => setSemanticRagEnabled(!semanticRagEnabled)}
+                className="px-2 py-0.5 rounded"
+                style={{
+                  backgroundColor: semanticRagEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
+                }}
+              >
+                <Text style={{ fontSize: 10, color: semanticRagEnabled ? "#00E5FF" : "#8888AA" }}>
+                  {semanticRagEnabled ? "ВКЛ" : "ВЫКЛ"}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={{ fontSize: 10, color: "#8888AA", lineHeight: 15, marginBottom: 8 }}>
+              Перед каждым файлом агент подбирает только нужные правила (Tamagui, формы, БД, прошлые
+              фиксы) — не весь справочник. Нужна embedding-модель в LM Studio; если не указать —
+              подберётся автоматически (nomic-embed, bge…).
+            </Text>
+            <ModelSelector
+              label="Модель эмбеддингов (необязательно)"
+              hint="Переопределение вручную. Пусто = авто из списка моделей LM Studio."
+              models={models}
+              loading={modelsLoading}
+              open={embeddingDropdownOpen}
+              onToggle={() => { setEmbeddingDropdownOpen(!embeddingDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); }}
+              onSelect={(id) => { setEmbeddingModel(id); setEmbeddingDropdownOpen(false); }}
+              savedModel={embeddingModel}
+              autoLabel="авто (из LM Studio)"
             />
           </View>
 

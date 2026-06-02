@@ -28,14 +28,20 @@ import type { SupportedNavigationType } from "./generation-contract.js";
 import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
 import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
+import { recordFix } from "./error-fix-store.js";
 
 interface CreateOptions {
   description: string;
   lmStudioUrl?: string;
   model?: string;
   plannerModel?: string;
+  embeddingModel?: string;
+  /** Smart semantic RAG (default true). */
+  semanticRagEnabled?: boolean;
   temperature?: number;
   maxTokens?: number;
+  /** Nucleus sampling (0–1). When undefined, the model default applies. */
+  topP?: number;
   requestId?: string;
   onProjectNameResolved?: (projectName: string) => void;
 }
@@ -54,6 +60,7 @@ interface IterateOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
   requestId?: string;
 }
 
@@ -286,8 +293,11 @@ const _createProjectInner = async (
     lmStudioUrl,
     model,
     plannerModel,
+    embeddingModel,
+    semanticRagEnabled = true,
     temperature,
     maxTokens,
+    topP,
     requestId,
     onProjectNameResolved,
   } = options;
@@ -330,6 +340,7 @@ const _createProjectInner = async (
     model: plannerModel || model,
     temperature,
     maxTokens,
+    topP,
     complete,
     onChunk: (chunk) => emitOperation({ type: "plan_chunk", chunk }),
   });
@@ -369,8 +380,11 @@ const _createProjectInner = async (
     plan,
     lmStudioUrl,
     model,
+    embeddingModel,
+    semanticRagEnabled,
     temperature,
     maxTokens,
+    topP,
     complete,
     onFileStart: (filepath, index, total) =>
       emitOperation({
@@ -601,6 +615,7 @@ const _createProjectInner = async (
       error: parsed.raw,
     });
 
+    let lastFixedBlock: { filepath: string; replace: string } | null = null;
     const fixResult = await autoFix({
       projectName: projectSlug,
       error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
@@ -613,14 +628,24 @@ const _createProjectInner = async (
           attempt: autoFixAttempts,
           maxAttempts: MAX_BUILD_AUTOFIX,
         }),
-      onFix: (block) =>
+      onFix: (block) => {
+        lastFixedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
         emitBuildScoped(buildId, {
           type: "autofix_block",
           filepath: block.filepath,
-        }),
+        });
+      },
     });
 
     if (fixResult.success) {
+      if (lastFixedBlock) {
+        const fixedBlock: { filepath: string; replace: string } = lastFixedBlock;
+        recordFix({
+          errorSignature: parsed.raw,
+          file: fixedBlock.filepath,
+          fixSummary: fixedBlock.replace.slice(0, 600),
+        });
+      }
       emitBuildScoped(buildId, {
         type: "autofix_success",
         attempts: autoFixAttempts,
@@ -748,7 +773,7 @@ export const iterateProject = async (
 const _iterateProjectInner = async (
   options: IterateOptions
 ): Promise<IterateResult> => {
-  const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens, requestId } = options;
+  const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens, topP, requestId } = options;
   const projectPath = getProjectPath(projectName);
   const emitProject = (message: Record<string, unknown>): void => {
     broadcast({
@@ -768,6 +793,7 @@ const _iterateProjectInner = async (
     model,
     temperature,
     maxTokens,
+    topP,
     onThinking: (text) => emitProject({ type: "thinking", content: text }),
     onAnalysis: (action) =>
       emitProject({

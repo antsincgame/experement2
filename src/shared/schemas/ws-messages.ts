@@ -269,8 +269,12 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     description: z.string().min(1),
     lmStudioUrl: z.string().optional(),
     model: z.string().optional(),
+    plannerModel: z.string().optional(),
+    embeddingModel: z.string().optional(),
+    semanticRagEnabled: z.boolean().optional(),
     temperature: z.number().optional(),
     maxTokens: z.number().optional(),
+    topP: z.number().optional(),
   }).merge(OutgoingScopedMessageSchema),
   z.object({
     type: z.literal("iterate"),
@@ -281,6 +285,7 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     model: z.string().optional(),
     temperature: z.number().optional(),
     maxTokens: z.number().optional(),
+    topP: z.number().optional(),
   }).merge(OutgoingScopedMessageSchema),
   z.object({
     type: z.literal("start_preview"),

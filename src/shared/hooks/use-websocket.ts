@@ -288,7 +288,8 @@ export const useWebSocket = () => {
   }, []);
 
   const createProject = useCallback((description: string) => {
-    const { lmStudioUrl, model, plannerModel, temperature, maxTokens } = useSettingsStore.getState();
+    const { lmStudioUrl, model, plannerModel, embeddingModel, semanticRagEnabled, temperature, maxTokens, topP } =
+      useSettingsStore.getState();
     send({
       type: "create_project",
       requestId: createRequestId(),
@@ -296,8 +297,11 @@ export const useWebSocket = () => {
       lmStudioUrl,
       ...(model ? { model } : {}),
       ...(plannerModel ? { plannerModel } : {}),
+      semanticRagEnabled,
+      ...(embeddingModel.trim() ? { embeddingModel: embeddingModel.trim() } : {}),
       temperature,
       maxTokens,
+      topP,
     });
   }, [send]);
 
@@ -317,7 +321,7 @@ export const useWebSocket = () => {
         content: message.content,
       }));
 
-    const { lmStudioUrl, model, temperature, maxTokens } = useSettingsStore.getState();
+    const { lmStudioUrl, model, temperature, maxTokens, topP } = useSettingsStore.getState();
     send({
       type: "iterate",
       requestId: createRequestId(),
@@ -328,6 +332,7 @@ export const useWebSocket = () => {
       ...(model ? { model } : {}),
       temperature,
       maxTokens,
+      topP,
     });
   }, [send]);
 

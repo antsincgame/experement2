@@ -354,8 +354,11 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             lmStudioUrl: message.lmStudioUrl,
             model: message.model,
             plannerModel: message.plannerModel,
+            embeddingModel: message.embeddingModel,
+            semanticRagEnabled: message.semanticRagEnabled,
             temperature: message.temperature,
             maxTokens: message.maxTokens,
+            topP: message.topP,
             requestId: message.requestId,
             onProjectNameResolved: (projectName) => {
               eventScope.projectName = projectName;
@@ -394,6 +397,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           model: message.model,
           temperature: message.temperature,
           maxTokens: message.maxTokens,
+          topP: message.topP,
           requestId: message.requestId,
         }),
         (result) => {

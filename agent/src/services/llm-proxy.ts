@@ -103,6 +103,7 @@ interface CompletionRequest {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
+  top_p?: number;
   stream?: boolean;
   response_format?: { type: "json_object" };
   model?: string;
@@ -119,6 +120,7 @@ export const streamCompletion = async (
   options: {
     temperature?: number;
     maxTokens?: number;
+    topP?: number;
     responseFormat?: { type: "json_object" };
     model?: string;
     lmStudioUrl?: string;
@@ -142,6 +144,7 @@ export const streamCompletion = async (
     messages,
     temperature: options.temperature ?? 0.4,
     max_tokens: options.maxTokens ?? 65536,
+    ...(options.topP !== undefined ? { top_p: options.topP } : {}),
     stream: true,
     ...(resolvedModel ? { model: resolvedModel } : {}),
   };
@@ -323,6 +326,7 @@ export const completeNonStreaming = async (
   options: {
     temperature?: number;
     maxTokens?: number;
+    topP?: number;
     responseFormat?: { type: "json_object" };
     model?: string;
     lmStudioUrl?: string;
@@ -341,6 +345,7 @@ export const completeNonStreaming = async (
     messages,
     temperature: options.temperature ?? 0.3,
     max_tokens: options.maxTokens ?? 65536,
+    ...(options.topP !== undefined ? { top_p: options.topP } : {}),
     stream: false,
     model: resolvedModel,
   };

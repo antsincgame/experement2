@@ -8,7 +8,7 @@ import type { AppPlan } from "../schemas/app-plan.schema.js";
 import type { ContractViolation } from "./project-validator.js";
 import { formatDiagnosticsForPrompt, type TypeDiagnostic } from "./typecheck.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
-import { getRelevantDocs } from "../prompts/knowledge-base.js";
+import { getGenerationContext } from "./rag-retrieve.js";
 import { broadcast } from "./event-bus.js";
 import {
   BOILERPLATE_TEMPLATES,
@@ -32,8 +32,13 @@ interface GeneratorOptions {
   plan: AppPlan;
   lmStudioUrl?: string;
   model?: string;
+  /** Override embedding model; when unset, agent auto-picks from LM Studio. */
+  embeddingModel?: string;
+  /** Smart context (semantic RAG). Default true; falls back to keyword RAG if no embedder. */
+  semanticRagEnabled?: boolean;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
   /** Model-completion seam; defaults to the real streamCompletion. */
   complete?: CompleteFn;
   onFileStart?: (filepath: string, index: number, total: number) => void;
@@ -232,8 +237,11 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     plan,
     lmStudioUrl,
     model,
+    embeddingModel,
+    semanticRagEnabled = true,
     temperature,
     maxTokens,
+    topP,
     complete = streamCompletion,
     onFileStart,
     onChunk,
@@ -319,8 +327,24 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     }
 
     const hasContracts = Object.keys(depContracts).length > 0;
-    const relevantDocs = getRelevantDocs(fileSpec.description, fileSpec.dependencies);
-    broadcast({ type: "build_event", eventType: "rag_injected", message: `🧠 RAG Context loaded for ${fileSpec.path}` });
+    const ragContext = await getGenerationContext(
+      {
+        path: fileSpec.path,
+        type: fileSpec.type,
+        description: fileSpec.description,
+        dependencies: fileSpec.dependencies,
+      },
+      {
+        semanticRagEnabled,
+        embedOptions: { url: lmStudioUrl, model: embeddingModel },
+      }
+    );
+    const relevantDocs = ragContext.text;
+    broadcast({
+      type: "build_event",
+      eventType: "rag_injected",
+      message: `🧠 ${ragContext.semantic ? "Semantic" : "Keyword"} RAG Context loaded for ${fileSpec.path}`,
+    });
 
     const userMessage = `
 ## App Plan
@@ -362,6 +386,7 @@ Generate the complete code for: ${fileSpec.path}`;
     const generator = await complete(messages, {
       temperature: temperature ?? 0.4,
       maxTokens: maxTokens ?? 65536,
+      topP,
       lmStudioUrl,
       model,
     });

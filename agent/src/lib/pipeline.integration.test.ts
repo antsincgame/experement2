@@ -78,7 +78,10 @@ describe("createProject (integration, injected PipelineContext)", () => {
   afterEach(() => removeTempProject(slug));
 
   it("plans, scaffolds, generates, passes the gates, and announces a ready preview", async () => {
-    const result = await createProject({ description: "a tiny test app" }, ctx);
+    const result = await createProject(
+      { description: "a tiny test app", semanticRagEnabled: false },
+      ctx
+    );
 
     expect(result.projectName).toBe(slug);
     expect(result.port).toBe(8081);

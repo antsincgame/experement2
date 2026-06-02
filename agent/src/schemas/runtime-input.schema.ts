@@ -107,8 +107,9 @@ export const LlmCompleteBodySchema = z.object({
   messages: z.array(LlmMessageSchema)
     .min(1, "messages must contain at least one item")
     .max(200, "messages is too long"),
-  temperature: z.number().min(0).max(2).optional(),
-  max_tokens: z.number().int().positive().max(131_072).optional(),
+  temperature: z.number().min(0).optional(),
+  max_tokens: z.number().int().positive().optional(),
+  top_p: z.number().min(0).max(1).optional(),
   stream: z.boolean().optional(),
   response_format: ResponseFormatSchema.optional(),
   model: OptionalModelSchema,
@@ -130,8 +131,11 @@ export const WsCreateProjectSchema = z.object({
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
   plannerModel: OptionalModelSchema,
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().int().positive().max(131_072).optional(),
+  embeddingModel: OptionalModelSchema,
+  semanticRagEnabled: z.boolean().optional(),
+  temperature: z.number().min(0).optional(),
+  maxTokens: z.number().int().positive().optional(),
+  topP: z.number().min(0).max(1).optional(),
 }).merge(WsRequestMetadataSchema);
 
 export const WsIterateSchema = z.object({
@@ -143,8 +147,9 @@ export const WsIterateSchema = z.object({
     .default([]),
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().int().positive().max(131_072).optional(),
+  temperature: z.number().min(0).optional(),
+  maxTokens: z.number().int().positive().optional(),
+  topP: z.number().min(0).max(1).optional(),
 }).merge(WsRequestMetadataSchema);
 
 export const WsStartPreviewSchema = z.object({

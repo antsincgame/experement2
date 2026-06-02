@@ -13,3 +13,5 @@ tools/e2e-results.json
 e2e/*.json
 e2e/*.md
 .vite/
+# Semantic RAG embedding cache + captured error->fix pairs (regenerated at runtime)
+agent/.rag/

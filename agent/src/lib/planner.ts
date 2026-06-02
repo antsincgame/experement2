@@ -9,6 +9,7 @@ interface PlannerOptions {
   description: string;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
   lmStudioUrl?: string;
   model?: string;
   /** Model-completion seam; defaults to the real streamCompletion. */
@@ -17,7 +18,7 @@ interface PlannerOptions {
 }
 
 export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
-  const { description, temperature = 0.3, maxTokens = 65536, lmStudioUrl, model, onChunk, complete = streamCompletion } = options;
+  const { description, temperature = 0.3, maxTokens = 65536, topP, lmStudioUrl, model, onChunk, complete = streamCompletion } = options;
 
   const messages = [
     { role: "system" as const, content: SYSTEM_PLANNER },
@@ -29,6 +30,7 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   const generator = await complete(messages, {
     temperature,
     maxTokens,
+    topP,
     lmStudioUrl,
     model,
   });

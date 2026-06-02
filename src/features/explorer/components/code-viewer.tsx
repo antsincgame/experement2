@@ -92,8 +92,8 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   if (!filepath && status === "generating") {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#0A0A0A" }}>
-        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+      <View className="flex-1" style={{ backgroundColor: "#0A0A0A", minHeight: 0 }}>
+        <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ padding: 16 }}>
           <Text
             style={{
               color: "#00E5FF",
@@ -219,7 +219,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     languageExtension
   ) {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#0A0A0A" }}>
+      <View className="flex-1" style={{ backgroundColor: "#0A0A0A", minHeight: 0 }}>
         {toolbar}
         <View className="flex-1" style={{ minHeight: 0 }}>
           <CodeMirror
@@ -271,9 +271,9 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   if (canHighlight) {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#0A0A0A" }}>
+      <View className="flex-1" style={{ backgroundColor: "#0A0A0A", minHeight: 0 }}>
         {toolbar}
-        <ScrollView className="flex-1">
+        <ScrollView style={{ flex: 1, minHeight: 0 }}>
           <SyntaxHighlighter
             language={lang}
             style={theme}
@@ -296,9 +296,9 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   const lines = draft.split("\n");
   return (
-    <View className="flex-1" style={{ backgroundColor: "#0A0A0A" }}>
+    <View className="flex-1" style={{ backgroundColor: "#0A0A0A", minHeight: 0 }}>
       {toolbar}
-      <ScrollView className="flex-1" horizontal>
+      <ScrollView style={{ flex: 1, minHeight: 0 }} horizontal>
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           {lines.map((line, i) => (
             <View key={i} className="flex-row" style={{ minHeight: 20 }}>

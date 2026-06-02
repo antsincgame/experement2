@@ -66,6 +66,7 @@ describe("generateFiles (integration, injected fake model)", () => {
       projectPath: getProjectPath(projectName),
       plan: buildPlan(),
       complete: fakeComplete,
+      semanticRagEnabled: false,
     });
 
     expect(files).toContain("app/_layout.tsx"); // auto-generated stack layout
@@ -79,6 +80,7 @@ describe("generateFiles (integration, injected fake model)", () => {
       projectPath: getProjectPath(projectName),
       plan: buildPlan(),
       complete: fakeComplete,
+      semanticRagEnabled: false,
     });
 
     expect(requested).toEqual(["src/types/index.ts", "app/index.tsx"]);
@@ -90,6 +92,7 @@ describe("generateFiles (integration, injected fake model)", () => {
       projectPath: getProjectPath(projectName),
       plan: buildPlan(),
       complete: fakeComplete,
+      semanticRagEnabled: false,
     });
 
     const screen = readFile(projectName, "app/index.tsx") ?? "";
