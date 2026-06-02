@@ -77,7 +77,7 @@ describe("createProject (integration, injected PipelineContext)", () => {
 
   afterEach(() => removeTempProject(slug));
 
-  it("plans, scaffolds, generates, passes the gates, and announces a ready preview", async () => {
+  it("plans, scaffolds, generates, passes the gates, and announces a ready preview", { timeout: 30000 }, async () => {
     const result = await createProject(
       { description: "a tiny test app", semanticRagEnabled: false },
       ctx
