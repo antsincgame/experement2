@@ -26,6 +26,7 @@ import { extractExportContracts, type ExportContract } from "./context-builder.j
 import type { SupportedNavigationType } from "./generation-contract.js";
 import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
+import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 
 interface CreateOptions {
   description: string;
@@ -66,6 +67,46 @@ interface GateResult {
   errors: string[];
 }
 
+/**
+ * The side-effecting boundary createProject depends on. Defaults wire the real
+ * implementations (createDefaultContext); tests pass fakes for deterministic,
+ * mock-free coverage of the orchestration. Members are named like the imports
+ * they replace so call sites stay unchanged after destructuring `ctx`.
+ */
+export interface PipelineContext {
+  complete: CompleteFn;
+  createProjectFromCache: typeof createProjectFromCache;
+  startExpo: typeof startExpo;
+  startExpoClearCache: typeof startExpoClearCache;
+  killExpo: typeof killExpo;
+  getActivePort: typeof getActivePort;
+  runTypecheck: typeof runTypecheck;
+  runWebExport: typeof runWebExport;
+  runNativeSmoke: typeof runNativeSmoke;
+  npmInstall: typeof npmInstall;
+  runGitCommand: typeof runGitCommand;
+  broadcast: typeof broadcast;
+  setPreviewPort: typeof setPreviewPort;
+  fetch: typeof fetch;
+}
+
+export const createDefaultContext = (): PipelineContext => ({
+  complete: streamCompletion,
+  createProjectFromCache,
+  startExpo,
+  startExpoClearCache,
+  killExpo,
+  getActivePort,
+  runTypecheck,
+  runWebExport,
+  runNativeSmoke,
+  npmInstall,
+  runGitCommand,
+  broadcast,
+  setPreviewPort,
+  fetch: globalThis.fetch.bind(globalThis),
+});
+
 const waitForBuildOutcome = async (
   timeoutMs: number,
   hasOutcome: () => boolean
@@ -102,8 +143,10 @@ const waitForBuildOutcome = async (
 
 const runProjectQualityGates = async (
   projectPath: string,
-  navigationType?: SupportedNavigationType
+  navigationType?: SupportedNavigationType,
+  ctx: PipelineContext = createDefaultContext()
 ): Promise<GateResult> => {
+  const { npmInstall, runTypecheck, runWebExport, runNativeSmoke } = ctx;
   const errors: string[] = [];
   const staticIssues = validateGeneratedProject(
     projectPath,
@@ -206,12 +249,13 @@ const runProjectQualityGates = async (
 };
 
 export const createProject = async (
-  options: CreateOptions
+  options: CreateOptions,
+  ctx: PipelineContext = createDefaultContext()
 ): Promise<CreateResult> => {
   try {
-    return await _createProjectInner(options);
+    return await _createProjectInner(options, ctx);
   } catch (error) {
-    broadcast({
+    ctx.broadcast({
       type: "status",
       status: "error",
       ...(options.requestId ? { requestId: options.requestId } : {}),
@@ -221,7 +265,8 @@ export const createProject = async (
 };
 
 const _createProjectInner = async (
-  options: CreateOptions
+  options: CreateOptions,
+  ctx: PipelineContext
 ): Promise<CreateResult> => {
   const {
     description,
@@ -233,6 +278,16 @@ const _createProjectInner = async (
     requestId,
     onProjectNameResolved,
   } = options;
+  const {
+    complete,
+    createProjectFromCache,
+    startExpo,
+    runTypecheck,
+    runGitCommand,
+    broadcast,
+    setPreviewPort,
+    fetch,
+  } = ctx;
   let projectSlug: string | null = null;
   const emitOperation = (message: Record<string, unknown>): void => {
     broadcast({
@@ -262,6 +317,7 @@ const _createProjectInner = async (
     model: plannerModel || model,
     temperature,
     maxTokens,
+    complete,
     onChunk: (chunk) => emitOperation({ type: "plan_chunk", chunk }),
   });
 
@@ -302,6 +358,7 @@ const _createProjectInner = async (
     model,
     temperature,
     maxTokens,
+    complete,
     onFileStart: (filepath, index, total) =>
       emitOperation({
         type: "file_generating",
@@ -362,7 +419,7 @@ const _createProjectInner = async (
 
         const fixSuccess = await regenerateFileWithContracts(
           projectSlug, projectPath, fp, violations, allContracts,
-          { lmStudioUrl, model, maxTokens },
+          { lmStudioUrl, model, maxTokens, complete },
         );
 
         if (!fixSuccess) {
@@ -425,7 +482,7 @@ const _createProjectInner = async (
             fp,
             fileDiagnostics,
             allContracts,
-            { lmStudioUrl, model, maxTokens }
+            { lmStudioUrl, model, maxTokens, complete }
           );
           if (fixed) fixedAny = true;
         } catch (err) {
@@ -440,13 +497,14 @@ const _createProjectInner = async (
   }
 
   // ── Step 4: Git init ──────────────────────────────────
-  gitInit(projectPath);
+  gitInit(projectPath, runGitCommand);
 
   // ── Step 5: Deterministic Validation Gates ────────────
   emitOperation({ type: "status", status: "validating" });
   const gateResult = await runProjectQualityGates(
     projectPath,
-    plan.navigation?.type
+    plan.navigation?.type,
+    ctx
   );
   if (!gateResult.success) {
     const message = gateResult.errors.join("\n\n");
@@ -534,6 +592,7 @@ const _createProjectInner = async (
       projectName: projectSlug,
       error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
       lmStudioUrl,
+      complete,
       maxAttempts: 1,
       onAttempt: () =>
         emitBuildScoped(buildId, {
@@ -579,7 +638,8 @@ const _createProjectInner = async (
   if (buildSuccess) {
     const postFixGateResult = await runProjectQualityGates(
       projectPath,
-      plan.navigation?.type
+      plan.navigation?.type,
+      ctx
     );
     if (!postFixGateResult.success) {
       buildSuccess = false;
@@ -639,7 +699,7 @@ const _createProjectInner = async (
 
   // Git commit the successful state
   if (buildSuccess) {
-    const hash = gitCommit(projectPath, "v1: initial generation (build verified)");
+    const hash = gitCommit(projectPath, "v1: initial generation (build verified)", runGitCommand);
     if (hash) {
       emitOperation({
         type: "version_created",
