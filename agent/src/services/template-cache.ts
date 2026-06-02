@@ -9,8 +9,18 @@ import {
   TEMPLATE_PACKAGE_SCRIPTS,
 } from "../lib/generation-contract.js";
 import { validateDependencies } from "../lib/dependency-validator.js";
+import { SCAFFOLD_UI_FILES } from "../lib/scaffold-ui.js";
 
 const TEMPLATE_DIR_NAME = "template_cache";
+
+/** Write the shared UI kit (src/ui/*) into a project or template root. Idempotent. */
+const writeScaffoldUiFiles = (root: string): void => {
+  for (const [relPath, content] of Object.entries(SCAFFOLD_UI_FILES)) {
+    const fullPath = path.join(root, relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content, "utf-8");
+  }
+};
 
 const BOILERPLATE_FILES: Record<string, string> = {
   "app.json": JSON.stringify(
@@ -137,6 +147,8 @@ export const initTemplateCache = async (): Promise<void> => {
       fs.writeFileSync(fullPath, content, "utf-8");
     }
 
+    writeScaffoldUiFiles(templatePath);
+
     console.log("[TemplateCache] Running npm install (this may take a minute)...");
     await npmInstall(templatePath);
 
@@ -167,6 +179,10 @@ export const createProjectFromCache = async (
 
   console.log(`[TemplateCache] Copying template -> ${projectName}...`);
   copyDirectory(templatePath, projectPath);
+
+  // Always (re)write the UI kit so projects copied from an older warm cache
+  // still receive the safe <Icon> wrapper and the "@/ui" barrel.
+  writeScaffoldUiFiles(projectPath);
 
   const appJson = JSON.parse(
     fs.readFileSync(path.join(projectPath, "app.json"), "utf-8")

@@ -16,6 +16,16 @@ export const ICON_CONTRACT = {
   defaultImportPath: "@expo/vector-icons/Feather",
 } as const;
 
+/**
+ * Scaffolded UI kit (see scaffold-ui.ts). Generated screens import their UI from
+ * here so they target one small, stable, type-forgiving surface. The <Icon>
+ * wrapper accepts any string name, eliminating the strict-glyph-union TS2322 class.
+ */
+export const UI_KIT = {
+  importPath: "@/ui",
+  iconComponent: "Icon",
+} as const;
+
 export const VECTOR_ICON_IMPORT_PATHS: Record<string, string> = {
   Ionicons: "@expo/vector-icons/Ionicons",
   MaterialIcons: "@expo/vector-icons/MaterialIcons",
