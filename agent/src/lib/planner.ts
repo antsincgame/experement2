@@ -1,5 +1,5 @@
 // Adds contract-aware plan validation so invalid or unrecoverable planner JSON fails before generation starts.
-import { streamCompletion } from "../services/llm-proxy.js";
+import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
 import { validateAppPlan } from "./project-validator.js";
@@ -11,11 +11,13 @@ interface PlannerOptions {
   maxTokens?: number;
   lmStudioUrl?: string;
   model?: string;
+  /** Model-completion seam; defaults to the real streamCompletion. */
+  complete?: CompleteFn;
   onChunk?: (chunk: string) => void;
 }
 
 export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
-  const { description, temperature = 0.3, maxTokens = 65536, lmStudioUrl, model, onChunk } = options;
+  const { description, temperature = 0.3, maxTokens = 65536, lmStudioUrl, model, onChunk, complete = streamCompletion } = options;
 
   const messages = [
     { role: "system" as const, content: SYSTEM_PLANNER },
@@ -24,7 +26,7 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
 
   let fullJson = "";
 
-  const generator = await streamCompletion(messages, {
+  const generator = await complete(messages, {
     temperature,
     maxTokens,
     lmStudioUrl,
