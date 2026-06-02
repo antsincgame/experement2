@@ -1,5 +1,5 @@
 // Applies Metro-driven autofix blocks with the same safe matching rules used by the main editor.
-import { streamCompletion } from "../services/llm-proxy.js";
+import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import { readFile, writeFile, getProjectPath } from "../services/file-manager.js";
 import { buildProjectSkeleton } from "./context-builder.js";
 import { parseStream } from "./stream-parser.js";
@@ -19,6 +19,8 @@ interface AutoFixOptions {
   error: MetroError;
   lmStudioUrl?: string;
   model?: string;
+  /** Model-completion seam; defaults to the real streamCompletion. */
+  complete?: CompleteFn;
   maxAttempts?: number;
   onAttempt?: (attempt: number, maxAttempts: number) => void;
   onFix?: (block: SearchReplaceBlock) => void;
@@ -78,6 +80,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
     error,
     lmStudioUrl,
     model,
+    complete = streamCompletion,
     maxAttempts = 3,
     onAttempt,
     onFix,
@@ -101,7 +104,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
       },
     ];
 
-    const generator = await streamCompletion(messages, {
+    const generator = await complete(messages, {
       temperature: 0.2,
       maxTokens: 4096,
       lmStudioUrl,

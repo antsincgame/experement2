@@ -488,7 +488,7 @@ export const regenerateFileWithContracts = async (
   filePath: string,
   violations: ContractViolation[],
   contracts: Record<string, ExportContract[]>,
-  options: { lmStudioUrl?: string; model?: string; maxTokens?: number } = {},
+  options: { lmStudioUrl?: string; model?: string; maxTokens?: number; complete?: CompleteFn } = {},
 ): Promise<string | null> => {
   const currentContent = readFile(projectName, filePath) ?? "";
   const violationsText = violations.map((v) => `- [${v.code}] ${v.message}`).join("\n");
@@ -515,7 +515,7 @@ RULES:
     },
   ];
 
-  const generator = await streamCompletion(messages, {
+  const generator = await (options.complete ?? streamCompletion)(messages, {
     temperature: 0.2,
     maxTokens: options.maxTokens ?? 65536,
     lmStudioUrl: options.lmStudioUrl,
@@ -558,7 +558,7 @@ export const regenerateFileWithTypeErrors = async (
   filePath: string,
   diagnostics: TypeDiagnostic[],
   contracts: Record<string, ExportContract[]>,
-  options: { lmStudioUrl?: string; model?: string; maxTokens?: number } = {}
+  options: { lmStudioUrl?: string; model?: string; maxTokens?: number; complete?: CompleteFn } = {}
 ): Promise<boolean> => {
   const currentContent = readFile(projectName, filePath);
   if (!currentContent) return false;
@@ -594,7 +594,7 @@ Return the COMPLETE corrected file for ${filePath}.`,
     },
   ];
 
-  const generator = await streamCompletion(messages, {
+  const generator = await (options.complete ?? streamCompletion)(messages, {
     temperature: 0.2,
     maxTokens: options.maxTokens ?? 65536,
     lmStudioUrl: options.lmStudioUrl,
