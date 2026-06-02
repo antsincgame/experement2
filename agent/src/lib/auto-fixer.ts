@@ -73,9 +73,9 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
 
     let errorHint = "";
     if (error.raw.includes("TS2322") && error.raw.includes("is not assignable to type") && error.raw.includes("_layout.tsx")) {
-      errorHint = "HINT: You used an invalid Feather icon name. ONLY these names exist: 'home', 'settings', 'user', 'search', 'plus', 'minus', 'x', 'check', 'list', 'edit', 'trash-2', 'save', 'star', 'heart', 'clock', 'calendar', 'folder', 'file-text', 'bell', 'mail', 'zap', 'activity', 'bar-chart-2', 'pie-chart', 'trending-up', 'dollar-sign', 'credit-card', 'play', 'pause', 'square', 'circle'. Replace the invalid icon name with the closest match from this list.";
+      errorHint = "HINT: Icons come from the UI kit — import { Icon } from '@/ui' and use <Icon name=\"...\" />. The name prop is a plain string, so no icon name is ever invalid; replace any raw vector-icons usage with <Icon> from '@/ui'.";
     } else if (error.raw.includes("TS2322") && error.raw.includes("is not assignable to type")) {
-      errorHint = "HINT: A prop value does not match the expected type. Check Tamagui component props and icon names. For icons use ONLY valid Feather names like 'star', 'circle', 'check', 'list'.";
+      errorHint = "HINT: A prop value does not match the expected type. Check the target component's Props. For icons use <Icon name=\"...\" /> from '@/ui' (name is any string).";
     } else if (error.raw.includes("TS2304") || error.raw.includes("TS2552")) {
       errorHint = "HINT: You forgot to import a type, interface, or component. Add the missing import statement at the top of the file.";
     } else if (error.raw.includes("TS2305")) {

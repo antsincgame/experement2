@@ -203,9 +203,24 @@ export const editProject = async (
     }
   }
 
-  // ── Install new dependencies ──────────────────────────
-  if (action.newDependencies.length > 0) {
-    await npmInstall(projectPath, action.newDependencies);
+  // ── Delete files the analysis flagged for removal ─────
+  for (const filepath of action.filesToDelete) {
+    if (deleteFile(projectName, filepath)) {
+      onBlock?.({ filepath, type: "delete" });
+      appliedBlocks++;
+    }
+  }
+
+  // ── Install new dependencies (validated; install_package already did this) ─
+  if (action.action !== "install_package" && action.newDependencies.length > 0) {
+    const { validateDependencies } = await import("./dependency-validator.js");
+    const { valid, rejected } = await validateDependencies(action.newDependencies);
+    if (rejected.length > 0) {
+      console.warn(`[Editor] Rejected deps: ${rejected.join(", ")}`);
+    }
+    if (valid.length > 0) {
+      await npmInstall(projectPath, valid);
+    }
   }
 
   return { action, appliedBlocks, failedBlocks, errors };

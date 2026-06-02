@@ -263,21 +263,21 @@ describe("parseStream", () => {
     expect(block.replace).toBe(replaceContent);
   });
 
-  // 12. DELETE marker
-  it("parses DELETE marker and sets current filepath", async () => {
-    // DELETE marker sets currentFilepath but yields no block by itself
-    // because the parser only yields when it has search+replace or code buffers
+  // 12. DELETE marker — yields a delete block (editor then removes the file)
+  it("parses DELETE marker into a delete block", async () => {
     const input = "DELETE: src/obsolete.ts\n";
 
     const results = await collect(parseStream(toStream(input, 1000)));
 
-    expect(results).toHaveLength(0);
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({ filepath: "src/obsolete.ts", type: "delete" });
   });
 
-  it("DELETE marker followed by SEARCH/REPLACE uses deleted filepath", async () => {
-    // After DELETE sets the filepath, a subsequent SEARCH/REPLACE uses it
+  it("yields a delete block, then a filepath-scoped SEARCH/REPLACE", async () => {
+    // Deletion targets one file; a following edit is scoped by its own filepath: marker.
     const input = [
-      "DELETE: src/target.ts\n",
+      "DELETE: src/obsolete.ts\n",
+      "filepath: src/target.ts\n",
       "<<<<<<< SEARCH\n",
       "old_code\n",
       "=======\n",
@@ -287,8 +287,9 @@ describe("parseStream", () => {
 
     const results = await collect(parseStream(toStream(input, 1000)));
 
-    expect(results).toHaveLength(1);
-    expect(results[0]).toEqual({
+    expect(results).toHaveLength(2);
+    expect(results[0]).toEqual({ filepath: "src/obsolete.ts", type: "delete" });
+    expect(results[1]).toEqual({
       filepath: "src/target.ts",
       type: "search_replace",
       search: "old_code",

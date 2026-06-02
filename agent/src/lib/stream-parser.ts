@@ -26,6 +26,7 @@ interface ParserState {
   searchBuffer: string;
   replaceBuffer: string;
   codeBuffer: string;
+  pendingDelete: string;
 }
 
 export async function* parseStream(
@@ -39,6 +40,7 @@ export async function* parseStream(
     searchBuffer: "",
     replaceBuffer: "",
     codeBuffer: "",
+    pendingDelete: "",
   };
 
   for await (const chunk of stream) {
@@ -54,6 +56,11 @@ export async function* parseStream(
       if (state.mode === "idle" && state.thinkingBuffer) {
         yield { type: "thinking", content: state.thinkingBuffer };
         state.thinkingBuffer = "";
+      }
+
+      if (state.mode === "idle" && state.pendingDelete) {
+        yield { filepath: state.pendingDelete, type: "delete" };
+        state.pendingDelete = "";
       }
 
       if (
@@ -159,9 +166,8 @@ const processBuffer = (buffer: string, state: ParserState): number => {
     const filepath = buffer
       .slice(DELETE_MARKER.length, lineEnd > 0 ? lineEnd : undefined)
       .trim();
-    state.currentFilepath = filepath;
-    state.codeBuffer = "";
-    // yield delete signal — handled by caller
+    state.pendingDelete = filepath;
+    // delete block is yielded by parseStream once this returns to idle
     return (lineEnd > 0 ? lineEnd + 1 : buffer.length);
   }
 

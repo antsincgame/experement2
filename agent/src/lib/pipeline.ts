@@ -419,7 +419,7 @@ const _createProjectInner = async (
           content = healed;
         }
 
-        const violations = validateFileContracts(content, fp, allContracts);
+        const violations = validateFileContracts(content, fp, allContracts, projectPath);
         if (violations.length === 0) break;
 
         if (retries === MAX_CONTRACT_RETRIES) {

@@ -202,10 +202,13 @@ const readPackageNames = (projectPath: string): Set<string> => {
     return new Set<string>();
   }
 
-  const parsed = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")) as {
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-  };
+  let parsed: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  try {
+    parsed = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+  } catch {
+    // package.json mid-write (e.g. during npm install) or malformed — treat as no deps
+    return new Set<string>();
+  }
 
   return new Set([
     ...Object.keys(parsed.dependencies ?? {}),
@@ -219,7 +222,13 @@ const validateSourceFileImports = (
   packageNames: Set<string>
 ): ValidationIssue[] => {
   const fullPath = path.join(projectPath, filePath);
-  const content = fs.readFileSync(fullPath, "utf-8");
+  let content: string;
+  try {
+    content = fs.readFileSync(fullPath, "utf-8");
+  } catch {
+    // File vanished between listing and validation — skip silently
+    return [];
+  }
   const issues: ValidationIssue[] = [];
 
   for (const originalSpecifier of collectImportSpecifiers(content)) {
@@ -337,8 +346,7 @@ const extractStoreKeysFromSource = (
   storePath: string,
 ): string[] => {
   try {
-    const fs = require("fs");
-    const fullPath = require("path").join(projectPath, storePath);
+    const fullPath = path.join(projectPath, storePath);
     if (!fs.existsSync(fullPath)) return [];
     const content = fs.readFileSync(fullPath, "utf-8");
 
@@ -395,6 +403,7 @@ export const validateFileContracts = (
   fileContent: string,
   filePath: string,
   contracts: Record<string, ExportContract[]>,
+  projectPath = "",
 ): ContractViolation[] => {
   const violations: ContractViolation[] = [];
   const allContracts = Object.values(contracts).flat();
@@ -468,7 +477,7 @@ export const validateFileContracts = (
 
         // Try 2: read store source file and extract interface keys via regex
         if (validKeys.length === 0 && storeFile) {
-          const storeKeys = extractStoreKeysFromSource("", storeFile);
+          const storeKeys = extractStoreKeysFromSource(projectPath, storeFile);
           if (storeKeys.length > 0) validKeys = storeKeys;
         }
       }

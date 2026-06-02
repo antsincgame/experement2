@@ -157,7 +157,11 @@ export const extractExportContracts = (filePath: string): ExportContract[] | nul
     }
 
     return contracts.length > 0 ? contracts : null;
-  } catch {
+  } catch (err) {
+    console.warn(
+      `[context-builder] extractExportContracts failed for ${filePath}:`,
+      err instanceof Error ? err.message : err
+    );
     return null;
   }
 };
