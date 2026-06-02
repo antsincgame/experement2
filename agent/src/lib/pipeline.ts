@@ -17,7 +17,8 @@ import {
 import { getProjectPath, readFile as readProjectFile, writeFile as writeProjectFile } from "../services/file-manager.js";
 import { parseMetroError } from "../services/log-watcher.js";
 import { planApp } from "./planner.js";
-import { generateFiles, regenerateFileWithContracts } from "./generator.js";
+import { generateFiles, regenerateFileWithContracts, regenerateFileWithTypeErrors } from "./generator.js";
+import { parseTypeErrors, groupDiagnosticsByFile, isFixableProjectFile } from "./typecheck.js";
 import { editProject } from "./editor.js";
 import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
@@ -451,6 +452,68 @@ const _createProjectInner = async (
         const updatedContracts = extractExportContracts(path.join(projectPath, fp));
         if (updatedContracts) allContracts[fp] = updatedContracts;
       }
+    }
+  }
+
+  // ── Step 3c: Compiler-in-the-loop Type-Fix ────────────
+  // Run the real typechecker, feed structured per-file errors back to the model,
+  // and iterate until the project compiles or we stop making progress. This is the
+  // fast inner loop that runs BEFORE the heavy web-export / native gates.
+  {
+    const MAX_TYPE_FIX_ROUNDS = 3;
+    emitOperation({ type: "status", status: "validating" });
+
+    for (let round = 1; round <= MAX_TYPE_FIX_ROUNDS; round++) {
+      const typecheck = await runTypecheck(projectPath);
+      if (typecheck.success) break;
+
+      const diagnostics = parseTypeErrors(typecheck.combinedOutput).filter((d) =>
+        isFixableProjectFile(d.filePath)
+      );
+      if (diagnostics.length === 0) break;
+
+      // Rebuild contracts so the fixer sees the current export shapes.
+      const allContracts: Record<string, ExportContract[]> = {};
+      for (const fp of files) {
+        const contracts = extractExportContracts(path.join(projectPath, fp));
+        if (contracts) allContracts[fp] = contracts;
+      }
+
+      const byFile = groupDiagnosticsByFile(diagnostics);
+      let fixedAny = false;
+
+      for (const [fp, fileDiagnostics] of byFile) {
+        emitOperation({
+          type: "build_event",
+          eventType: "self_healing",
+          message: `🔧 Type-fix ${round}/${MAX_TYPE_FIX_ROUNDS}: ${fp} (${fileDiagnostics
+            .map((d) => d.code)
+            .join(", ")})`,
+        });
+        emitOperation({
+          type: "autofix_start",
+          file: fp,
+          error: `${fileDiagnostics.length} type error(s)`,
+        });
+
+        try {
+          const fixed = await regenerateFileWithTypeErrors(
+            projectSlug,
+            projectPath,
+            fp,
+            fileDiagnostics,
+            allContracts,
+            { lmStudioUrl, model, maxTokens }
+          );
+          if (fixed) fixedAny = true;
+        } catch (err) {
+          console.warn(
+            `[Pipeline] Type-fix failed for ${fp}: ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      }
+
+      if (!fixedAny) break; // no file changed → further rounds won't help
     }
   }
 
