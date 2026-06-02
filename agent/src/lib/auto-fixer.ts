@@ -52,6 +52,26 @@ const applyBlock = (
   return true;
 };
 
+/**
+ * Maps a raw Metro/TypeScript error string to a targeted fix hint for the LLM.
+ * Exported for testing; returns "" when no specific hint applies.
+ */
+export const getErrorHint = (raw: string): string => {
+  if (raw.includes("TS2322") && raw.includes("is not assignable to type") && raw.includes("_layout.tsx")) {
+    return "HINT: Icons come from the UI kit — import { Icon } from '@/ui' and use <Icon name=\"...\" />. The name prop is a plain string, so no icon name is ever invalid; replace any raw vector-icons usage with <Icon> from '@/ui'.";
+  }
+  if (raw.includes("TS2322") && raw.includes("is not assignable to type")) {
+    return "HINT: A prop value does not match the expected type. Check the target component's Props. For icons use <Icon name=\"...\" /> from '@/ui' (name is any string).";
+  }
+  if (raw.includes("TS2304") || raw.includes("TS2552")) {
+    return "HINT: You forgot to import a type, interface, or component. Add the missing import statement at the top of the file.";
+  }
+  if (raw.includes("TS2305")) {
+    return "HINT: You imported a member that does not exist in the module. Pressable does NOT exist in 'tamagui' — import it from 'react-native'. View/Text do NOT exist in 'tamagui' — use YStack/XStack/Text from 'tamagui'.";
+  }
+  return "";
+};
+
 export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> => {
   const {
     projectName,
@@ -71,16 +91,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
     const skeleton = buildProjectSkeleton(projectPath);
     const fileContent = readFile(projectName, error.file) ?? "// file not found";
 
-    let errorHint = "";
-    if (error.raw.includes("TS2322") && error.raw.includes("is not assignable to type") && error.raw.includes("_layout.tsx")) {
-      errorHint = "HINT: Icons come from the UI kit — import { Icon } from '@/ui' and use <Icon name=\"...\" />. The name prop is a plain string, so no icon name is ever invalid; replace any raw vector-icons usage with <Icon> from '@/ui'.";
-    } else if (error.raw.includes("TS2322") && error.raw.includes("is not assignable to type")) {
-      errorHint = "HINT: A prop value does not match the expected type. Check the target component's Props. For icons use <Icon name=\"...\" /> from '@/ui' (name is any string).";
-    } else if (error.raw.includes("TS2304") || error.raw.includes("TS2552")) {
-      errorHint = "HINT: You forgot to import a type, interface, or component. Add the missing import statement at the top of the file.";
-    } else if (error.raw.includes("TS2305")) {
-      errorHint = "HINT: You imported a member that does not exist in the module. Pressable does NOT exist in 'tamagui' — import it from 'react-native'. View/Text do NOT exist in 'tamagui' — use YStack/XStack/Text from 'tamagui'.";
-    }
+    const errorHint = getErrorHint(error.raw);
 
     const messages = [
       { role: "system" as const, content: SYSTEM_AUTOFIX },
