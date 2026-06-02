@@ -7,9 +7,13 @@
 import fs from "fs";
 import { getProjectPath } from "../services/file-manager.js";
 
-/** A unique, collision-resistant project name for one integration test run. */
-export const makeTempProjectName = (prefix = "it"): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+// The "vitest-" prefix marks these as throwaway test projects: it cannot collide
+// with a real app slug (plan names are slugified and never start with "vitest-")
+// and it is gitignored (workspace/vitest-*), so running the suite in a
+// non-isolated environment (e.g. Cursor on a dev machine) cannot pollute the real
+// workspace or git status even if a run is interrupted before cleanup.
+export const makeTempProjectName = (label = "tmp"): string =>
+  `vitest-${label}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 /** Recursively remove a temp project directory created during a test. */
 export const removeTempProject = (projectName: string): void => {

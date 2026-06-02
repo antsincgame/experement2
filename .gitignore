@@ -6,6 +6,7 @@ agent/dist/
 test-results/
 playwright-report/
 workspace/e2e-existing-project/
+workspace/vitest-*/
 tools/e2e-results.json
 e2e/*.json
 e2e/*.md

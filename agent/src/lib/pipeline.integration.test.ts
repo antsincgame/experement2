@@ -44,7 +44,13 @@ describe("createProject (integration, injected PipelineContext)", () => {
         // Mirror the real scaffold (copy the committed template_cache + set app.json)
         // minus the npm install, so the real static validator sees a full project.
         const p = getProjectPath(name);
-        fs.cpSync(path.join(getWorkspaceRoot(), "template_cache"), p, { recursive: true });
+        fs.cpSync(path.join(getWorkspaceRoot(), "template_cache"), p, {
+          recursive: true,
+          // Skip node_modules/.git/etc: on a non-isolated machine template_cache
+          // may contain a large installed node_modules, and the validator only
+          // needs the source files + package.json.
+          filter: (src) => !/[/\\](node_modules|\.git|\.expo|dist)([/\\]|$)/.test(src),
+        });
         const appJsonPath = path.join(p, "app.json");
         const appJson = JSON.parse(fs.readFileSync(appJsonPath, "utf-8"));
         appJson.expo.name = displayName;
