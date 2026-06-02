@@ -1,5 +1,4 @@
 // Verifies generated projects with deterministic validation gates and scoped preview events before announcing success.
-import { spawnSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { broadcast, setPreviewPort } from "./event-bus.js";
@@ -26,6 +25,7 @@ import { validateGeneratedProject, validateFileContracts, autoHealImportContract
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
 import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
+import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
 
 interface CreateOptions {
   description: string;
@@ -65,58 +65,6 @@ interface GateResult {
   success: boolean;
   errors: string[];
 }
-
-const GIT_HASH_PATTERN = /^[a-f0-9]{7,64}$/i;
-
-const runGitCommand = (
-  projectPath: string,
-  args: string[],
-  options: { allowFailure?: boolean } = {}
-): string => {
-  const result = spawnSync("git", args, {
-    cwd: projectPath,
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  if ((result.status ?? 1) !== 0 && !options.allowFailure) {
-    const output = [result.stdout, result.stderr]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-    throw new Error(output || `git ${args.join(" ")} failed`);
-  }
-
-  return result.stdout?.trim() ?? "";
-};
-
-const gitCommit = (projectPath: string, message: string): string | null => {
-  try {
-    runGitCommand(projectPath, ["add", "-A"]);
-    runGitCommand(projectPath, ["commit", "-m", message, "--allow-empty"]);
-    return runGitCommand(projectPath, ["rev-parse", "--short", "HEAD"]);
-  } catch {
-    return null;
-  }
-};
-
-const gitInit = (projectPath: string): void => {
-  try {
-    runGitCommand(projectPath, ["init"]);
-    // Set local git identity so commit works even without global config
-    runGitCommand(projectPath, ["config", "user.email", "agent@appfactory.local"]);
-    runGitCommand(projectPath, ["config", "user.name", "App Factory Agent"]);
-    runGitCommand(projectPath, ["add", "-A"]);
-    runGitCommand(projectPath, ["commit", "-m", "v1: initial generation"]);
-  } catch (err) {
-    console.warn("[Pipeline] git init failed:", err);
-  }
-};
 
 const waitForBuildOutcome = async (
   timeoutMs: number,
@@ -904,14 +852,4 @@ export const revertVersion = async (
 };
 
 // handleAutoFix removed — replaced by inline Build Verification Loop in createProject
-
-const getVersionNumber = (projectPath: string): number => {
-  try {
-    const log = runGitCommand(projectPath, ["log", "--oneline"], {
-      allowFailure: true,
-    });
-    return log ? log.split("\n").length + 1 : 1;
-  } catch {
-    return 1;
-  }
-};
+// git helpers (runGitCommand/gitCommit/gitInit/getVersionNumber) live in ./git.ts
