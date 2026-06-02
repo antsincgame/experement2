@@ -38,7 +38,7 @@ interface GeneratorOptions {
   onFileComplete?: (filepath: string) => void;
 }
 
-const normalizeImportDeclarations = (code: string): string => {
+export const normalizeImportDeclarations = (code: string): string => {
   try {
     const project = new Project({
       useInMemoryFileSystem: true,
@@ -96,7 +96,7 @@ const normalizeImportDeclarations = (code: string): string => {
  * are now type-safe via the scaffolded <Icon> wrapper, and real type mismatches
  * are repaired by the compiler-in-the-loop (see typecheck.ts + pipeline Step 3c).
  */
-const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
+export const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   let result = code;
 
   // Strip Qwen3 thinking blocks
@@ -129,7 +129,7 @@ const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
 };
 
 /** Ensure hooks and components use export default (not named export) */
-const ensureDefaultExport = (code: string, filePath: string): string => {
+export const ensureDefaultExport = (code: string, filePath: string): string => {
   // Only apply to hooks and components
   const isHook = filePath.includes("/hooks/") && filePath.match(/use[A-Z]/);
   const isComponent = filePath.includes("/components/") && filePath.match(/\/[A-Z]/);
@@ -149,7 +149,7 @@ const ensureDefaultExport = (code: string, filePath: string): string => {
 };
 
 /** Fix named imports of hooks — hooks use export default, must be imported without braces */
-const fixHookImports = (code: string): string => {
+export const fixHookImports = (code: string): string => {
   // Match: import { useX } from "@/hooks/useX" → import useX from "@/hooks/useX"
   return code.replace(
     /import\s*\{\s*(use[A-Z]\w*)\s*\}\s*from\s*(["']@\/hooks\/[^"']+["'])/g,
@@ -158,7 +158,7 @@ const fixHookImports = (code: string): string => {
 };
 
 /** Fix named imports of components — components use export default */
-const fixComponentImports = (code: string): string => {
+export const fixComponentImports = (code: string): string => {
   // Match: import { ComponentName } from "@/components/ComponentName" → import ComponentName from ...
   return code.replace(
     /import\s*\{\s*([A-Z]\w*)\s*\}\s*from\s*(["']@\/components\/[^"']+["'])/g,
@@ -198,7 +198,7 @@ const buildDependencyContext = (
   return dependencyContents;
 };
 
-const extractCodeFromResponse = (response: string): { filepath: string; code: string } | null => {
+export const extractCodeFromResponse = (response: string): { filepath: string; code: string } | null => {
   const filepathMatch = response.match(/^filepath:\s*(.+)/m);
   if (!filepathMatch) return null;
 
@@ -552,7 +552,7 @@ RULES:
 
 // ── Compiler-in-the-loop: regenerate a single file given its TYPE errors ──
 
-const stripCodePreamble = (raw: string): string => {
+export const stripCodePreamble = (raw: string): string => {
   let code = raw.trim()
     .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
     .replace(/\n?```\s*$/, "")
