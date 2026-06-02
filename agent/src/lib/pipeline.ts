@@ -25,6 +25,7 @@ import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { validateGeneratedProject, validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
+import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
 
 interface CreateOptions {
   description: string;
@@ -116,9 +117,6 @@ const gitInit = (projectPath: string): void => {
     console.warn("[Pipeline] git init failed:", err);
   }
 };
-
-const summarizeOutput = (output: string): string =>
-  output.trim().split("\n").slice(-12).join("\n").trim();
 
 const waitForBuildOutcome = async (
   timeoutMs: number,
@@ -320,34 +318,10 @@ const _createProjectInner = async (
   });
 
   // Auto-heal plan: add missing dependency files that are referenced but not in files[]
-  const planFilePaths = new Set(plan.files.map((f) => f.path));
-  for (const file of [...plan.files]) {
-    for (const dep of file.dependencies) {
-      if (!dep.startsWith("src/") && !dep.startsWith("app/")) continue;
-      if (planFilePaths.has(dep)) continue;
-      const inferredType = dep.includes("/hooks/") ? "hook"
-        : dep.includes("/stores/") ? "store"
-        : dep.includes("/types/") ? "type"
-        : dep.includes("/components/") ? "component"
-        : dep.includes("/lib/") ? "type"
-        : "component";
-      plan.files.push({
-        path: dep,
-        type: inferredType as "hook" | "store" | "type" | "component" | "screen",
-        description: `Auto-added: referenced by ${file.path}`,
-        dependencies: inferredType === "type" ? [] : ["src/types/index.ts"].filter((t) => planFilePaths.has(t) || dep !== t),
-      });
-      planFilePaths.add(dep);
-    }
-  }
+  autoHealPlanDependencies(plan);
 
   // Deduplicate project name
-  projectSlug = plan.name;
-  let suffix = 0;
-  while (fs.existsSync(getProjectPath(projectSlug))) {
-    suffix++;
-    projectSlug = `${plan.name}-${suffix}`;
-  }
+  projectSlug = dedupeProjectSlug(plan.name, (slug) => fs.existsSync(getProjectPath(slug)));
 
   onProjectNameResolved?.(projectSlug);
 

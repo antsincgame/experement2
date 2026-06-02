@@ -1,0 +1,81 @@
+import { describe, it, expect } from "vitest";
+import type { AppPlan } from "../schemas/app-plan.schema.js";
+import {
+  summarizeOutput,
+  dedupeProjectSlug,
+  autoHealPlanDependencies,
+} from "./pipeline-helpers.js";
+
+type PlanFile = AppPlan["files"][number];
+
+const makePlan = (files: PlanFile[]): AppPlan =>
+  ({ name: "test", files } as unknown as AppPlan);
+
+const file = (path: string, dependencies: string[] = []): PlanFile =>
+  ({ path, type: "screen", description: path, dependencies } as PlanFile);
+
+describe("summarizeOutput", () => {
+  it("trims and keeps only the last 12 lines", () => {
+    const many = Array.from({ length: 20 }, (_, i) => `line${i}`).join("\n");
+    const out = summarizeOutput(many).split("\n");
+    expect(out).toHaveLength(12);
+    expect(out[0]).toBe("line8");
+    expect(out[11]).toBe("line19");
+  });
+
+  it("trims surrounding whitespace for short output", () => {
+    expect(summarizeOutput("  a\nb  ")).toBe("a\nb");
+  });
+});
+
+describe("dedupeProjectSlug", () => {
+  it("returns the base name when there is no collision", () => {
+    expect(dedupeProjectSlug("calc", () => false)).toBe("calc");
+  });
+
+  it("appends an incrementing suffix until a free slug is found", () => {
+    const taken = new Set(["calc", "calc-1"]);
+    expect(dedupeProjectSlug("calc", (slug) => taken.has(slug))).toBe("calc-2");
+  });
+});
+
+describe("autoHealPlanDependencies", () => {
+  it("adds missing src/ dependencies with inferred types", () => {
+    const plan = makePlan([
+      file("app/index.tsx", [
+        "src/hooks/useThing.ts",
+        "src/stores/appStore.ts",
+        "src/components/Card.tsx",
+        "src/lib/format.ts",
+      ]),
+    ]);
+
+    autoHealPlanDependencies(plan);
+
+    const byPath = new Map(plan.files.map((f) => [f.path, f.type]));
+    expect(byPath.get("src/hooks/useThing.ts")).toBe("hook");
+    expect(byPath.get("src/stores/appStore.ts")).toBe("store");
+    expect(byPath.get("src/components/Card.tsx")).toBe("component");
+    expect(byPath.get("src/lib/format.ts")).toBe("type");
+  });
+
+  it("ignores bare module deps and does not duplicate known files", () => {
+    const plan = makePlan([
+      file("app/index.tsx", ["react", "src/stores/appStore.ts"]),
+      file("src/stores/appStore.ts", []),
+    ]);
+
+    autoHealPlanDependencies(plan);
+
+    expect(plan.files.some((f) => f.path === "react")).toBe(false);
+    expect(plan.files.filter((f) => f.path === "src/stores/appStore.ts")).toHaveLength(1);
+  });
+
+  it("marks auto-added files in their description", () => {
+    const plan = makePlan([file("app/index.tsx", ["src/types/index.ts"])]);
+    autoHealPlanDependencies(plan);
+    const added = plan.files.find((f) => f.path === "src/types/index.ts");
+    expect(added?.type).toBe("type");
+    expect(added?.description).toContain("Auto-added");
+  });
+});
