@@ -1,6 +1,6 @@
 // Generates files with contract-aware layouts, broader dependency context, and safer import normalization.
 import { Project, QuoteKind, ScriptKind } from "ts-morph";
-import { streamCompletion } from "../services/llm-proxy.js";
+import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import { writeFile, readFile } from "../services/file-manager.js";
 import path from "path";
 import { buildProjectSkeleton, extractExportContracts, type ExportContract } from "./context-builder.js";
@@ -34,6 +34,8 @@ interface GeneratorOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Model-completion seam; defaults to the real streamCompletion. */
+  complete?: CompleteFn;
   onFileStart?: (filepath: string, index: number, total: number) => void;
   onChunk?: (chunk: string) => void;
   onFileComplete?: (filepath: string) => void;
@@ -232,6 +234,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     model,
     temperature,
     maxTokens,
+    complete = streamCompletion,
     onFileStart,
     onChunk,
     onFileComplete,
@@ -357,7 +360,7 @@ Generate the complete code for: ${fileSpec.path}`;
 
     let responseBuffer = "";
 
-    const generator = await streamCompletion(messages, {
+    const generator = await complete(messages, {
       temperature: temperature ?? 0.4,
       maxTokens: maxTokens ?? 65536,
       lmStudioUrl,
@@ -445,7 +448,7 @@ Generate the complete code for: ${fileSpec.path}`;
         },
       ];
 
-      const retryGen = await streamCompletion(retryMessages, {
+      const retryGen = await complete(retryMessages, {
         temperature: temperature ?? 0.3,
         maxTokens: maxTokens ?? 65536,
         lmStudioUrl,

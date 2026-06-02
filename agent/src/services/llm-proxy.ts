@@ -308,6 +308,13 @@ export const streamCompletion = async (
   return parseSSE();
 };
 
+/**
+ * The model-completion seam. generator/editor accept a value of this type
+ * (defaulting to streamCompletion), so tests inject a scripted fake with plain
+ * function passing instead of mocking the module — readable and debuggable.
+ */
+export type CompleteFn = typeof streamCompletion;
+
 const NON_STREAMING_TIMEOUT_MS = 120_000;
 const NON_STREAMING_MAX_RETRIES = 3;
 

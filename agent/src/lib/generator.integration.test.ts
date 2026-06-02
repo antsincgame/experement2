@@ -1,16 +1,15 @@
 // Integration test: exercise the real generateFiles orchestration end-to-end
 // (real file-manager writes, real ts-morph contract extraction, real plan
-// validation and sanitization) with only the LLM boundary scripted. This is the
-// first node of the orchestrator safety net described in the architecture review.
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+// validation and sanitization). The model is supplied via the injected `complete`
+// function — no module mocking — so the test reads as "given the model returns X
+// for file Y, the generator writes Z". To explore it, ctrl-click generateFiles:
+// the `complete` parameter is the seam.
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
+import type { CompleteFn } from "../services/llm-proxy.js";
 import { getProjectPath, readFile } from "../services/file-manager.js";
 import { makeTempProjectName, removeTempProject } from "../test-support/temp-workspace.js";
-import { streamOf, type ChatMsg } from "../test-support/llm-mock.js";
-
-const mocks = vi.hoisted(() => ({ streamCompletion: vi.fn() }));
-vi.mock("../services/llm-proxy.js", () => ({ streamCompletion: mocks.streamCompletion }));
-
+import { streamOf } from "../test-support/llm-mock.js";
 import { generateFiles } from "./generator.js";
 
 const buildPlan = (): AppPlan =>
@@ -28,7 +27,7 @@ const buildPlan = (): AppPlan =>
 const responseFor = (filePath: string): string => {
   if (filePath === "app/index.tsx") {
     // Includes a @/src/ alias and a named hook import so we can assert the real
-    // sanitizer ran (alias collapse + hook→default import). // EOF avoids the
+    // sanitizer ran (alias collapse + hook->default import). // EOF avoids the
     // truncation-continuation path.
     return [
       "filepath: app/index.tsx",
@@ -41,33 +40,32 @@ const responseFor = (filePath: string): string => {
   return `filepath: ${filePath}\nexport interface T { a: number }\n// EOF`;
 };
 
-describe("generateFiles (integration, scripted LLM)", () => {
+describe("generateFiles (integration, injected fake model)", () => {
   let projectName: string;
   const requested: string[] = [];
+
+  // The injected model: picks its reply from the requested file path and records
+  // call order. Plain function — assignable to the same type the real model has.
+  const fakeComplete: CompleteFn = async (messages) => {
+    const user = messages.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+    const filePath = user.match(/Generate the complete code for:\s*(\S+)/)?.[1] ?? "";
+    requested.push(filePath);
+    return streamOf(responseFor(filePath));
+  };
 
   beforeEach(() => {
     projectName = makeTempProjectName("it-gen");
     requested.length = 0;
-    mocks.streamCompletion.mockImplementation(async (messages: ChatMsg[]) => {
-      const user = messages.filter((m) => m.role === "user").map((m) => m.content).join("\n");
-      const match = user.match(/Generate the complete code for:\s*(\S+)/);
-      const filePath = match?.[1] ?? "";
-      requested.push(filePath);
-      return streamOf(responseFor(filePath));
-    });
   });
 
-  afterEach(() => {
-    removeTempProject(projectName);
-    vi.clearAllMocks();
-  });
+  afterEach(() => removeTempProject(projectName));
 
   it("scaffolds the layout and writes every planned file", async () => {
-    const plan = buildPlan();
     const files = await generateFiles({
       projectName,
       projectPath: getProjectPath(projectName),
-      plan,
+      plan: buildPlan(),
+      complete: fakeComplete,
     });
 
     expect(files).toContain("app/_layout.tsx"); // auto-generated stack layout
@@ -76,18 +74,26 @@ describe("generateFiles (integration, scripted LLM)", () => {
   });
 
   it("generates dependencies before their consumers (type before screen)", async () => {
-    const plan = buildPlan();
-    await generateFiles({ projectName, projectPath: getProjectPath(projectName), plan });
+    await generateFiles({
+      projectName,
+      projectPath: getProjectPath(projectName),
+      plan: buildPlan(),
+      complete: fakeComplete,
+    });
 
     expect(requested).toEqual(["src/types/index.ts", "app/index.tsx"]);
   });
 
   it("runs the real sanitizer on generated code (alias collapse + hook import fix)", async () => {
-    const plan = buildPlan();
-    await generateFiles({ projectName, projectPath: getProjectPath(projectName), plan });
+    await generateFiles({
+      projectName,
+      projectPath: getProjectPath(projectName),
+      plan: buildPlan(),
+      complete: fakeComplete,
+    });
 
     const screen = readFile(projectName, "app/index.tsx") ?? "";
-    expect(screen).toContain(`import useThing from "@/hooks/useThing"`); // named → default
+    expect(screen).toContain(`import useThing from "@/hooks/useThing"`); // named -> default
     expect(screen).toContain(`from "@/types"`); // @/src/ collapsed
     expect(screen).not.toContain("@/src/");
   });

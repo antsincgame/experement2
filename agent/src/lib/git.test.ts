@@ -1,12 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-const mocks = vi.hoisted(() => ({ spawnSync: vi.fn() }));
-vi.mock("child_process", () => ({ spawnSync: mocks.spawnSync }));
-
-import { GIT_HASH_PATTERN, runGitCommand, gitCommit } from "./git.js";
-
-const ok = (stdout = "") => ({ status: 0, stdout, stderr: "", error: undefined });
-const fail = (stderr = "boom") => ({ status: 1, stdout: "", stderr, error: undefined });
+// No module mocking. The thin runGitCommand wrapper is exercised with REAL git
+// on operations that don't sign (init/rev-parse, which work in any environment),
+// and the higher-level helpers are tested with an injected fake `run` so their
+// logic (command order, hash extraction, version counting, error handling) is
+// fully deterministic and independent of the git environment.
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { GIT_HASH_PATTERN, runGitCommand, gitInit, gitCommit, getVersionNumber } from "./git.js";
 
 describe("GIT_HASH_PATTERN", () => {
   it("accepts 7-64 char hex hashes (case-insensitive)", () => {
@@ -16,42 +17,58 @@ describe("GIT_HASH_PATTERN", () => {
   });
 
   it("rejects short, non-hex, or injection-y strings", () => {
-    expect(GIT_HASH_PATTERN.test("12345")).toBe(false); // too short
-    expect(GIT_HASH_PATTERN.test("g123456")).toBe(false); // non-hex
+    expect(GIT_HASH_PATTERN.test("12345")).toBe(false);
+    expect(GIT_HASH_PATTERN.test("g123456")).toBe(false);
     expect(GIT_HASH_PATTERN.test("abc123; rm -rf /")).toBe(false);
   });
 });
 
-describe("runGitCommand", () => {
-  beforeEach(() => mocks.spawnSync.mockReset());
+describe("runGitCommand (real git, non-signing operations)", () => {
+  let dir: string;
 
-  it("returns trimmed stdout on success", () => {
-    mocks.spawnSync.mockReturnValue(ok("  deadbeef\n"));
-    expect(runGitCommand("/p", ["rev-parse", "HEAD"])).toBe("deadbeef");
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "git-test-"));
   });
 
-  it("throws on non-zero exit unless allowFailure is set", () => {
-    mocks.spawnSync.mockReturnValue(fail("fatal: not a repo"));
-    expect(() => runGitCommand("/p", ["status"])).toThrow(/not a repo/);
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 
-    mocks.spawnSync.mockReturnValue(fail("fatal"));
-    expect(runGitCommand("/p", ["log"], { allowFailure: true })).toBe("");
+  it("returns trimmed stdout on success", () => {
+    expect(runGitCommand(dir, ["init"]).toLowerCase()).toContain("repository");
+  });
+
+  it("throws on a failing command unless allowFailure is set", () => {
+    expect(() => runGitCommand(dir, ["rev-parse", "HEAD"])).toThrow();
+    expect(runGitCommand(dir, ["rev-parse", "HEAD"], { allowFailure: true })).toBe("");
   });
 });
 
-describe("gitCommit", () => {
-  beforeEach(() => mocks.spawnSync.mockReset());
-
-  it("returns the short hash on success", () => {
-    mocks.spawnSync
-      .mockReturnValueOnce(ok()) // add
-      .mockReturnValueOnce(ok()) // commit
-      .mockReturnValueOnce(ok("abc1234")); // rev-parse
-    expect(gitCommit("/p", "msg")).toBe("abc1234");
+describe("git helpers (injected runner — deterministic, no real git)", () => {
+  it("gitInit issues init, identity config, add, and commit in order", () => {
+    const commands: string[] = [];
+    gitInit("/p", (_projectPath, args) => {
+      commands.push(args[0]);
+      return "";
+    });
+    expect(commands).toEqual(["init", "config", "config", "add", "commit"]);
   });
 
-  it("returns null when any git step fails", () => {
-    mocks.spawnSync.mockReturnValue(fail());
-    expect(gitCommit("/p", "msg")).toBeNull();
+  it("gitCommit returns the short hash from rev-parse", () => {
+    const hash = gitCommit("/p", "msg", (_projectPath, args) =>
+      args[0] === "rev-parse" ? "abc1234" : ""
+    );
+    expect(hash).toBe("abc1234");
+  });
+
+  it("gitCommit returns null when a git step throws", () => {
+    expect(gitCommit("/p", "msg", () => {
+      throw new Error("not a repo");
+    })).toBeNull();
+  });
+
+  it("getVersionNumber is the commit count + 1 (or 1 when there is no log)", () => {
+    expect(getVersionNumber("/p", () => "h1\nh2\nh3")).toBe(4);
+    expect(getVersionNumber("/p", () => "")).toBe(1);
   });
 });

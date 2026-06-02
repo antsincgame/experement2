@@ -1,5 +1,5 @@
 // Plans and applies LLM-driven file edits with shared search/replace semantics and explicit JSON validation.
-import { streamCompletion } from "../services/llm-proxy.js";
+import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import {
   readFile,
   writeFile,
@@ -32,6 +32,8 @@ interface EditorOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Model-completion seam; defaults to the real streamCompletion. */
+  complete?: CompleteFn;
   onThinking?: (text: string) => void;
   onBlock?: (block: SearchReplaceBlock) => void;
   onDiff?: (filepath: string, before: string, after: string) => void;
@@ -56,6 +58,7 @@ export const editProject = async (
     model,
     temperature,
     maxTokens,
+    complete = streamCompletion,
     onThinking,
     onBlock,
     onDiff,
@@ -76,7 +79,7 @@ export const editProject = async (
     },
   ];
 
-  const analyzeGen = await streamCompletion(analyzeMessages, {
+  const analyzeGen = await complete(analyzeMessages, {
     temperature: temperature ?? 0.3,
     maxTokens: 2048,
     lmStudioUrl,
@@ -149,7 +152,7 @@ export const editProject = async (
     },
   ];
 
-  const generateGen = await streamCompletion(generateMessages, {
+  const generateGen = await complete(generateMessages, {
     temperature: temperature ?? 0.4,
     maxTokens: maxTokens ?? 65536,
     lmStudioUrl,
