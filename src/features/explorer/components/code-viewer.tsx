@@ -241,7 +241,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
 
   if (Platform.OS !== "web") {
     return (
-      <View className="flex-1" style={{ backgroundColor: "#0A0A0A" }}>
+      <View className="flex-1" style={{ backgroundColor: "#0A0A0A", minHeight: 0 }}>
         {toolbar}
         <TextInput
           value={draft}

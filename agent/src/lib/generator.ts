@@ -43,8 +43,56 @@ interface GeneratorOptions {
   complete?: CompleteFn;
   onFileStart?: (filepath: string, index: number, total: number) => void;
   onChunk?: (chunk: string) => void;
+  /** Per-file model reasoning (captured from <think>/<thinking> blocks) for chat humanization. */
+  onThinking?: (filepath: string, reasoning: string) => void;
   onFileComplete?: (filepath: string) => void;
 }
+
+/**
+ * Compact plan context for a single file generation. Instead of embedding the
+ * full plan JSON (O(files × plan_size), now even larger with rich descriptions),
+ * send the app header, a cheap file manifest (the "map"), and only the intent of
+ * THIS file's direct dependencies. Their full code is still appended separately.
+ */
+export const buildPlanContext = (
+  plan: AppPlan,
+  fileSpec: AppPlan["files"][number]
+): string => {
+  const themeStyle = plan.theme?.style ?? "premium";
+  const navType = plan.navigation?.type ?? "stack";
+  const manifest = plan.files.map((f) => `- ${f.path} (${f.type})`).join("\n");
+  const depSpecs = fileSpec.dependencies
+    .map((dep) => plan.files.find((f) => f.path === dep))
+    .filter((f): f is AppPlan["files"][number] => Boolean(f))
+    .map((f) => `- ${f.path} (${f.type}): ${f.description}`);
+
+  const sections = [
+    "## App",
+    `Name: ${plan.displayName} (${plan.name})`,
+    `Description: ${plan.description}`,
+    `Theme: ${themeStyle}; Navigation: ${navType}`,
+    "",
+    "## File Manifest (every file in this app)",
+    manifest,
+  ];
+  if (depSpecs.length > 0) {
+    sections.push("", "## This file's dependencies (intent)", depSpecs.join("\n"));
+  }
+  return sections.join("\n");
+};
+
+/** Extracts the first reasoning block (<think>/<thinking>/redacted_thinking) for display. */
+export const extractReasoning = (text: string): string => {
+  const match = text.match(
+    /<(think|thinking|redacted_thinking)>([\s\S]*?)<\/\1>/i
+  );
+  if (match) {
+    return match[2].trim();
+  }
+  // Unclosed block: take everything after the opening tag.
+  const open = text.match(/<(?:think|thinking|redacted_thinking)>([\s\S]*)/i);
+  return open ? open[1].trim() : "";
+};
 
 export const normalizeImportDeclarations = (code: string): string => {
   try {
@@ -107,9 +155,12 @@ export const normalizeImportDeclarations = (code: string): string => {
 export const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   let result = code;
 
-  // Strip Qwen3 thinking blocks
-  result = result.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-  if (result.includes("<think>")) result = result.replace(/<think>[\s\S]*/g, "").trim();
+  // Strip reasoning blocks from thinking-enabled models (Qwen3 <think>,
+  // DeepSeek-R1, our <thinking>, and redacted_thinking variants).
+  result = result.replace(/<(think|thinking|redacted_thinking)>[\s\S]*?<\/\1>/gi, "").trim();
+  if (/<(?:think|thinking|redacted_thinking)>/i.test(result)) {
+    result = result.replace(/<(?:think|thinking|redacted_thinking)>[\s\S]*/gi, "").trim();
+  }
 
   result = result.replace(/from\s+["']@\/src\//g, 'from "@/');
   result = result.replace(/from\s*["']expo-router\/tabs["']/g, 'from "expo-router"');
@@ -245,6 +296,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     complete = streamCompletion,
     onFileStart,
     onChunk,
+    onThinking,
     onFileComplete,
   } = options;
 
@@ -347,8 +399,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     });
 
     const userMessage = `
-## App Plan
-${JSON.stringify(plan, null, 2)}
+${buildPlanContext(plan, fileSpec)}
 
 ## Project Skeleton
 ${skeleton.summary}
@@ -405,6 +456,15 @@ Generate the complete code for: ${fileSpec.path}`;
       }
     }
     if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
+
+    // Surface the model's reasoning for this file (if it produced any) so the
+    // chat can show the thought process, then it is stripped from the saved code.
+    if (onThinking && /<(?:think|thinking|redacted_thinking)>/i.test(responseBuffer)) {
+      const reasoning = extractReasoning(responseBuffer);
+      if (reasoning) {
+        onThinking(fileSpec.path, reasoning);
+      }
+    }
 
     const extracted = extractCodeFromResponse(responseBuffer);
     if (extracted) {

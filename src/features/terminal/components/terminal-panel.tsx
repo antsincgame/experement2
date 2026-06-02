@@ -63,7 +63,12 @@ const TerminalPanel = () => {
         </View>
       )}
 
-      <ScrollView ref={scrollRef} style={{ height: 120 }} contentContainerStyle={{ padding: 12 }}>
+      <ScrollView
+        ref={scrollRef}
+        style={mixedStyle({ height: 120, overflow: "auto", flexShrink: 0 })}
+        contentContainerStyle={{ padding: 12 }}
+        nestedScrollEnabled
+      >
         {lines.length > 0 ? (
           lines.map((line) => (
             <Text

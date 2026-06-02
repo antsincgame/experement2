@@ -288,7 +288,7 @@ export const useWebSocket = () => {
   }, []);
 
   const createProject = useCallback((description: string) => {
-    const { lmStudioUrl, model, plannerModel, embeddingModel, semanticRagEnabled, temperature, maxTokens, topP } =
+    const { lmStudioUrl, model, plannerModel, editorModel, embeddingModel, semanticRagEnabled, temperature, maxTokens, topP } =
       useSettingsStore.getState();
     send({
       type: "create_project",
@@ -297,6 +297,7 @@ export const useWebSocket = () => {
       lmStudioUrl,
       ...(model ? { model } : {}),
       ...(plannerModel ? { plannerModel } : {}),
+      ...(editorModel ? { editorModel } : {}),
       semanticRagEnabled,
       ...(embeddingModel.trim() ? { embeddingModel: embeddingModel.trim() } : {}),
       temperature,
@@ -321,7 +322,7 @@ export const useWebSocket = () => {
         content: message.content,
       }));
 
-    const { lmStudioUrl, model, temperature, maxTokens, topP } = useSettingsStore.getState();
+    const { lmStudioUrl, model, editorModel, temperature, maxTokens, topP } = useSettingsStore.getState();
     send({
       type: "iterate",
       requestId: createRequestId(),
@@ -330,6 +331,7 @@ export const useWebSocket = () => {
       chatHistory,
       lmStudioUrl,
       ...(model ? { model } : {}),
+      ...(editorModel ? { editorModel } : {}),
       temperature,
       maxTokens,
       topP,
@@ -337,13 +339,14 @@ export const useWebSocket = () => {
   }, [send]);
 
   const startPreview = useCallback((projectName: string) => {
-    const { lmStudioUrl, model } = useSettingsStore.getState();
+    const { lmStudioUrl, model, editorModel } = useSettingsStore.getState();
     send({
       type: "start_preview",
       requestId: createRequestId(),
       projectName,
       lmStudioUrl,
       ...(model ? { model } : {}),
+      ...(editorModel ? { editorModel } : {}),
     });
   }, [send]);
 

@@ -33,6 +33,7 @@ const ChatInput = ({
   const enhanceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
+  const generationModel = useSettingsStore((state) => state.model);
   const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
 
   const handleSend = useCallback(() => {
@@ -66,12 +67,25 @@ const ChatInput = ({
     try {
       const improvedPrompt = await apiClient.enhancePrompt({
         prompt: trimmed,
-        model: enhancerModel || undefined,
+        model: enhancerModel.trim() || generationModel.trim() || undefined,
         lmStudioUrl,
       });
 
-      if (improvedPrompt) {
-        setText(improvedPrompt);
+      const trimmedResult = improvedPrompt.trim();
+      if (trimmedResult) {
+        setText(trimmedResult);
+      } else {
+        const msg =
+          "Модель вернула пустой ответ — проверьте, что в LM Studio загружена chat-модель, а не только embedding.";
+        setEnhanceError(msg);
+        useSettingsStore.getState().addErrorLog({ level: "warn", source: "enhance", message: msg });
+        if (enhanceErrorTimerRef.current) {
+          clearTimeout(enhanceErrorTimerRef.current);
+        }
+        enhanceErrorTimerRef.current = setTimeout(() => {
+          setEnhanceError(null);
+          enhanceErrorTimerRef.current = null;
+        }, 6_000);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Enhancement failed";
@@ -87,7 +101,7 @@ const ChatInput = ({
     } finally {
       setEnhancing(false);
     }
-  }, [enhancerModel, lmStudioUrl, text]);
+  }, [enhancerModel, generationModel, lmStudioUrl, text]);
 
   useEffect(() => {
     if (Platform.OS !== "web") {

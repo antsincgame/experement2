@@ -1,4 +1,4 @@
-<!-- Updated for LM Studio-only setup so the public docs match the single supported local provider. -->
+<!-- Docs aligned with planner depth, chat reasoning, per-project chat cache, and settings draft/save. -->
 # ⚡ App Factory
 
 **Generate full React Native apps from natural language. Runs 100% locally.**
@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue)](https://www.typescriptlang.org/)
 [![Expo](https://img.shields.io/badge/Expo-SDK%2055-black)](https://expo.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-117%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/Tests-299%2B%20passing-brightgreen)]()
 
 Describe an app → AI plans, generates, builds, and previews it — all on your machine. No cloud. No API keys. No limits.
 
@@ -45,11 +45,18 @@ Open http://localhost:8081 and start building.
 ## Features
 
 - 🧠 **JSON Contract-Driven Development** — LLM sees exact export signatures, prevents import/export mismatches
-- 🔄 **Auto-fix loop** — if code breaks, AI fixes it automatically (max 2 retries)
+- 📋 **Deeper planning** — planner asks for 3–6 screens, real stores/types, rich per-file descriptions (not 2-tab stubs)
+- 💭 **Reasoning in chat** — plan summary + per-file model thoughts during generation; collapsible «Reasoning» bubbles on iterate
+- 💬 **Per-project chat cache** — switch projects without losing generation history; background runs append to the other project’s cache
+- 🔄 **Auto-fix loop** — if code breaks, AI fixes it automatically (max 2 retries); skips non-actionable Metro timeouts
 - 📝 **Markdown in chat** — code blocks with syntax highlighting
 - 🎯 **Export signature validation** — catches `import { X }` vs `import X` mismatches before Metro
 - 🔍 **Event Log** — full pipeline visibility with filters (ERROR/WARN/INFO)
 - ⚡ **Multi-project preview** — each project gets its own proxy URL
+- ⚙️ **Role-based models** — separate Generation, Planner, **Editor/Fix**, Enhancer, Embedding (optional; empty = auto)
+- 💾 **Settings draft + Save** — edit LM Studio URL and models, then **Save**; close without saving discards changes
+- 🧩 **Thinking-model friendly** — strips `<think>` / `<thinking>`; stream parser + `json_object` on planner/analyze
+- 📦 **Compact generation context** — file manifest + dependency intent instead of full plan JSON on every file (scales to large plans)
 - 🎨 **Aurora glassmorphism UI** — beautiful cyan-pink gradient design
 - 🛡️ **3 layers of error protection** — prompts, sanitizer, build verification loop
 
@@ -60,6 +67,12 @@ Open http://localhost:8081 and start building.
 | Qwen 3 Coder 30B (Q4_K_M) | ~18 GB | Generation (128k context) |
 | Qwen 2.5 Coder 32B | ~20 GB | High accuracy |
 | GLM 4.7 Flash | ~18 GB | Fast enhance/planning |
+
+**Tip:** set **Planner** and **Editor/Fix** to your strongest loaded model if auto-pick swaps to a weaker one during long runs. Use `/no_think` in prompts where supported; reasoning models still work via strip + parser.
+
+## Settings (web UI)
+
+Open the settings drawer, change LM Studio URL and per-role models, then click **Сохранить**. Values persist in `localStorage` (web) / AsyncStorage (native) under `app-factory-settings`. Per-project chat history persists under `app-factory-projects` (last 50 messages per project on disk).
 
 ## Project Structure
 

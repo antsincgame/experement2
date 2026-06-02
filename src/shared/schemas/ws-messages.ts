@@ -270,6 +270,7 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     lmStudioUrl: z.string().optional(),
     model: z.string().optional(),
     plannerModel: z.string().optional(),
+    editorModel: z.string().optional(),
     embeddingModel: z.string().optional(),
     semanticRagEnabled: z.boolean().optional(),
     temperature: z.number().optional(),
@@ -283,6 +284,7 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     chatHistory: UserAssistantMessageSchema.array(),
     lmStudioUrl: z.string().optional(),
     model: z.string().optional(),
+    editorModel: z.string().optional(),
     temperature: z.number().optional(),
     maxTokens: z.number().optional(),
     topP: z.number().optional(),
@@ -292,6 +294,7 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     projectName: ProjectNameSchema,
     lmStudioUrl: z.string().optional(),
     model: z.string().optional(),
+    editorModel: z.string().optional(),
   }).merge(OutgoingScopedMessageSchema),
   z.object({
     type: z.literal("abort_generation"),

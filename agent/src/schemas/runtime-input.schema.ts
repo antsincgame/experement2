@@ -131,6 +131,7 @@ export const WsCreateProjectSchema = z.object({
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
   plannerModel: OptionalModelSchema,
+  editorModel: OptionalModelSchema,
   embeddingModel: OptionalModelSchema,
   semanticRagEnabled: z.boolean().optional(),
   temperature: z.number().min(0).optional(),
@@ -147,6 +148,7 @@ export const WsIterateSchema = z.object({
     .default([]),
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
+  editorModel: OptionalModelSchema,
   temperature: z.number().min(0).optional(),
   maxTokens: z.number().int().positive().optional(),
   topP: z.number().min(0).max(1).optional(),
@@ -157,6 +159,7 @@ export const WsStartPreviewSchema = z.object({
   projectName: ProjectNameSchema,
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
+  editorModel: OptionalModelSchema,
 }).merge(WsRequestMetadataSchema);
 
 export const WsRevertVersionSchema = z.object({

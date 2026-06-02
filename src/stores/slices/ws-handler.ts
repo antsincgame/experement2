@@ -7,6 +7,7 @@ import {
   createDiffMessage,
   createSystemMessage,
   createErrorMessage,
+  type ChatMessage,
 } from "@/features/chat/schemas/message.schema";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -104,6 +105,19 @@ export const createWsHandler = (
   const { type } = msg;
   const store = get();
   const log = useSettingsStore.getState().addErrorLog;
+
+  const isActive = matchesActiveProject(get, msg);
+  const targetProjectName = getMessageProjectName(msg);
+  // Route a chat message to the active conversation, or — when the event belongs
+  // to a project the user has switched away from — silently into that project's
+  // cache so its generation/iteration history is not lost.
+  const emitChat = (message: ChatMessage): void => {
+    if (isActive) {
+      store.addMessage(message);
+    } else if (targetProjectName) {
+      store.appendBackgroundMessage(targetProjectName, message);
+    }
+  };
 
   switch (type) {
     case "connected":
@@ -229,16 +243,14 @@ export const createWsHandler = (
     }
 
     case "file_complete":
-      if (!matchesActiveProject(get, msg)) break;
-      store.completeGenerationFile(msg.filepath);
-      store.addMessage(createSystemMessage(`File created: ${msg.filepath}`, true));
+      if (isActive) store.completeGenerationFile(msg.filepath);
+      emitChat(createSystemMessage(`File created: ${msg.filepath}`, true));
       log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
       break;
 
     case "generation_complete":
-      if (!matchesActiveProject(get, msg)) break;
-      store.clearStreamingContent();
-      store.addMessage(createAssistantMessage(`Generated ${msg.filesCount} files [ok]`));
+      if (isActive) store.clearStreamingContent();
+      emitChat(createAssistantMessage(`Generated ${msg.filesCount} files [ok]`));
       log({ level: "info", source: "generator", message: `Generated ${msg.filesCount} files` });
       break;
 
@@ -261,23 +273,22 @@ export const createWsHandler = (
     }
 
     case "preview_status":
-      if (!matchesActiveProject(get, msg)) {
-        break;
+      if (isActive) {
+        applyPreviewStatus(store, msg.previewStatus, {
+          buildId: msg.buildId,
+          error: msg.error,
+          clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error" || msg.previewStatus === "stopped",
+        });
       }
-      applyPreviewStatus(store, msg.previewStatus, {
-        buildId: msg.buildId,
-        error: msg.error,
-        clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error" || msg.previewStatus === "stopped",
-      });
       if (msg.previewStatus === "error") {
-        store.addMessage(createErrorMessage("Preview failed to start.", msg.error));
+        emitChat(createErrorMessage("Preview failed to start.", msg.error));
         log({
           level: "error",
           source: "preview",
           message: "Preview failed",
           details: msg.error,
         });
-      } else if (msg.previewStatus === "starting") {
+      } else if (msg.previewStatus === "starting" && isActive) {
         log({ level: "info", source: "preview", message: "Preview starting" });
       }
       break;
@@ -307,30 +318,21 @@ export const createWsHandler = (
     }
 
     case "thinking":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createReasoningMessage(msg.content));
+      emitChat(createReasoningMessage(msg.content));
       break;
 
     case "analysis_complete": {
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
       const thinking = msg.thinking;
-      if (thinking) store.addMessage(createReasoningMessage(thinking));
+      if (thinking) emitChat(createReasoningMessage(thinking));
       const { files } = msg;
-      if (files?.length) store.addMessage(createSystemMessage(`Analyzing: ${files.join(", ")}`, true));
+      if (files?.length) emitChat(createSystemMessage(`Analyzing: ${files.join(", ")}`, true));
       break;
     }
 
     case "file_diff": {
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
       const { filepath, before, after } = msg;
-      store.addMessage(createDiffMessage(filepath, before, after));
-      store.setFileContent(filepath, after);
+      emitChat(createDiffMessage(filepath, before, after));
+      if (isActive) store.setFileContent(filepath, after);
       break;
     }
 
@@ -342,28 +344,27 @@ export const createWsHandler = (
       break;
 
     case "iteration_complete": {
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
       const { applied, failed } = msg;
       const errors = msg.errors ?? [];
       const hasFailure = failed > 0 || errors.length > 0;
       if (hasFailure) {
         const failureCount = Math.max(failed, errors.length, 1);
-        store.addMessage(createErrorMessage(`Applied ${applied} changes, ${failureCount} errors`, errors.join("\n") || undefined));
+        emitChat(createErrorMessage(`Applied ${applied} changes, ${failureCount} errors`, errors.join("\n") || undefined));
         log({ level: "error", source: "iteration", message: `${failureCount} blocks failed`, details: errors.join("\n") });
-        applyErrorState(store, {
-          error: errors.join("\n") || "Iteration failed",
-        });
-      } else {
+        if (isActive) {
+          applyErrorState(store, {
+            error: errors.join("\n") || "Iteration failed",
+          });
+        }
+      } else if (isActive) {
         store.setStatus("ready");
         if (get().previewStatus === "starting") {
           store.setPreviewStatus("stopped", { buildId: get().previewBuildId });
         }
       }
       if (applied > 0 && !hasFailure) {
-        store.addMessage(createAssistantMessage(`Applied ${applied} changes [ok]`));
-        store.setStatus("ready");
+        emitChat(createAssistantMessage(`Applied ${applied} changes [ok]`));
+        if (isActive) store.setStatus("ready");
       }
       break;
     }
@@ -377,59 +378,47 @@ export const createWsHandler = (
       break;
 
     case "autofix_start":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createSystemMessage(`Autofix: ${msg.file ?? "unknown"} - ${msg.error.slice(0, 100)}`, false));
+      emitChat(createSystemMessage(`Autofix: ${msg.file ?? "unknown"} - ${msg.error.slice(0, 100)}`, false));
       log({ level: "warn", source: "autofix", message: `Starting autofix: ${msg.file ?? "unknown"}`, details: msg.error.slice(0, 300) });
       break;
 
     case "autofix_success":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createAssistantMessage(`Error fixed (attempt ${msg.attempts}) [ok]`));
+      emitChat(createAssistantMessage(`Error fixed (attempt ${msg.attempts}) [ok]`));
       log({ level: "info", source: "autofix", message: `Fixed on attempt ${msg.attempts}` });
       break;
 
     case "autofix_failed":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createErrorMessage(`Could not fix after ${msg.attempts} attempts.`, msg.error, msg.file));
+      emitChat(createErrorMessage(`Could not fix after ${msg.attempts} attempts.`, msg.error, msg.file));
       log({ level: "error", source: "autofix", message: `Autofix failed after ${msg.attempts} attempts`, details: `File: ${msg.file ?? "unknown"}\n${msg.error ?? ""}` });
-      applyErrorState(store, {
-        error: msg.error ?? "Autofix failed",
-        buildId: msg.buildId ?? null,
-      });
+      if (isActive) {
+        applyErrorState(store, {
+          error: msg.error ?? "Autofix failed",
+          buildId: msg.buildId ?? null,
+        });
+      }
       break;
 
     case "reloading_preview":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createSystemMessage("Reverting version, reloading preview...", false));
+      emitChat(createSystemMessage("Reverting version, reloading preview...", false));
       break;
 
     case "system_error":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createErrorMessage(`Error: ${msg.error}`, msg.error, msg.file));
+      emitChat(createErrorMessage(`Error: ${msg.error}`, msg.error, msg.file));
       log({ level: "error", source: "system", message: String(msg.error), details: msg.file ? `File: ${msg.file}` : undefined });
-      applyErrorState(store, {
-        error: msg.error,
-        buildId: msg.buildId ?? null,
-      });
+      if (isActive) {
+        applyErrorState(store, {
+          error: msg.error,
+          buildId: msg.buildId ?? null,
+        });
+      }
       break;
 
     case "generation_aborted":
-      if (!matchesActiveProject(get, msg)) {
-        break;
+      emitChat(createSystemMessage("Generation aborted by user", false));
+      if (isActive) {
+        store.setStatus("ready");
+        applyPreviewStatus(store, "stopped", { clearPreview: true });
       }
-      store.addMessage(createSystemMessage("Generation aborted by user", false));
-      store.setStatus("ready");
-      applyPreviewStatus(store, "stopped", { clearPreview: true });
       log({ level: "warn", source: "pipeline", message: "Generation aborted by user" });
       break;
 
@@ -453,18 +442,12 @@ export const createWsHandler = (
     }
 
     case "autofix_attempt":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createSystemMessage(`Autofix: attempt ${msg.attempt}/${msg.maxAttempts}`, true));
+      emitChat(createSystemMessage(`Autofix: attempt ${msg.attempt}/${msg.maxAttempts}`, true));
       log({ level: "warn", source: "autofix", message: `Attempt ${msg.attempt}/${msg.maxAttempts}` });
       break;
 
     case "autofix_block":
-      if (!matchesActiveProject(get, msg)) {
-        break;
-      }
-      store.addMessage(createSystemMessage(`Fix: ${msg.filepath}`, true));
+      emitChat(createSystemMessage(`Fix: ${msg.filepath}`, true));
       log({ level: "info", source: "autofix", message: `Fix applied: ${msg.filepath}` });
       break;
 

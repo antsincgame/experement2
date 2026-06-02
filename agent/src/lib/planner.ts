@@ -4,6 +4,7 @@ import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
 import { validateAppPlan } from "./project-validator.js";
 import { safeJsonParse } from "./json-repair.js";
+import { stripThinkingFromText } from "./strip-thinking.js";
 
 interface PlannerOptions {
   description: string;
@@ -33,6 +34,7 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
     topP,
     lmStudioUrl,
     model,
+    responseFormat: { type: "json_object" },
   });
 
   let planChunkBuffer = "";
@@ -49,12 +51,9 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   }
   if (planChunkBuffer) onChunk?.(planChunkBuffer);
 
-  // Strip Qwen3 thinking blocks: <think>...</think>
-  let trimmed = fullJson.trim().replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-  // Also strip unclosed thinking block (model started thinking but didn't close)
-  if (trimmed.includes("<think>")) {
-    trimmed = trimmed.replace(/<think>[\s\S]*/g, "").trim();
-  }
+  // Strip reasoning-model blocks (<think>, <thinking>, redacted_thinking) and
+  // markdown fences via the shared utility so planner/editor behave identically.
+  const trimmed = stripThinkingFromText(fullJson);
 
   let parsed: unknown;
   try {

@@ -4,6 +4,7 @@ import {
   summarizeOutput,
   dedupeProjectSlug,
   autoHealPlanDependencies,
+  summarizePlanForChat,
 } from "./pipeline-helpers.js";
 
 type PlanFile = AppPlan["files"][number];
@@ -13,6 +14,33 @@ const makePlan = (files: PlanFile[]): AppPlan =>
 
 const file = (path: string, dependencies: string[] = []): PlanFile =>
   ({ path, type: "screen", description: path, dependencies } as PlanFile);
+
+describe("summarizePlanForChat", () => {
+  it("summarizes screens, components, state and libraries", () => {
+    const plan = {
+      name: "notes",
+      displayName: "Notes",
+      description: "A notes app",
+      extraDependencies: ["zustand"],
+      files: [
+        { path: "app/(tabs)/index.tsx", type: "screen", description: "list", dependencies: [] },
+        { path: "app/note/[id].tsx", type: "screen", description: "detail", dependencies: [] },
+        { path: "src/components/NoteCard.tsx", type: "component", description: "card", dependencies: [] },
+        { path: "src/stores/noteStore.ts", type: "store", description: "store", dependencies: [] },
+        { path: "src/types/index.ts", type: "type", description: "types", dependencies: [] },
+      ],
+    } as unknown as AppPlan;
+
+    const summary = summarizePlanForChat(plan);
+
+    expect(summary).toContain("Planned **Notes**");
+    expect(summary).toContain("Screens (2)");
+    expect(summary).toContain("Components (1): NoteCard.tsx");
+    expect(summary).toContain("State & logic: noteStore.ts");
+    expect(summary).toContain("Libraries: zustand");
+    expect(summary).toContain("Total: 5 files.");
+  });
+});
 
 describe("summarizeOutput", () => {
   it("trims and keeps only the last 12 lines", () => {

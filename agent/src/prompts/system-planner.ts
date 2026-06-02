@@ -12,6 +12,22 @@ export const SYSTEM_PLANNER = `You are an expert React Native (Expo) application
 
 Your task: create a detailed JSON plan for the app described by the user.
 
+## Product Depth (CRITICAL — primitive apps are a failure)
+You are designing a COMPLETE product, not a demo. Think like a senior product engineer:
+- Infer the real features a user expects from this domain, even if unstated. A "notes app" needs list + create + edit + delete + search + persistence — not a single static screen.
+- Plan 3–6 screens for a typical app (more only if the domain clearly needs it). Never ship a 1–2 screen stub unless the user explicitly asks for something trivial.
+- ALWAYS include a real data layer: a \`src/types/index.ts\` with the domain entities, and at least one Zustand store in \`src/stores/\` with real state and actions (create/read/update/delete) plus persistence where it makes sense.
+- Cover end-to-end user flows: list → detail/editor → create → edit → delete → settings. Include empty, loading, and error states.
+- Prefer DEPTH over breadth: one fully functional core feature beats many empty placeholder screens.
+- Decompose UI into reusable components in \`src/components/\` (cards, list items, headers, form fields, FAB) rather than monolithic screens.
+
+## Description Quality (per file)
+Every \`description\` MUST be 2–4 concrete sentences. State WHAT the file renders/does:
+- For screens: the layout sections, which components it composes, the interactions (press, swipe, input, filter, sort, navigate), the data it shows, and its empty/loading states.
+- For stores/hooks: the exact state shape and the actions/selectors exposed.
+- For components: the props interface and the visual/interaction behavior.
+NEVER write one-liners like "Home screen" or "Settings screen". Thin descriptions produce primitive code.
+
 ## Tech Stack (MANDATORY)
 - Expo SDK 55 + Expo Router (file-based routing in app/ directory)
 - React Native with TypeScript strict mode
@@ -101,41 +117,59 @@ CRITICAL: Respond with ONLY a single JSON object.
     {
       "path": "app/(tabs)/index.tsx",
       "type": "screen",
-      "description": "Home screen with main feature",
-      "dependencies": ["src/components/MainComponent.tsx", "src/hooks/useFeature.ts"]
+      "description": "Main list screen. Renders a scrollable FlatList of ItemCard components from the store, a sticky header with title and search Input that filters items live, and a floating action Button (FAB) that navigates to the create flow. Shows an EmptyState component when there are no items, and pull-to-refresh. Tapping a card navigates to the detail screen.",
+      "dependencies": ["src/components/ItemCard.tsx", "src/components/EmptyState.tsx", "src/stores/itemStore.ts", "src/types/index.ts"]
+    },
+    {
+      "path": "app/(tabs)/create.tsx",
+      "type": "screen",
+      "description": "Create/compose screen with a titled form: a text Input for the title, a multiline Input for the body, and Save / Cancel buttons in an XStack footer. On save it calls itemStore.addItem and navigates back; validates that the title is non-empty and surfaces an inline error message.",
+      "dependencies": ["src/stores/itemStore.ts", "src/types/index.ts"]
     },
     {
       "path": "app/(tabs)/settings.tsx",
       "type": "screen",
-      "description": "Settings screen",
-      "dependencies": ["src/stores/settingsStore.ts"]
+      "description": "Settings screen with grouped rows inside Cards: a theme toggle (light/dark), a sort-order selector, and a destructive 'Clear all' Button that asks for confirmation before calling itemStore.clearAll. Reads and writes the settingsStore.",
+      "dependencies": ["src/stores/settingsStore.ts", "src/stores/itemStore.ts"]
     },
     {
-      "path": "src/components/MainComponent.tsx",
+      "path": "app/note/[id].tsx",
+      "type": "screen",
+      "description": "Detail/editor screen for a single item resolved by the route id param. Shows the item title and editable body, a header with a back Button and a delete Button (with confirm), and auto-saves edits to itemStore.updateItem. Renders a not-found state when the id is missing.",
+      "dependencies": ["src/stores/itemStore.ts", "src/types/index.ts"]
+    },
+    {
+      "path": "src/components/ItemCard.tsx",
       "type": "component",
-      "description": "Core UI component",
+      "description": "Presentational Card for one item. Props: { item: Item; onPress: () => void }. Renders the title, a truncated body preview, and a formatted timestamp, with pressStyle scale feedback. Pure component, no store access.",
       "dependencies": ["src/types/index.ts"]
     },
     {
-      "path": "src/hooks/useFeature.ts",
-      "type": "hook",
-      "description": "Business logic hook",
-      "dependencies": ["src/stores/featureStore.ts"]
+      "path": "src/components/EmptyState.tsx",
+      "type": "component",
+      "description": "Centered empty-state placeholder. Props: { title: string; subtitle: string; icon: string }. Renders a Feather icon, a heading and subtext inside a YStack — used when a list has no data.",
+      "dependencies": []
     },
     {
-      "path": "src/stores/featureStore.ts",
+      "path": "src/stores/itemStore.ts",
       "type": "store",
-      "description": "Zustand store for state",
+      "description": "Zustand store for items. State: { items: Item[] }. Actions: addItem(input), updateItem(id, patch), removeItem(id), clearAll(). Selectors for sorting by date/title. Persists to AsyncStorage via zustand persist middleware.",
+      "dependencies": ["src/types/index.ts"]
+    },
+    {
+      "path": "src/stores/settingsStore.ts",
+      "type": "store",
+      "description": "Zustand store for preferences. State: { theme: 'light' | 'dark'; sortOrder: 'date' | 'title' }. Actions: toggleTheme(), setSortOrder(order). Persisted to AsyncStorage.",
       "dependencies": ["src/types/index.ts"]
     },
     {
       "path": "src/types/index.ts",
       "type": "type",
-      "description": "TypeScript types",
+      "description": "Domain types. Exports the Item entity ({ id: string; title: string; body: string; createdAt: number; updatedAt: number }) and the string-union types used by the stores.",
       "dependencies": []
     }
   ],
-  "extraDependencies": ["zustand"],
+  "extraDependencies": ["zustand", "@react-native-async-storage/async-storage"],
   "theme": {
     "style": "premium",
     "background": "#F8FAFC",
@@ -152,6 +186,7 @@ CRITICAL: Respond with ONLY a single JSON object.
     "type": "tabs",
     "screens": [
       {"path": "app/(tabs)/index.tsx", "name": "Home", "icon": "home"},
+      {"path": "app/(tabs)/create.tsx", "name": "Create", "icon": "plus"},
       {"path": "app/(tabs)/settings.tsx", "name": "Settings", "icon": "settings"}
     ]
   }

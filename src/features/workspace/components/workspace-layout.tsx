@@ -68,14 +68,19 @@ const WorkspaceLayout = ({
             <FileTree nodes={fileTree} activeFile={activeFile} onFilePress={onOpenFile} />
           </View>
         )}
-        <View className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+        <View
+          className="flex-1 overflow-hidden"
+          style={{ minHeight: 0, flexDirection: "column" }}
+        >
           <FileTabBar
             openFiles={openFiles}
             activeFile={activeFile}
             onSelect={onSelectFile}
             onClose={onCloseFile}
           />
-          <CodeViewer filepath={activeFile} />
+          <View style={{ flex: 1, minHeight: 0 }}>
+            <CodeViewer filepath={activeFile} />
+          </View>
         </View>
       </View>
       {terminalVisible && <TerminalPanel />}

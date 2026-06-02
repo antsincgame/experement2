@@ -1,5 +1,66 @@
 import { describe, it, expect } from "vitest";
-import { getErrorHint } from "./auto-fixer.js";
+import { autoFix, getErrorHint, type MetroError } from "./auto-fixer.js";
+import type { CompleteFn } from "../services/llm-proxy.js";
+import { streamOf } from "../test-support/llm-mock.js";
+import { writeFile } from "../services/file-manager.js";
+import { makeTempProjectName, removeTempProject } from "../test-support/temp-workspace.js";
+
+const searchReplace = (filepath: string, search: string, replace: string): string =>
+  ["filepath: " + filepath, "<<<<<<< SEARCH", search, "=======", replace, ">>>>>>> REPLACE"].join("\n");
+
+describe("autoFix (safety guards)", () => {
+  it("skips non-actionable errors (file 'unknown') without calling the model", async () => {
+    let called = false;
+    const complete: CompleteFn = async () => {
+      called = true;
+      return streamOf("");
+    };
+
+    const error: MetroError = {
+      type: "UnknownError",
+      file: "unknown",
+      line: "0",
+      raw: "Metro build timed out after 60000ms",
+    };
+
+    const result = await autoFix({ projectName: "vitest-noop", error, complete });
+
+    expect(called).toBe(false);
+    expect(result.success).toBe(false);
+    expect(result.attempts).toBe(0);
+    expect(result.lastError).toContain("no editable source file");
+  });
+
+  it("never throws when the model echoes an absolute/node_modules path", async () => {
+    const projectName = makeTempProjectName("autofix-unsafe");
+    writeFile(projectName, "app/index.tsx", "export const x = 1;\n");
+
+    // The model returns a block targeting an absolute esbuild-register path
+    // (as observed when a weak model echoes the Metro stack trace).
+    const complete: CompleteFn = async () =>
+      streamOf(
+        searchReplace(
+          "D:\\projects\\experement2\\workspace\\x\\node_modules\\esbuild-register\\dist\\node.js",
+          "a",
+          "b"
+        )
+      );
+
+    const error: MetroError = {
+      type: "SyntaxError",
+      file: "app/index.tsx",
+      line: "1",
+      raw: "app/index.tsx(1,1): SyntaxError: boom",
+    };
+
+    try {
+      const result = await autoFix({ projectName, error, complete, maxAttempts: 1 });
+      expect(result.success).toBe(false);
+    } finally {
+      removeTempProject(projectName);
+    }
+  });
+});
 
 describe("getErrorHint", () => {
   it("points icon TS2322 errors in _layout to the <Icon> kit wrapper", () => {

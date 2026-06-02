@@ -3,95 +3,12 @@ import type { Request, Response as ExpressResponse } from "express";
 import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
 import { assertLlmUrl } from "../lib/llm-url.js";
+import { clearChatModelCache, resolveChatModel } from "./chat-model.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
-interface CachedModelEntry {
-  modelId: string | null;
-  expiresAt: number;
-}
-
-const SUCCESS_MODEL_CACHE_TTL_MS = 5 * 60_000;
-const FAILED_MODEL_CACHE_TTL_MS = 30_000;
-
-const cachedModelIds = new Map<string, CachedModelEntry>();
-const modelFetchPromises = new Map<string, Promise<string | null>>();
-
-const getCachedModelId = (baseUrl: string): string | null | undefined => {
-  const entry = cachedModelIds.get(baseUrl);
-  if (!entry) {
-    return undefined;
-  }
-
-  if (entry.expiresAt <= Date.now()) {
-    cachedModelIds.delete(baseUrl);
-    return undefined;
-  }
-
-  return entry.modelId;
-};
-
-const setCachedModelId = (
-  baseUrl: string,
-  modelId: string | null,
-  ttlMs: number
-): void => {
-  cachedModelIds.set(baseUrl, {
-    modelId,
-    expiresAt: Date.now() + ttlMs,
-  });
-};
-
 export const clearModelCache = (baseUrl?: string): void => {
-  if (baseUrl) {
-    cachedModelIds.delete(baseUrl);
-    modelFetchPromises.delete(baseUrl);
-    return;
-  }
-
-  cachedModelIds.clear();
-  modelFetchPromises.clear();
-};
-
-const getDefaultModel = async (baseUrl: string): Promise<string | null> => {
-  const cachedModelId = getCachedModelId(baseUrl);
-  if (cachedModelId !== undefined) {
-    return cachedModelId;
-  }
-
-  const existingPromise = modelFetchPromises.get(baseUrl);
-  if (existingPromise) {
-    return existingPromise;
-  }
-
-  const fetchPromise = (async () => {
-    try {
-      const resp = await fetch(`${baseUrl}/v1/models`);
-      if (!resp.ok) {
-        setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);
-        return null;
-      }
-
-      const data = await resp.json();
-      const models = data.data ?? [];
-      const resolvedModel = models[0]?.id ?? null;
-      setCachedModelId(
-        baseUrl,
-        resolvedModel,
-        resolvedModel ? SUCCESS_MODEL_CACHE_TTL_MS : FAILED_MODEL_CACHE_TTL_MS
-      );
-      // Model auto-detected silently
-      return resolvedModel;
-    } catch {
-      setCachedModelId(baseUrl, null, FAILED_MODEL_CACHE_TTL_MS);
-      return null;
-    } finally {
-      modelFetchPromises.delete(baseUrl);
-    }
-  })();
-
-  modelFetchPromises.set(baseUrl, fetchPromise);
-  return fetchPromise;
+  clearChatModelCache(baseUrl);
 };
 
 interface ChatMessage {
@@ -138,7 +55,10 @@ export const streamCompletion = async (
 
   activeControllers.set(taskId, controller);
 
-  const resolvedModel = options.model || await getDefaultModel(baseUrl);
+  const resolvedModel = await resolveChatModel({
+    url: baseUrl,
+    explicitModel: options.model,
+  });
 
   const body: CompletionRequest = {
     messages,
@@ -219,7 +139,7 @@ export const streamCompletion = async (
     // If model not found (404) — clear cache and retry with auto-detected model
     if (response.status === 404 && errorText.includes("not found") && resolvedModel) {
       clearModelCache(baseUrl);
-      const fallbackModel = await getDefaultModel(baseUrl);
+      const fallbackModel = await resolveChatModel({ url: baseUrl });
       if (fallbackModel && fallbackModel !== resolvedModel) {
         console.log(`[LLM] Model '${resolvedModel}' not found, falling back to '${fallbackModel}'`);
         body.model = fallbackModel;
@@ -333,11 +253,14 @@ export const completeNonStreaming = async (
   } = {}
 ): Promise<string> => {
   const baseUrl = assertLlmUrl(options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL);
-  const resolvedModel = options.model || await getDefaultModel(baseUrl);
+  const resolvedModel = await resolveChatModel({
+    url: baseUrl,
+    explicitModel: options.model,
+  });
 
   if (!resolvedModel) {
     throw new Error(
-      "No LLM model available — check that LM Studio is running and has a model loaded"
+      "No LLM model available — check that LM Studio is running and has a chat model loaded"
     );
   }
 

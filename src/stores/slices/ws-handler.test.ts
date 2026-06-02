@@ -1,7 +1,7 @@
 // Verifies that WebSocket reducer logic enforces strict project scoping and preview failure handling.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
-import type { ProjectState } from "../project-store.types";
+import type { ProjectChat, ProjectState } from "../project-store.types";
 import { createWsHandler } from "./ws-handler";
 
 const addErrorLog = vi.fn();
@@ -21,6 +21,24 @@ vi.mock("@/features/chat/schemas/message.schema", () => ({
     content,
     timestamp: Date.now(),
     status: "complete",
+  }),
+  createReasoningMessage: (thinking: string) => ({
+    id: `reasoning:${thinking}`,
+    role: "assistant",
+    content: thinking,
+    thinking,
+    timestamp: Date.now(),
+    status: "complete",
+  }),
+  createDiffMessage: (filepath: string, before: string, after: string) => ({
+    id: `diff:${filepath}`,
+    role: "assistant",
+    content: filepath,
+    timestamp: Date.now(),
+    status: "complete",
+    diffFilepath: filepath,
+    diffBefore: before,
+    diffAfter: after,
   }),
   createSystemMessage: (content: string, isHidden = false) => ({
     id: `system:${content}`,
@@ -86,6 +104,19 @@ const createHarness = () => {
     setStatus: (status) => setState({ status }),
     setPlan: (plan) => setState({ plan }),
     addMessage: (message) => setState((current) => ({ messages: [...current.messages, message] })),
+    appendBackgroundMessage: (projectName, message) => setState((current) => {
+      if (!projectName || projectName === current.projectName) {
+        return { messages: [...current.messages, message] };
+      }
+      const existing = current.projectChats[projectName];
+      const messages = [...(existing?.messages ?? []), message];
+      return {
+        projectChats: {
+          ...current.projectChats,
+          [projectName]: { ...(existing ?? {}), messages } as ProjectChat,
+        },
+      };
+    }),
     updateLastAssistantMessage: () => undefined,
     setFileTree: (fileTree) => setState({ fileTree }),
     openFile: () => undefined,
@@ -219,6 +250,39 @@ describe("createWsHandler", () => {
     expect(harness.getState().previewBuildId).toBe(BUILD_ID);
     expect(harness.getState().previewUrl).toBe("/preview/alpha/");
     expect(harness.getState().previewPort).toBe(8081);
+  });
+
+  it("mirrors a background project's chat events into its cache without touching the active chat", () => {
+    const harness = createHarness();
+
+    // alpha is active; an event arrives for beta (a project generating in the background)
+    harness.handle({
+      type: "thinking",
+      requestId: REQUEST_ID,
+      projectName: "beta",
+      content: "Designing beta",
+    });
+
+    // active chat untouched
+    expect(harness.getState().messages).toHaveLength(0);
+    // beta's cached chat received the reasoning message
+    const betaMessages = harness.getState().projectChats.beta?.messages ?? [];
+    expect(betaMessages).toHaveLength(1);
+    expect(betaMessages[0].content).toBe("Designing beta");
+  });
+
+  it("appends to the active chat when the event matches the active project", () => {
+    const harness = createHarness();
+
+    harness.handle({
+      type: "thinking",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      content: "Designing alpha",
+    });
+
+    expect(harness.getState().messages).toHaveLength(1);
+    expect(harness.getState().messages[0].content).toBe("Designing alpha");
   });
 
   it("treats iteration errors as terminal failures and clears preview", () => {

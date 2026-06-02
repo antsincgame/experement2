@@ -1,10 +1,16 @@
-// Keeps the settings drawer LM Studio-only so the UI no longer exposes legacy secondary-provider paths.
-import { useState, useEffect, useCallback } from "react";
+// Draft + explicit Save so edits are not lost on backdrop close or store rehydrate.
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { View, Text, TextInput, Pressable, Modal, Platform, ScrollView } from "react-native";
-import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info, RotateCcw } from "lucide-react-native";
+import { X, Settings, Wifi, WifiOff, Server, RefreshCw, ChevronDown, Trash2, Copy, AlertTriangle, Info, RotateCcw, Save } from "lucide-react-native";
 import { apiClient, type LmModel } from "@/shared/lib/api-client";
 import { mixedStyle } from "@/shared/lib/web-styles";
-import { useSettingsStore } from "@/stores/settings-store";
+import {
+  applySettingsDraft,
+  snapshotSettingsDraft,
+  type SettingsDraft,
+  useSettingsStore,
+} from "@/stores/settings-store";
+import { defaultPersistedSettings } from "@/stores/settings-persist";
 import { useProjectStore } from "@/stores/project-store";
 
 interface SettingsDrawerProps {
@@ -45,29 +51,33 @@ const parsePositiveInt = (raw: string, fallback: number): number => {
   return n;
 };
 
+const draftsEqual = (a: SettingsDraft, b: SettingsDraft): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
 const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
-  const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
-  const setLmStudioUrl = useSettingsStore((state) => state.setLmStudioUrl);
-  const model = useSettingsStore((state) => state.model);
-  const setModel = useSettingsStore((state) => state.setModel);
-  const temperature = useSettingsStore((state) => state.temperature);
-  const setTemperature = useSettingsStore((state) => state.setTemperature);
-  const maxTokens = useSettingsStore((state) => state.maxTokens);
-  const setMaxTokens = useSettingsStore((state) => state.setMaxTokens);
-  const topP = useSettingsStore((state) => state.topP);
-  const setTopP = useSettingsStore((state) => state.setTopP);
-  const agentUrl = useSettingsStore((state) => state.agentUrl);
-  const setAgentUrl = useSettingsStore((state) => state.setAgentUrl);
-  const plannerModel = useSettingsStore((state) => state.plannerModel);
-  const setPlannerModel = useSettingsStore((state) => state.setPlannerModel);
-  const enhancerModel = useSettingsStore((state) => state.enhancerModel);
-  const setEnhancerModel = useSettingsStore((state) => state.setEnhancerModel);
-  const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
-  const setEnhancerEnabled = useSettingsStore((state) => state.setEnhancerEnabled);
-  const embeddingModel = useSettingsStore((state) => state.embeddingModel);
-  const setEmbeddingModel = useSettingsStore((state) => state.setEmbeddingModel);
-  const semanticRagEnabled = useSettingsStore((state) => state.semanticRagEnabled);
-  const setSemanticRagEnabled = useSettingsStore((state) => state.setSemanticRagEnabled);
+  const handleDiscardClose = useCallback(() => onClose(), [onClose]);
+
+  const [draft, setDraft] = useState<SettingsDraft>(defaultPersistedSettings);
+  const [savedSnapshot, setSavedSnapshot] = useState<SettingsDraft>(defaultPersistedSettings);
+
+  const patchDraft = useCallback((patch: Partial<SettingsDraft>) => {
+    setDraft((prev) => {
+      const next = { ...prev, ...patch };
+      if (patch.lmStudioUrl !== undefined && patch.lmStudioUrl !== prev.lmStudioUrl) {
+        next.model = "";
+      }
+      return next;
+    });
+  }, []);
+
+  const isDirty = useMemo(() => !draftsEqual(draft, savedSnapshot), [draft, savedSnapshot]);
+
+  const handleSave = useCallback(() => {
+    applySettingsDraft(draft);
+    setSavedSnapshot(draft);
+    onClose();
+  }, [draft, onClose]);
+
   const lmStatus = useProjectStore((s) => s.lmStudioStatus);
   const isConnected = useProjectStore((s) => s.isConnected);
 
@@ -75,6 +85,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [plannerDropdownOpen, setPlannerDropdownOpen] = useState(false);
+  const [editorDropdownOpen, setEditorDropdownOpen] = useState(false);
   const [enhancerDropdownOpen, setEnhancerDropdownOpen] = useState(false);
   const [embeddingDropdownOpen, setEmbeddingDropdownOpen] = useState(false);
 
@@ -89,13 +100,20 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
     }
   }, []);
 
-  // Debounce URL changes to avoid spamming fetch on each keystroke
-  const [debouncedUrl, setDebouncedUrl] = useState(lmStudioUrl);
+  const [debouncedUrl, setDebouncedUrl] = useState(draft.lmStudioUrl);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedUrl(lmStudioUrl), 500);
+    if (!visible) return;
+    const snap = snapshotSettingsDraft();
+    setDraft(snap);
+    setSavedSnapshot(snap);
+    setDebouncedUrl(snap.lmStudioUrl);
+  }, [visible]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedUrl(draft.lmStudioUrl), 500);
     return () => clearTimeout(timer);
-  }, [lmStudioUrl]);
+  }, [draft.lmStudioUrl]);
 
   useEffect(() => {
     if (visible) void fetchModels().catch(() => {});
@@ -103,7 +121,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <Pressable className="flex-1" style={{ backgroundColor: "rgba(0,0,0,0.6)" }} onPress={onClose} />
+      <Pressable className="flex-1" style={{ backgroundColor: "rgba(0,0,0,0.6)" }} onPress={handleDiscardClose} />
       <View
         className="absolute bottom-0 left-0 right-0 rounded-t-3xl"
         style={mixedStyle({
@@ -122,14 +140,37 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           <View className="flex-row items-center gap-2">
             <Settings size={15} color="#FFD700" strokeWidth={1.5} />
             <Text className="text-white text-sm font-semibold">Settings</Text>
+            {isDirty ? (
+              <Text style={{ fontSize: 9, color: "#FF8844", marginLeft: 4 }}>не сохранено</Text>
+            ) : null}
           </View>
-          <Pressable
-            onPress={onClose}
-            className="w-7 h-7 rounded-full items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-          >
-            <X size={14} color="#C0C0D0" strokeWidth={1.5} />
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handleSave}
+              disabled={!isDirty}
+              accessibilityLabel="Save settings"
+              className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg"
+              style={{
+                backgroundColor: isDirty ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.04)",
+                borderWidth: 1,
+                borderColor: isDirty ? "rgba(255,215,0,0.45)" : "rgba(255,255,255,0.08)",
+                opacity: isDirty ? 1 : 0.5,
+              }}
+            >
+              <Save size={12} color={isDirty ? "#FFD700" : "#8888AA"} strokeWidth={2} />
+              <Text style={{ fontSize: 11, fontWeight: "700", color: isDirty ? "#FFD700" : "#8888AA" }}>
+                Сохранить
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleDiscardClose}
+              accessibilityLabel="Close settings"
+              className="w-7 h-7 rounded-full items-center justify-center"
+              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+            >
+              <X size={14} color="#C0C0D0" strokeWidth={1.5} />
+            </Pressable>
+          </View>
         </View>
 
         <View className="flex-row gap-4 px-6 py-3" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}>
@@ -145,22 +186,22 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
         <ScrollView className="px-6 py-4 pb-8" contentContainerStyle={{ gap: 16 }}>
           <View>
-            <Field label="LM Studio URL" value={lmStudioUrl} onChange={setLmStudioUrl} />
+            <Field label="LM Studio URL" value={draft.lmStudioUrl} onChange={(v) => patchDraft({ lmStudioUrl: v })} />
             <View className="flex-row gap-1.5 mt-1.5">
               <Pressable
-                onPress={() => setLmStudioUrl("http://localhost:1234")}
+                onPress={() => patchDraft({ lmStudioUrl: "http://localhost:1234" })}
                 className="px-2.5 py-1 rounded-lg"
                 style={{
-                  backgroundColor: lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
+                  backgroundColor: draft.lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.12)" : "rgba(0,0,0,0.03)",
                   borderWidth: 1,
-                  borderColor: lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
+                  borderColor: draft.lmStudioUrl.includes("1234") ? "rgba(0,229,255,0.25)" : "rgba(0,0,0,0.05)",
                 }}
               >
-                <Text style={{ fontSize: 9, color: lmStudioUrl.includes("1234") ? "#00E5FF" : "#4A4A6A", fontWeight: "600" }}>LM Studio :1234</Text>
+                <Text style={{ fontSize: 9, color: draft.lmStudioUrl.includes("1234") ? "#00E5FF" : "#4A4A6A", fontWeight: "600" }}>LM Studio :1234</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
-                  apiClient.testLlmConnection(lmStudioUrl)
+                  apiClient.testLlmConnection(draft.lmStudioUrl)
                     .then((result) => {
                       if (result.ok) {
                         alert(`LLM connected! ${result.models} models available.`);
@@ -177,7 +218,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             </View>
           </View>
           <View>
-            <Field label="Agent URL" value={agentUrl} onChange={setAgentUrl} />
+            <Field label="Agent URL" value={draft.agentUrl} onChange={(v) => patchDraft({ agentUrl: v })} />
             <Pressable
               onPress={() => {
                 apiClient.testAgentConnection()
@@ -202,9 +243,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             models={models}
             loading={modelsLoading}
             open={modelDropdownOpen}
-            onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
-            onSelect={(id) => { setModel(id); setModelDropdownOpen(false); }}
-            savedModel={model}
+            onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
+            onSelect={(id) => { patchDraft({ model: id }); setModelDropdownOpen(false); }}
+            savedModel={draft.model}
             autoLabel="auto (first loaded in LM Studio)"
           />
           <ModelSelector
@@ -213,9 +254,20 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             models={models}
             loading={modelsLoading}
             open={plannerDropdownOpen}
-            onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
-            onSelect={(id) => { setPlannerModel(id); setPlannerDropdownOpen(false); }}
-            savedModel={plannerModel}
+            onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
+            onSelect={(id) => { patchDraft({ plannerModel: id }); setPlannerDropdownOpen(false); }}
+            savedModel={draft.plannerModel}
+            autoLabel="same as generation"
+          />
+          <ModelSelector
+            label="Editor / Fix Model"
+            hint="Used when fixing build/type errors and applying chat edits (Fix Error). Pick a strong instruct/coder model so JSON analysis stays valid. Auto = same as generation."
+            models={models}
+            loading={modelsLoading}
+            open={editorDropdownOpen}
+            onToggle={() => { setEditorDropdownOpen(!editorDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
+            onSelect={(id) => { patchDraft({ editorModel: id }); setEditorDropdownOpen(false); }}
+            savedModel={draft.editorModel}
             autoLabel="same as generation"
           />
 
@@ -225,14 +277,11 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             </Text>
             <View className="flex-row gap-2">
               {SAMPLING_PRESETS.map((preset) => {
-                const active = approxEqual(temperature, preset.temperature) && approxEqual(topP, preset.topP);
+                const active = approxEqual(draft.temperature, preset.temperature) && approxEqual(draft.topP, preset.topP);
                 return (
                   <Pressable
                     key={preset.label}
-                    onPress={() => {
-                      setTemperature(preset.temperature);
-                      setTopP(preset.topP);
-                    }}
+                    onPress={() => patchDraft({ temperature: preset.temperature, topP: preset.topP })}
                     className="flex-1 items-center px-2 py-2 rounded-xl"
                     style={{
                       backgroundColor: active ? "rgba(255,215,0,0.15)" : "rgba(26,26,46,0.6)",
@@ -254,24 +303,24 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             <View className="flex-1">
               <Field
                 label="Temperature"
-                value={String(temperature)}
-                onChange={(v) => setTemperature(parseNonNegative(v, temperature))}
+                value={String(draft.temperature)}
+                onChange={(v) => patchDraft({ temperature: parseNonNegative(v, draft.temperature) })}
                 keyboardType="numeric"
               />
             </View>
             <View className="flex-1">
               <Field
                 label="Top-P"
-                value={String(topP)}
-                onChange={(v) => setTopP(clamp01(parseNonNegative(v, topP)))}
+                value={String(draft.topP)}
+                onChange={(v) => patchDraft({ topP: clamp01(parseNonNegative(v, draft.topP)) })}
                 keyboardType="numeric"
               />
             </View>
             <View className="flex-1">
               <Field
                 label="Max Tokens"
-                value={String(maxTokens)}
-                onChange={(v) => setMaxTokens(parsePositiveInt(v, maxTokens))}
+                value={String(draft.maxTokens)}
+                onChange={(v) => patchDraft({ maxTokens: parsePositiveInt(v, draft.maxTokens) })}
                 keyboardType="numeric"
               />
             </View>
@@ -289,14 +338,14 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             <View className="flex-row items-center justify-between mb-2">
               <Text className="text-white text-xs font-semibold">Prompt Enhancer</Text>
               <Pressable
-                onPress={() => setEnhancerEnabled(!enhancerEnabled)}
+                onPress={() => patchDraft({ enhancerEnabled: !draft.enhancerEnabled })}
                 className="px-2 py-0.5 rounded"
                 style={{
-                  backgroundColor: enhancerEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
+                  backgroundColor: draft.enhancerEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
                 }}
               >
-                <Text style={{ fontSize: 10, color: enhancerEnabled ? "#00E5FF" : "#8888AA" }}>
-                  {enhancerEnabled ? "ON" : "OFF"}
+                <Text style={{ fontSize: 10, color: draft.enhancerEnabled ? "#00E5FF" : "#8888AA" }}>
+                  {draft.enhancerEnabled ? "ON" : "OFF"}
                 </Text>
               </Pressable>
             </View>
@@ -305,9 +354,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               models={models}
               loading={modelsLoading}
               open={enhancerDropdownOpen}
-              onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
-              onSelect={(id) => { setEnhancerModel(id); setEnhancerDropdownOpen(false); }}
-              savedModel={enhancerModel}
+              onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
+              onSelect={(id) => { patchDraft({ enhancerModel: id }); setEnhancerDropdownOpen(false); }}
+              savedModel={draft.enhancerModel}
               autoLabel="same as generation"
             />
           </View>
@@ -320,14 +369,14 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-white text-xs font-semibold">Умный контекст</Text>
               <Pressable
-                onPress={() => setSemanticRagEnabled(!semanticRagEnabled)}
+                onPress={() => patchDraft({ semanticRagEnabled: !draft.semanticRagEnabled })}
                 className="px-2 py-0.5 rounded"
                 style={{
-                  backgroundColor: semanticRagEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
+                  backgroundColor: draft.semanticRagEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
                 }}
               >
-                <Text style={{ fontSize: 10, color: semanticRagEnabled ? "#00E5FF" : "#8888AA" }}>
-                  {semanticRagEnabled ? "ВКЛ" : "ВЫКЛ"}
+                <Text style={{ fontSize: 10, color: draft.semanticRagEnabled ? "#00E5FF" : "#8888AA" }}>
+                  {draft.semanticRagEnabled ? "ВКЛ" : "ВЫКЛ"}
                 </Text>
               </Pressable>
             </View>
@@ -342,9 +391,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               models={models}
               loading={modelsLoading}
               open={embeddingDropdownOpen}
-              onToggle={() => { setEmbeddingDropdownOpen(!embeddingDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); }}
-              onSelect={(id) => { setEmbeddingModel(id); setEmbeddingDropdownOpen(false); }}
-              savedModel={embeddingModel}
+              onToggle={() => { setEmbeddingDropdownOpen(!embeddingDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); }}
+              onSelect={(id) => { patchDraft({ embeddingModel: id }); setEmbeddingDropdownOpen(false); }}
+              savedModel={draft.embeddingModel}
               autoLabel="авто (из LM Studio)"
             />
           </View>

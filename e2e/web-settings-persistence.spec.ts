@@ -93,6 +93,11 @@ const closeSettings = async (page: import("@playwright/test").Page) => {
   await expect(page.getByText(/LM Studio/i).first()).not.toBeVisible({ timeout: 5_000 });
 };
 
+const saveSettings = async (page: import("@playwright/test").Page) => {
+  await page.getByText("Сохранить", { exact: true }).click();
+  await expect(page.getByText(/LM Studio/i).first()).not.toBeVisible({ timeout: 5_000 });
+};
+
 /** Read a specific settings field from localStorage. */
 const readSettingsField = (page: import("@playwright/test").Page, field: string) =>
   page.evaluate((f) => {
@@ -123,7 +128,7 @@ test("settings drawer opens and shows current values", async ({ page }) => {
   await closeSettings(page);
 });
 
-test("URL change persists in localStorage after drawer close", async ({ page }) => {
+test("URL change persists in localStorage after Save", async ({ page }) => {
   await page.addInitScript((settings) => {
     window.localStorage.clear();
     window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
@@ -150,11 +155,8 @@ test("URL change persists in localStorage after drawer close", async ({ page }) 
     await firstInput.triple_click();
     await firstInput.fill("http://localhost:9999");
 
-    // Close drawer to trigger zustand persist
-    await closeSettings(page);
-
-    // Wait for zustand persist debounce (500ms in settings-drawer + persist write)
-    await page.waitForTimeout(1_000);
+    await saveSettings(page);
+    await page.waitForTimeout(300);
 
     // Verify localStorage was updated
     const updatedUrl = await readSettingsField(page, "lmStudioUrl");
@@ -162,7 +164,34 @@ test("URL change persists in localStorage after drawer close", async ({ page }) 
   }
 });
 
-test("enhancer toggle persists through close/reopen", async ({ page }) => {
+test("URL change is discarded when drawer closes without Save", async ({ page }) => {
+  await page.addInitScript((settings) => {
+    window.localStorage.clear();
+    window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
+    window.localStorage.removeItem("app-factory-projects");
+  }, SETTINGS_SNAPSHOT);
+
+  await page.goto("/");
+  await expect(page.getByText("Connected")).toBeVisible({ timeout: 30_000 });
+
+  await openSettings(page);
+
+  const inputs = page.locator("input[type='text'], input:not([type])").filter({ hasNot: page.locator("[hidden]") });
+  const firstInput = inputs.first();
+  const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
+
+  if (hasInput) {
+    await firstInput.triple_click();
+    await firstInput.fill("http://localhost:8888");
+    await closeSettings(page);
+    await page.waitForTimeout(300);
+
+    const urlAfterDiscard = await readSettingsField(page, "lmStudioUrl");
+    expect(urlAfterDiscard).toBe(MOCK_LLM_URL);
+  }
+});
+
+test("enhancer toggle persists through Save and reopen", async ({ page }) => {
   await page.addInitScript((settings) => {
     window.localStorage.clear();
     window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
@@ -187,8 +216,8 @@ test("enhancer toggle persists through close/reopen", async ({ page }) => {
     await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
   }
 
-  await closeSettings(page);
-  await page.waitForTimeout(500);
+  await saveSettings(page);
+  await page.waitForTimeout(300);
 
   // Verify the toggle persisted in localStorage
   const updatedEnabled = await readSettingsField(page, "enhancerEnabled");

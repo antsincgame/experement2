@@ -22,6 +22,31 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
       };
     }),
 
+  // Mirror a chat event into a project the user is NOT currently viewing, so
+  // generation/iteration progress is not lost when switching projects mid-run.
+  // Never mutates the active `messages` array unless the target IS active.
+  appendBackgroundMessage: (projectName: string, message: ChatMessage) =>
+    set((state) => {
+      if (!projectName || projectName === state.projectName) {
+        const nextActive = [...state.messages, message];
+        const messages = nextActive.length > 200 ? nextActive.slice(-200) : nextActive;
+        return {
+          messages,
+          projectChats: saveProjectChatPatch(state.projectChats, state.projectName, {
+            messages,
+          }),
+        };
+      }
+      const existing = state.projectChats[projectName]?.messages ?? [];
+      const next = [...existing, message];
+      const messages = next.length > 200 ? next.slice(-200) : next;
+      return {
+        projectChats: saveProjectChatPatch(state.projectChats, projectName, {
+          messages,
+        }),
+      };
+    }),
+
   updateLastAssistantMessage: (content: string) =>
     set((state) => {
       const messages = [...state.messages];

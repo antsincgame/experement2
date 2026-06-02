@@ -5,8 +5,14 @@ const DIVIDER_MARKER = "=======";
 const REPLACE_MARKER = ">>>>>>> REPLACE";
 const FILEPATH_MARKER = "filepath:";
 const DELETE_MARKER = "DELETE:";
-const THINKING_OPEN = "<thinking>";
-const THINKING_CLOSE = "</thinking>";
+
+// Reasoning-model variants: <thinking> (our prompt), <think> (Qwen3), and
+// <redacted_thinking> (some Anthropic-compatible local backends).
+const THINKING_TAGS: ReadonlyArray<{ open: string; close: string }> = [
+  { open: "<thinking>", close: "</thinking>" },
+  { open: "<redacted_thinking>", close: "</redacted_thinking>" },
+  { open: "<think>", close: "</think>" },
+];
 
 const stripCodeFences = (text: string): string =>
   text
@@ -23,6 +29,7 @@ interface ParserState {
     | "new_file_code";
   currentFilepath: string;
   thinkingBuffer: string;
+  thinkingClose: string;
   searchBuffer: string;
   replaceBuffer: string;
   codeBuffer: string;
@@ -37,6 +44,7 @@ export async function* parseStream(
     mode: "idle",
     currentFilepath: "",
     thinkingBuffer: "",
+    thinkingClose: "</thinking>",
     searchBuffer: "",
     replaceBuffer: "",
     codeBuffer: "",
@@ -109,14 +117,15 @@ export async function* parseStream(
 
 const processBuffer = (buffer: string, state: ParserState): number => {
   if (state.mode === "thinking") {
-    const closeIdx = buffer.indexOf(THINKING_CLOSE);
+    const closeTag = state.thinkingClose;
+    const closeIdx = buffer.indexOf(closeTag);
     if (closeIdx === -1) {
       state.thinkingBuffer += buffer;
       return buffer.length;
     }
     state.thinkingBuffer += buffer.slice(0, closeIdx);
     state.mode = "idle";
-    return closeIdx + THINKING_CLOSE.length;
+    return closeIdx + closeTag.length;
   }
 
   if (state.mode === "search") {
@@ -154,10 +163,18 @@ const processBuffer = (buffer: string, state: ParserState): number => {
   }
 
   // idle mode
-  if (buffer.startsWith(THINKING_OPEN)) {
-    state.mode = "thinking";
-    state.thinkingBuffer = "";
-    return THINKING_OPEN.length;
+  for (const tag of THINKING_TAGS) {
+    if (buffer.startsWith(tag.open)) {
+      state.mode = "thinking";
+      state.thinkingBuffer = "";
+      state.thinkingClose = tag.close;
+      return tag.open.length;
+    }
+  }
+  // Wait for more data if the buffer is a partial prefix of any opening tag,
+  // so a chunk boundary mid-tag (e.g. "<thin") does not get skipped.
+  if (THINKING_TAGS.some((tag) => tag.open.startsWith(buffer))) {
+    return 0;
   }
 
   const deleteIdx = buffer.indexOf(DELETE_MARKER);

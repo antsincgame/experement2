@@ -10,7 +10,60 @@ import {
   fixComponentImports,
   normalizeImportDeclarations,
   stripCodePreamble,
+  buildPlanContext,
+  extractReasoning,
 } from "./generator.js";
+import type { AppPlan } from "../schemas/app-plan.schema.js";
+
+describe("buildPlanContext", () => {
+  const plan = {
+    name: "notes",
+    displayName: "Notes",
+    description: "A notes app",
+    extraDependencies: [],
+    theme: { style: "premium" },
+    navigation: { type: "tabs", screens: [] },
+    files: [
+      { path: "app/(tabs)/index.tsx", type: "screen", description: "List screen", dependencies: ["src/stores/noteStore.ts"] },
+      { path: "src/stores/noteStore.ts", type: "store", description: "Zustand store with CRUD", dependencies: ["src/types/index.ts"] },
+      { path: "src/types/index.ts", type: "type", description: "Domain types", dependencies: [] },
+    ],
+  } as unknown as AppPlan;
+
+  it("includes the app header and a full file manifest", () => {
+    const ctx = buildPlanContext(plan, plan.files[0]);
+    expect(ctx).toContain("Name: Notes (notes)");
+    expect(ctx).toContain("Theme: premium; Navigation: tabs");
+    expect(ctx).toContain("- app/(tabs)/index.tsx (screen)");
+    expect(ctx).toContain("- src/types/index.ts (type)");
+  });
+
+  it("lists only the target file's direct dependency intent, not all descriptions", () => {
+    const ctx = buildPlanContext(plan, plan.files[0]);
+    expect(ctx).toContain("- src/stores/noteStore.ts (store): Zustand store with CRUD");
+    // The unrelated types file's description is NOT inlined as a dependency intent.
+    expect(ctx).not.toContain("(type): Domain types");
+  });
+
+  it("omits the dependency section when the file has no dependencies", () => {
+    const ctx = buildPlanContext(plan, plan.files[2]);
+    expect(ctx).not.toContain("This file's dependencies");
+  });
+});
+
+describe("extractReasoning", () => {
+  it("extracts a closed <think> block", () => {
+    expect(extractReasoning("<think>plan it</think>code")).toBe("plan it");
+  });
+
+  it("extracts an unclosed reasoning block", () => {
+    expect(extractReasoning("<thinking>still going")).toBe("still going");
+  });
+
+  it("returns empty string when there is no reasoning", () => {
+    expect(extractReasoning("just code")).toBe("");
+  });
+});
 
 describe("sanitizeGeneratedCode", () => {
   it("strips closed <think> blocks", () => {

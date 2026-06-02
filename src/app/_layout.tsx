@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { LogBox, View } from "react-native";
 import { disposeWebSocketRuntime, useWebSocket } from "@/shared/hooks/use-websocket";
+import { hydrateSettingsStore } from "@/stores/settings-store";
 import { useKeyboardShortcuts } from "@/shared/hooks/use-keyboard-shortcuts";
 import ErrorBoundary from "@/shared/components/error-boundary";
 
@@ -14,8 +15,11 @@ const AppShell = () => {
   useWebSocket();
   useKeyboardShortcuts();
 
-  useEffect(() => () => {
-    disposeWebSocketRuntime();
+  useEffect(() => {
+    void hydrateSettingsStore();
+    return () => {
+      disposeWebSocketRuntime();
+    };
   }, []);
 
   return null;

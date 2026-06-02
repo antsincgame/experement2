@@ -63,6 +63,7 @@ const createState = (): ProjectState => ({
   setStatus: () => undefined,
   setPlan: () => undefined,
   addMessage: () => undefined,
+  appendBackgroundMessage: () => undefined,
   updateLastAssistantMessage: () => undefined,
   setFileTree: () => undefined,
   openFile: () => undefined,

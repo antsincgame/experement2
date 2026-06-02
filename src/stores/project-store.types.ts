@@ -88,6 +88,7 @@ export interface ProjectStateActions {
   setStatus: (status: AppStatus) => void;
   setPlan: (plan: Record<string, unknown>) => void;
   addMessage: (message: ChatMessage) => void;
+  appendBackgroundMessage: (projectName: string, message: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
   setFileTree: (tree: FileNode[]) => void;
   openFile: (path: string) => void;

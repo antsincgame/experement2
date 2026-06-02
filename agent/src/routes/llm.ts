@@ -4,6 +4,7 @@ import { parseOrRespond } from "../lib/request-validation.js";
 import { LlmEnhanceBodySchema } from "../schemas/runtime-input.schema.js";
 import { handleLLMProxyRoute, completeNonStreaming, getActiveRequestCount } from "../services/llm-proxy.js";
 import { assertLlmUrl } from "../lib/llm-url.js";
+import { stripThinkingFromText } from "../lib/strip-thinking.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
@@ -29,7 +30,7 @@ llmRouter.post("/enhance", async (req, res) => {
   }
 
   try {
-    const enhanced = await completeNonStreaming(
+    const raw = await completeNonStreaming(
       [
         {
           role: "system",
@@ -55,17 +56,29 @@ YOUR INSTRUCTIONS:
 2. Explicitly dictate the use of specific Tamagui Arsenal features mentioned above to guarantee a world-class UI/UX.
 3. Output ONLY the improved prompt text. No explanations, no markdown code blocks, no preamble.
 4. Write in the EXACT SAME LANGUAGE as the user's input.
-5. Keep it punchy, dense, and visionary: 4-6 sentences max.`,
+5. Keep it punchy, dense, and visionary: 4-6 sentences max.
+6. Do NOT use thinking or reasoning XML tags — output ONLY the final prompt.`,
         },
-        { role: "user", content: payload.prompt },
+        {
+          role: "user",
+          content: `/no_think\n${payload.prompt}\n\nRespond with ONLY the enhanced product prompt.`,
+        },
       ],
       {
         temperature: 0.7,
-        maxTokens: 1024,
+        maxTokens: 4096,
         model: payload.model,
         lmStudioUrl: payload.lmStudioUrl,
       }
     );
+    const enhanced = stripThinkingFromText(raw);
+    if (!enhanced) {
+      res.status(502).json({
+        error:
+          "LM Studio returned an empty response. Load a chat model (not embedding-only) in LM Studio.",
+      });
+      return;
+    }
     res.json({ data: enhanced });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

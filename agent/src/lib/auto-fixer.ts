@@ -6,6 +6,7 @@ import { parseStream } from "./stream-parser.js";
 import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
 import { SYSTEM_AUTOFIX } from "../prompts/system-editor.js";
 import { applySearchReplace } from "./search-replace.js";
+import { isUnsafeEditPath } from "./editor.js";
 
 export interface MetroError {
   type: string;
@@ -40,18 +41,29 @@ const applyBlock = (
     return false;
   }
 
-  const content = readFile(projectName, block.filepath);
-  if (!content) {
+  // A weak model often echoes the error's stack trace and proposes an absolute or
+  // node_modules path (e.g. esbuild-register). Reject it here so file-manager never
+  // throws "Invalid file path" and crashes the whole autofix run.
+  if (isUnsafeEditPath(block.filepath)) {
     return false;
   }
 
-  const { result } = applySearchReplace(content, block.search, block.replace);
-  if (!result || result === content) {
+  try {
+    const content = readFile(projectName, block.filepath);
+    if (!content) {
+      return false;
+    }
+
+    const { result } = applySearchReplace(content, block.search, block.replace);
+    if (!result || result === content) {
+      return false;
+    }
+
+    writeFile(projectName, block.filepath, result);
+    return true;
+  } catch {
     return false;
   }
-
-  writeFile(projectName, block.filepath, result);
-  return true;
 };
 
 /**
@@ -88,6 +100,18 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
 
   const projectPath = getProjectPath(projectName);
 
+  // Non-actionable errors (Metro timeouts, crashes with no source location) parse to
+  // file "unknown". Feeding those to the model just produces garbage SEARCH/REPLACE
+  // blocks (often echoing stack-trace paths), so bail out early with a clear reason.
+  const targetFile = error.file?.trim();
+  if (!targetFile || targetFile === "unknown" || isUnsafeEditPath(targetFile)) {
+    return {
+      success: false,
+      attempts: 0,
+      lastError: `Autofix skipped: error has no editable source file (${error.type || "unknown error"}).`,
+    };
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     onAttempt?.(attempt, maxAttempts);
 
@@ -100,13 +124,15 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
       { role: "system" as const, content: SYSTEM_AUTOFIX },
       {
         role: "user" as const,
-        content: `Project skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro/TypeScript error:\n${error.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
+        content: `/no_think\nProject skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro/TypeScript error:\n${error.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
       },
     ];
 
     const generator = await complete(messages, {
       temperature: 0.2,
-      maxTokens: 4096,
+      // Headroom so a reasoning model that ignores /no_think still emits the
+      // SEARCH/REPLACE blocks after its thinking instead of being truncated.
+      maxTokens: 8192,
       lmStudioUrl,
       model,
     });

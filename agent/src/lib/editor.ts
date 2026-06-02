@@ -18,6 +18,7 @@ import { npmInstall } from "../services/process-manager.js";
 import { safeJsonParse } from "./json-repair.js";
 import { applySearchReplace } from "./search-replace.js";
 import { collectStream } from "./stream-collect.js";
+import { stripThinkingFromText } from "./strip-thinking.js";
 
 /**
  * Guards LLM-proposed paths before they reach the file system. A malformed path
@@ -98,23 +99,31 @@ export const editProject = async (
 
   const analyzeGen = await complete(analyzeMessages, {
     temperature: temperature ?? 0.3,
-    maxTokens: 2048,
+    // Headroom for reasoning models: a model that ignores /no_think spends
+    // tokens thinking before the JSON action; 2048 truncated it mid-output.
+    maxTokens: 8192,
+    // Force a JSON object so the analyze step survives weak/thinking models that
+    // would otherwise wrap the answer in prose and break parsing.
+    responseFormat: { type: "json_object" },
     lmStudioUrl,
     model,
   });
 
   const actionJson = await collectStream(analyzeGen);
+  // Thinking models (Qwen, DeepSeek-R1) prepend reasoning even with /no_think;
+  // strip it before attempting to parse the JSON action.
+  const cleanedJson = stripThinkingFromText(actionJson);
 
   let action: EditAction;
   try {
-    const parsed = safeJsonParse(actionJson);
+    const parsed = safeJsonParse(cleanedJson);
     if (parsed === null) {
       throw new Error("Editor analysis returned unrecoverable JSON");
     }
     action = EditActionSchema.parse(parsed);
   } catch (err) {
     throw new Error(
-      `Editor analysis failed: ${err instanceof Error ? err.message : "Invalid JSON"}\n${actionJson.slice(0, 300)}`
+      `Editor analysis failed: ${err instanceof Error ? err.message : "Invalid JSON"}\n${cleanedJson.slice(0, 300)}`
     );
   }
 

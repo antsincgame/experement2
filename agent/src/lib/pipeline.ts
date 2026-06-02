@@ -25,7 +25,7 @@ import { validateGeneratedProject, validateFileContracts, autoHealImportContract
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import { waitForMetroReady } from "./metro-ready.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
-import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
+import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug, summarizePlanForChat } from "./pipeline-helpers.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
 import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import { recordFix } from "./error-fix-store.js";
@@ -35,6 +35,8 @@ interface CreateOptions {
   lmStudioUrl?: string;
   model?: string;
   plannerModel?: string;
+  /** Model for build autofix (Metro/type errors). Falls back to `model`, then auto. */
+  editorModel?: string;
   embeddingModel?: string;
   /** Smart semantic RAG (default true). */
   semanticRagEnabled?: boolean;
@@ -58,6 +60,8 @@ interface IterateOptions {
   chatHistory: Array<{ role: "user" | "assistant"; content: string }>;
   lmStudioUrl?: string;
   model?: string;
+  /** Model for the editor (analyze + edit). Falls back to `model`, then auto. */
+  editorModel?: string;
   temperature?: number;
   maxTokens?: number;
   topP?: number;
@@ -293,6 +297,7 @@ const _createProjectInner = async (
     lmStudioUrl,
     model,
     plannerModel,
+    editorModel,
     embeddingModel,
     semanticRagEnabled = true,
     temperature,
@@ -355,6 +360,9 @@ const _createProjectInner = async (
 
   emitOperation({ type: "plan_complete", plan: { ...plan, name: projectSlug } });
 
+  // Humanize: surface the planner's intent as a reasoning bubble in chat.
+  emitOperation({ type: "thinking", content: summarizePlanForChat(plan) });
+
   // ── Step 2: Scaffold ──────────────────────────────────
   emitOperation({ type: "status", status: "scaffolding" });
 
@@ -393,6 +401,8 @@ const _createProjectInner = async (
         progress: (index + 1) / total,
       }),
     onChunk: (chunk) => emitOperation({ type: "code_chunk", chunk }),
+    onThinking: (filepath, reasoning) =>
+      emitOperation({ type: "thinking", content: `\`${filepath}\`\n${reasoning}` }),
     onFileComplete: (filepath) =>
       emitOperation({ type: "file_complete", filepath }),
   });
@@ -620,6 +630,7 @@ const _createProjectInner = async (
       projectName: projectSlug,
       error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
       lmStudioUrl,
+      model: editorModel || model,
       complete,
       maxAttempts: 1,
       onAttempt: () =>
@@ -773,7 +784,7 @@ export const iterateProject = async (
 const _iterateProjectInner = async (
   options: IterateOptions
 ): Promise<IterateResult> => {
-  const { projectName, userRequest, chatHistory, lmStudioUrl, model, temperature, maxTokens, topP, requestId } = options;
+  const { projectName, userRequest, chatHistory, lmStudioUrl, model, editorModel, temperature, maxTokens, topP, requestId } = options;
   const projectPath = getProjectPath(projectName);
   const emitProject = (message: Record<string, unknown>): void => {
     broadcast({
@@ -790,7 +801,7 @@ const _iterateProjectInner = async (
     userRequest,
     chatHistory,
     lmStudioUrl,
-    model,
+    model: editorModel || model,
     temperature,
     maxTokens,
     topP,

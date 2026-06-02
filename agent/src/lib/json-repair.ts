@@ -11,8 +11,13 @@
 export const repairJson = (raw: string): string => {
   let text = raw.trim();
 
-  // Strip <think>...</think> blocks from thinking-enabled local models
-  text = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Strip reasoning blocks from thinking-enabled local models. Covers all
+  // variants (<think>, <thinking>, <redacted_thinking>), then drops a dangling
+  // unclosed block so the remaining text is parseable JSON.
+  text = text.replace(/<(think|thinking|redacted_thinking)>[\s\S]*?<\/\1>/gi, "").trim();
+  if (/<(?:think|thinking|redacted_thinking)>/i.test(text)) {
+    text = text.replace(/<(?:think|thinking|redacted_thinking)>[\s\S]*$/i, "").trim();
+  }
 
   // Strip markdown code fences
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);

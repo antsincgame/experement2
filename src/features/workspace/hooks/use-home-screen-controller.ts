@@ -29,6 +29,7 @@ export const useHomeScreenController = () => {
   const setStatus = useProjectStore((state) => state.setStatus);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
+  const generationModel = useSettingsStore((state) => state.model);
   const agentUrl = useSettingsStore((state) => state.agentUrl);
   const lmStudioUrl = useSettingsStore((state) => state.lmStudioUrl);
   const pendingProjectName = useProjectStore((state) => state.pendingProjectName);
@@ -96,11 +97,24 @@ export const useHomeScreenController = () => {
     try {
       const improvedPrompt = await apiClient.enhancePrompt({
         prompt: trimmed,
-        model: enhancerModel || undefined,
+        model: enhancerModel.trim() || generationModel.trim() || undefined,
         lmStudioUrl,
       });
-      if (improvedPrompt) {
-        setWelcomeInput(improvedPrompt);
+      const trimmedResult = improvedPrompt.trim();
+      if (trimmedResult) {
+        setWelcomeInput(trimmedResult);
+      } else {
+        const msg =
+          "Модель вернула пустой ответ — проверьте, что в LM Studio загружена chat-модель, а не только embedding.";
+        setEnhanceError(msg);
+        useSettingsStore.getState().addErrorLog({ level: "warn", source: "enhance", message: msg });
+        if (enhanceErrorTimerRef.current) {
+          clearTimeout(enhanceErrorTimerRef.current);
+        }
+        enhanceErrorTimerRef.current = setTimeout(() => {
+          setEnhanceError(null);
+          enhanceErrorTimerRef.current = null;
+        }, 6_000);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Enhancement failed";
@@ -116,7 +130,7 @@ export const useHomeScreenController = () => {
     } finally {
       setEnhancing(false);
     }
-  }, [enhanceErrorTimerRef, enhancerModel, lmStudioUrl, welcomeInput]);
+  }, [enhanceErrorTimerRef, enhancerModel, generationModel, lmStudioUrl, welcomeInput]);
 
   const isCreating =
     pendingProjectName === CREATING_PENDING_KEY || isGenerationActive(status);

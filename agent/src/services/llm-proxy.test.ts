@@ -56,4 +56,29 @@ describe("llm-proxy model caching", () => {
     ) as { model?: string };
     expect(secondCompletionBody.model).toBe("qwen3-coder-32b");
   });
+
+  it("auto-selects a chat model when an embedding model is listed first", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        mockModelsResponse([
+          "text-embedding-nomic-embed-text-v1.5",
+          "qwen3-coder-32b",
+        ])
+      )
+      .mockResolvedValueOnce(mockCompletionResponse("enhanced prompt"));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await completeNonStreaming(
+      [{ role: "user", content: "notes app" }],
+      { lmStudioUrl: "http://127.0.0.1:1234" }
+    );
+
+    expect(result).toBe("enhanced prompt");
+    const body = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string) as {
+      model?: string;
+    };
+    expect(body.model).toBe("qwen3-coder-32b");
+  });
 });

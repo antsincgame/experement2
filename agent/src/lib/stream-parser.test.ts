@@ -98,6 +98,51 @@ describe("parseStream", () => {
     });
   });
 
+  // 3b. Qwen3 <think> blocks are recognized as thinking
+  it("extracts <think> reasoning blocks (Qwen3 / DeepSeek-R1)", async () => {
+    const input = "<think>Plan the import fix step by step.</think>";
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      type: "thinking",
+      content: "Plan the import fix step by step.",
+    });
+  });
+
+  // 3c. <redacted_thinking> blocks are recognized as thinking
+  it("extracts <redacted_thinking> blocks", async () => {
+    const input = "<redacted_thinking>hidden reasoning</redacted_thinking>";
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      type: "thinking",
+      content: "hidden reasoning",
+    });
+  });
+
+  // 3d. <think> followed by a SEARCH/REPLACE block (does not corrupt the edit)
+  it("parses a <think> block followed by SEARCH/REPLACE", async () => {
+    const input = [
+      "<think>I should rename the variable.</think>",
+      "filepath: src/x.ts\n",
+      "<<<<<<< SEARCH\n",
+      "const a = 1;\n",
+      "=======\n",
+      "const b = 1;\n",
+      ">>>>>>> REPLACE\n",
+    ].join("");
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toEqual({ type: "thinking", content: "I should rename the variable." });
+    expect((results[1] as SearchReplaceBlock).filepath).toBe("src/x.ts");
+  });
+
   // 4. New file (filepath + ```typescript code ```)
   it("parses new file with typescript code fence", async () => {
     const input = [
