@@ -86,7 +86,7 @@ export interface ProjectStateData {
 export interface ProjectStateActions {
   setProjectName: (name: string | null) => void;
   setStatus: (status: AppStatus) => void;
-  setPlan: (plan: Record<string, unknown>) => void;
+  setPlan: (plan: Record<string, unknown> | null) => void;
   addMessage: (message: ChatMessage) => void;
   appendBackgroundMessage: (projectName: string, message: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;

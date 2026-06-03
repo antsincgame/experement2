@@ -27,6 +27,7 @@ export const useHomeScreenController = () => {
   const setPendingProjectName = useProjectStore((state) => state.setPendingProjectName);
   const switchProject = useProjectStore((state) => state.switchProject);
   const setProjectName = useProjectStore((state) => state.setProjectName);
+  const setPlan = useProjectStore((state) => state.setPlan);
   const setStatus = useProjectStore((state) => state.setStatus);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
@@ -142,18 +143,20 @@ export const useHomeScreenController = () => {
       return;
     }
 
+    setPlan(null);
     switchProject(CREATING_PROJECT_SLUG);
     setPendingProjectName(CREATING_PENDING_KEY);
     setStatus("planning");
     addMessage(createUserMessage(trimmed));
     createProject(trimmed);
-    router.push(`/project/${encodeURIComponent(CREATING_PROJECT_SLUG)}`);
+    router.replace(`/project/${encodeURIComponent(CREATING_PROJECT_SLUG)}`);
   }, [
     addMessage,
     createProject,
     isCreating,
     router,
     setPendingProjectName,
+    setPlan,
     switchProject,
     setStatus,
   ]);

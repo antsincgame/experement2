@@ -25,7 +25,7 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
         : state.projectList,
     })),
 
-  setPlan: (plan: Record<string, unknown>) => set({ plan }),
+  setPlan: (plan: Record<string, unknown> | null) => set({ plan }),
 
   addProject: (entry: ProjectEntry) =>
     set((state) => ({

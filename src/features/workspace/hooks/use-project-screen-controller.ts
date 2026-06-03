@@ -7,7 +7,7 @@ import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { apiClient } from "@/shared/lib/api-client";
 import { fetchProjectFiles, useProjectStore } from "@/stores/project-store";
 import {
-  CREATING_PROJECT_SLUG,
+  getCreatingRouteSyncSlug,
   isCreatingRoute,
   isCreationSession,
 } from "@/shared/lib/creation-flow";
@@ -36,6 +36,7 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const setActiveFile = useProjectStore((state) => state.setActiveFile);
   const setPendingProjectName = useProjectStore((state) => state.setPendingProjectName);
   const pendingProjectName = useProjectStore((state) => state.pendingProjectName);
+  const plan = useProjectStore((state) => state.plan);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
   const previousPreviewStatus = useRef(previewStatus);
@@ -95,24 +96,24 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
     });
   }, [routeProjectName, router, startPreview]);
 
-  // After planning resolves the real slug, replace the temporary /project/__creating__ route.
+  // After plan_complete, replace /project/__creating__ with the planned slug only.
   useEffect(() => {
-    if (!projectName || isCreatingRoute(projectName)) {
+    if (!isCreatingRoute(routeProjectName)) {
       return;
     }
 
-    if (routeProjectName === projectName) {
-      return;
-    }
-
-    if (routeProjectName === CREATING_PROJECT_SLUG || isCreationSession({
-      projectName: routeProjectName,
+    const syncSlug = getCreatingRouteSyncSlug({
+      plan,
+      projectName,
       pendingProjectName,
-    })) {
-      activeProjectRef.current = projectName;
-      router.replace(`/project/${encodeURIComponent(projectName)}`);
+    });
+    if (!syncSlug || routeProjectName === syncSlug) {
+      return;
     }
-  }, [pendingProjectName, projectName, routeProjectName, router]);
+
+    activeProjectRef.current = syncSlug;
+    router.replace(`/project/${encodeURIComponent(syncSlug)}`);
+  }, [pendingProjectName, plan, projectName, routeProjectName, router]);
 
   // On generation failure during creation, keep the user in the workspace so the
   // error message stays visible in chat. Only clear the in-flight marker so the

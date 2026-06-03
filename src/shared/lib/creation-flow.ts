@@ -13,3 +13,32 @@ export const isCreationSession = (options: {
   pendingProjectName: string | null;
 }): boolean =>
   isCreatingRoute(options.projectName) || isPendingCreation(options.pendingProjectName);
+
+/** Slug from the planner once plan_complete has been applied. */
+export const getPlannedProjectSlug = (
+  plan: Record<string, unknown> | null
+): string | null => {
+  const name = plan?.name;
+  return typeof name === "string" && name.length > 0 ? name : null;
+};
+
+/**
+ * When the URL is /project/__creating__, only navigate to a real slug after the
+ * plan names the project and the store projectName matches — never a stale slug.
+ */
+export const getCreatingRouteSyncSlug = (options: {
+  plan: Record<string, unknown> | null;
+  projectName: string | null;
+  pendingProjectName: string | null;
+}): string | null => {
+  if (!isPendingCreation(options.pendingProjectName) && !isCreatingRoute(options.projectName)) {
+    return null;
+  }
+
+  const planned = getPlannedProjectSlug(options.plan);
+  if (!planned || options.projectName !== planned) {
+    return null;
+  }
+
+  return planned;
+};

@@ -1,6 +1,7 @@
 // Maps validated WebSocket events onto store actions so project lifecycle and preview runtime stay in sync.
 import {
   CREATING_PROJECT_SLUG,
+  getPlannedProjectSlug,
   isCreationSession,
   isPendingCreation,
 } from "@/shared/lib/creation-flow";
@@ -291,6 +292,25 @@ export const createWsHandler = (
         log({ level: "warn", source: "pipeline", message: `Ignoring scaffold_complete for ${projectName} (pending: ${pending})` });
         break;
       }
+      if (isPendingCreation(pending)) {
+        const planned = getPlannedProjectSlug(get().plan);
+        if (!planned) {
+          log({
+            level: "warn",
+            source: "pipeline",
+            message: `Ignoring scaffold_complete for ${projectName} (plan not ready)`,
+          });
+          break;
+        }
+        if (projectName !== planned) {
+          log({
+            level: "warn",
+            source: "pipeline",
+            message: `Ignoring scaffold_complete for ${projectName} (planned: ${planned})`,
+          });
+          break;
+        }
+      }
       const existing = store.projectList.find((p) => p.name === projectName);
       const entryStatus: AppStatus = existing?.status ?? store.status ?? "generating";
       store.addProject({
@@ -555,6 +575,18 @@ export const createWsHandler = (
       if (!pName) {
         log({ level: "warn", source: "pipeline", message: "Received project_created without projectName" });
         break;
+      }
+      const creationState = get();
+      if (isPendingCreation(creationState.pendingProjectName)) {
+        const planned = getPlannedProjectSlug(creationState.plan);
+        if (planned && pName !== planned) {
+          log({
+            level: "warn",
+            source: "pipeline",
+            message: `Ignoring project_created for ${pName} (planned: ${planned})`,
+          });
+          break;
+        }
       }
       const existing = store.projectList.find((p) => p.name === pName);
       set({ projectName: pName });
