@@ -5,8 +5,10 @@ agent/dist/
 .expo/
 test-results/
 playwright-report/
-workspace/e2e-existing-project/
-workspace/vitest-*/
+# Generated apps live under workspace/<project>/ and must never enter this repo.
+# Keep only the template_cache (used by the scaffolder); ignore everything else.
+workspace/*
+!workspace/template_cache/
 # Regenerated at runtime by initTemplateCache (node_modules already ignored above)
 workspace/template_cache/src/
 tools/e2e-results.json

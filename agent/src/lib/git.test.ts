@@ -67,6 +67,31 @@ describe("git helpers (injected runner — deterministic, no real git)", () => {
     })).toBeNull();
   });
 
+  it("gitCommit initializes the project when it is NOT its own repo root", () => {
+    const commands: string[] = [];
+    const hash = gitCommit("/workspace/foo", "v2: change", (_projectPath, args) => {
+      commands.push(args[0]);
+      // show-toplevel resolves to a DIFFERENT (parent) repo → must trigger init.
+      if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return "/some/parent-repo";
+      if (args[0] === "rev-parse") return "abc1234";
+      return "";
+    });
+    expect(hash).toBe("abc1234");
+    expect(commands).toContain("init");
+  });
+
+  it("gitCommit does NOT re-init when the project is already its own repo root", () => {
+    const commands: string[] = [];
+    const hash = gitCommit("/workspace/foo", "v2: change", (_projectPath, args) => {
+      commands.push(args[0]);
+      if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return "/workspace/foo";
+      if (args[0] === "rev-parse") return "abc1234";
+      return "";
+    });
+    expect(hash).toBe("abc1234");
+    expect(commands).not.toContain("init");
+  });
+
   it("getVersionNumber is the commit count + 1 (or 1 when there is no log)", () => {
     expect(getVersionNumber("/p", () => "h1\nh2\nh3")).toBe(4);
     expect(getVersionNumber("/p", () => "")).toBe(1);

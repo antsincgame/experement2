@@ -4,6 +4,7 @@
 // tested deterministically without spawning git — plain function injection, no
 // module mocking.
 import { spawnSync } from "child_process";
+import path from "path";
 
 export const GIT_HASH_PATTERN = /^[a-f0-9]{7,64}$/i;
 
@@ -17,6 +18,11 @@ export const runGitCommand = (
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    // CRITICAL: never let git's repo discovery climb ABOVE the project directory.
+    // A generated project without its own .git would otherwise resolve to the App
+    // Factory repo itself, and `git add -A` there would commit the entire dev tree
+    // (source edits + every workspace project) as bogus "version" commits.
+    env: { ...process.env, GIT_CEILING_DIRECTORIES: path.dirname(projectPath) },
   });
 
   if (result.error) {
@@ -36,12 +42,31 @@ export const runGitCommand = (
 
 type GitRunner = typeof runGitCommand;
 
+/** True only when projectPath is itself a git repo root — never a parent repo. */
+const isOwnGitRepo = (projectPath: string, run: GitRunner): boolean => {
+  try {
+    const top = run(projectPath, ["rev-parse", "--show-toplevel"], { allowFailure: true });
+    if (!top) {
+      return false;
+    }
+    const normalize = (p: string): string => path.resolve(p).replace(/\\/g, "/").toLowerCase();
+    return normalize(top) === normalize(projectPath);
+  } catch {
+    return false;
+  }
+};
+
 export const gitCommit = (
   projectPath: string,
   message: string,
   run: GitRunner = runGitCommand
 ): string | null => {
   try {
+    // Guard against committing into a parent repo: if this project isn't its own
+    // git root yet, initialize it first instead of polluting the App Factory repo.
+    if (!isOwnGitRepo(projectPath, run)) {
+      gitInit(projectPath, run);
+    }
     run(projectPath, ["add", "-A"]);
     run(projectPath, ["commit", "-m", message, "--allow-empty"]);
     return run(projectPath, ["rev-parse", "--short", "HEAD"]);
