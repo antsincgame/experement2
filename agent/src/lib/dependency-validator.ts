@@ -7,6 +7,27 @@ const REGISTRY_TIMEOUT_MS = 5000;
 // injection (e.g. "--save-dev", "--registry=...") into `npm install`.
 const VALID_PACKAGE_NAME = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
 
+const UNSAFE_SPEC_CHARS = /[;&|`$()<>\s]/;
+
+const extractPackageName = (dep: string): string | null => {
+  const trimmed = dep.trim();
+  if (!trimmed || UNSAFE_SPEC_CHARS.test(trimmed)) {
+    return null;
+  }
+
+  if (trimmed.startsWith("@")) {
+    const slashIdx = trimmed.indexOf("/");
+    if (slashIdx === -1) {
+      return null;
+    }
+    const versionAt = trimmed.indexOf("@", slashIdx + 1);
+    return versionAt === -1 ? trimmed : trimmed.slice(0, versionAt);
+  }
+
+  const versionAt = trimmed.indexOf("@");
+  return versionAt === -1 ? trimmed : trimmed.slice(0, versionAt);
+};
+
 const checkNpmPackageExists = async (packageName: string): Promise<boolean> => {
   try {
     const controller = new AbortController();
@@ -40,7 +61,7 @@ export const validateDependencies = async (
   const rejected: string[] = [];
 
   for (const dep of deps) {
-    const name = dep.replace(/@[\^~]?\d.*$/, "").trim();
+    const name = extractPackageName(dep);
 
     if (!name || name.length < 2 || name.length > 214 || !VALID_PACKAGE_NAME.test(name)) {
       rejected.push(dep);

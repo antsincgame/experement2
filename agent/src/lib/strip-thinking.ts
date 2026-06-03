@@ -1,6 +1,7 @@
 // Strips reasoning/thinking blocks from raw LLM text (Qwen, DeepSeek-R1, etc.).
+// Only anchored open+close pairs — never strip from start-of-string to a lone close tag.
 const THINKING_PATTERNS = [
-  /[\s\S]*?<\/think>/gi,
+  /<think>[\s\S]*?<\/think>/gi,
   /<think>[\s\S]*?<\/redacted_thinking>/gi,
   /<thinking>[\s\S]*?<\/thinking>/gi,
 ];

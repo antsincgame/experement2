@@ -3,6 +3,7 @@
 // Every failure mode (no embedding model loaded, 404, network) resolves to null so
 // the caller can fall back to the keyword RAG — semantic search is always optional.
 import { assertLlmUrl } from "../lib/llm-url.js";
+import { isFiniteVector } from "../lib/vector-store.js";
 import { resolveEmbeddingModel } from "./embedding-model.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
@@ -65,9 +66,18 @@ export const embedTexts = async (
     if (!Array.isArray(rows) || rows.length !== texts.length) return null;
 
     const vectors: number[][] = [];
+    let expectedDimension = 0;
     for (const row of rows) {
       const vector = row?.embedding;
       if (!Array.isArray(vector) || vector.length === 0) return null;
+      // A ragged or NaN-laden response would silently corrupt the index and
+      // poison top-K scoring later; reject the whole batch instead.
+      if (expectedDimension === 0) {
+        expectedDimension = vector.length;
+      } else if (vector.length !== expectedDimension) {
+        return null;
+      }
+      if (!isFiniteVector(vector)) return null;
       vectors.push(vector);
     }
     return vectors;

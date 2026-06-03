@@ -1,6 +1,8 @@
 // Verifies Metro parsing stays categorized so downstream gates can react to dependency and syntax failures.
-import { describe, it, expect } from "vitest";
-import { parseMetroError } from "./log-watcher";
+import { EventEmitter } from "events";
+import type { ChildProcess } from "child_process";
+import { describe, it, expect, vi } from "vitest";
+import { isNonFatalLine, parseMetroError, watchProcess, type LogCallback } from "./log-watcher";
 
 describe("parseMetroError", () => {
   it('parses "Unable to resolve module" error', () => {
@@ -139,5 +141,97 @@ describe("parseMetroError", () => {
     expect(result).not.toBeNull();
     expect(result!.type).toBe("UnknownError");
     // The real success detection happens in watchProcess via text.includes("Bundled")
+  });
+
+  it("does NOT treat a Tamagui parse bailout as an actionable error", () => {
+    const output = "| Error in Tamagui parse, skipping Unexpected token '{' SyntaxError: Unexpected token '{'";
+    const result = parseMetroError(output);
+    expect(result).not.toBeNull();
+    // The non-fatal Tamagui line must not become the error type, and no file is blamed.
+    expect(result!.type).toBe("UnknownError");
+    expect(result!.file).toBe("unknown");
+  });
+
+  it("still reports a real SyntaxError that appears alongside a Tamagui bailout", () => {
+    const output = [
+      "Error in Tamagui parse, skipping Unexpected token '{'",
+      "SyntaxError: Unexpected token (12:5)",
+      "  at src/App.tsx:12",
+    ].join("\n");
+    const result = parseMetroError(output);
+    expect(result).not.toBeNull();
+    expect(result!.type).toContain("SyntaxError");
+    expect(result!.file).toBe("src/App.tsx");
+  });
+});
+
+describe("isNonFatalLine", () => {
+  it("flags Tamagui parse bailouts as non-fatal", () => {
+    expect(isNonFatalLine("Error in Tamagui parse, skipping Unexpected token '{'")).toBe(true);
+    expect(isNonFatalLine("Error in src/App.tsx parse, skipping package.json not found in path")).toBe(true);
+  });
+
+  it("does not flag real syntax or resolution errors", () => {
+    expect(isNonFatalLine("SyntaxError: Unexpected token (12:5)")).toBe(false);
+    expect(isNonFatalLine('Unable to resolve module "x" from "src/y.tsx"')).toBe(false);
+  });
+});
+
+describe("watchProcess", () => {
+  const makeFakeProcess = (): ChildProcess => {
+    const proc = new EventEmitter() as unknown as ChildProcess;
+    (proc as unknown as { stdout: EventEmitter }).stdout = new EventEmitter();
+    (proc as unknown as { stderr: EventEmitter }).stderr = new EventEmitter();
+    return proc;
+  };
+
+  const emitStdout = (proc: ChildProcess, text: string): void => {
+    (proc.stdout as unknown as EventEmitter).emit("data", Buffer.from(text));
+  };
+
+  it("does NOT emit build_error for Tamagui parse bailouts", async () => {
+    vi.useFakeTimers();
+    const proc = makeFakeProcess();
+    const callback = vi.fn<Parameters<LogCallback>>();
+    watchProcess(proc, callback);
+
+    emitStdout(proc, "| Error in Tamagui parse, skipping Unexpected token '{' SyntaxError: Unexpected token '{'\n");
+    vi.advanceTimersByTime(300);
+
+    const errorCalls = callback.mock.calls.filter(([event]) => event.type === "build_error");
+    expect(errorCalls).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
+  it("emits a single build_error for a real fatal error", async () => {
+    vi.useFakeTimers();
+    const proc = makeFakeProcess();
+    const callback = vi.fn<Parameters<LogCallback>>();
+    watchProcess(proc, callback);
+
+    emitStdout(proc, "SyntaxError: Unexpected token (12:5)\n  at src/App.tsx:12\n");
+    vi.advanceTimersByTime(300);
+
+    const errorCalls = callback.mock.calls.filter(([event]) => event.type === "build_error");
+    expect(errorCalls).toHaveLength(1);
+    expect(errorCalls[0][0].error).toContain("SyntaxError");
+    vi.useRealTimers();
+  });
+
+  it("deduplicates identical repeated errors within one build", async () => {
+    vi.useFakeTimers();
+    const proc = makeFakeProcess();
+    const callback = vi.fn<Parameters<LogCallback>>();
+    watchProcess(proc, callback);
+
+    const fatal = "SyntaxError: Unexpected token (12:5)\n  at src/App.tsx:12\n";
+    emitStdout(proc, fatal);
+    vi.advanceTimersByTime(300);
+    emitStdout(proc, fatal);
+    vi.advanceTimersByTime(300);
+
+    const errorCalls = callback.mock.calls.filter(([event]) => event.type === "build_error");
+    expect(errorCalls).toHaveLength(1);
+    vi.useRealTimers();
   });
 });

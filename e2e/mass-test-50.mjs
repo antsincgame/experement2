@@ -423,11 +423,15 @@ async function main() {
   const timeouts = results.filter((r) => r.status === "timeout").length;
 
   console.log("\n" + "=".repeat(70));
-  console.log("MASS E2E TEST RESULTS: 50 APPS");
+  const total = results.length;
+  const denom = total > 0 ? total : 1;
+  const passThreshold = Math.ceil(denom / 2);
+
+  console.log(`MASS E2E TEST RESULTS: ${total} APPS`);
   console.log("=".repeat(70));
-  console.log(`✅ READY:   ${wins}/50 (${(wins / 50 * 100).toFixed(0)}%)`);
-  console.log(`❌ ERROR:   ${fails}/50`);
-  console.log(`⏰ TIMEOUT: ${timeouts}/50`);
+  console.log(`✅ READY:   ${wins}/${total} (${(wins / denom * 100).toFixed(0)}%)`);
+  console.log(`❌ ERROR:   ${fails}/${total}`);
+  console.log(`⏰ TIMEOUT: ${timeouts}/${total}`);
   console.log(`⏱  Total:   ${elapsed}s (~${Math.round(elapsed / 60)}min)`);
   console.log("=".repeat(70));
 
@@ -445,7 +449,7 @@ async function main() {
   console.log(`Results saved to ${RESULTS_FILE}`);
   console.log(`Error DB saved to ${ERROR_DB_FILE}`);
   console.log(`Summary saved to ${SUMMARY_FILE}`);
-  process.exit(wins >= 25 ? 0 : 1);
+  process.exit(wins >= passThreshold ? 0 : 1);
 }
 
 main().catch(console.error);

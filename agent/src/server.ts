@@ -1,5 +1,5 @@
 ﻿// Orchestrates HTTP, WebSocket, and preview runtime state with explicit build scope for each client flow.
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import { createServer } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 
@@ -189,6 +189,18 @@ app.get("/api/projects/:name/export", async (req, res) => {
 });
 
 app.use("/preview", handlePreviewRequest);
+
+// Last-resort JSON error handler: catches synchronous throws in route handlers
+// so Express does not return its default HTML stack trace (internal leak).
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : "Internal server error";
+  console.error("[server] Unhandled route error:", message);
+  if (res.headersSent) {
+    res.destroy(err instanceof Error ? err : undefined);
+    return;
+  }
+  res.status(500).json({ error: message, code: "INTERNAL_ERROR" });
+});
 
 // в”Ђв”Ђ WebSocket в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 

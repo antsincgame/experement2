@@ -25,6 +25,7 @@ export const useHomeScreenController = () => {
   const addProject = useProjectStore((state) => state.addProject);
   const reset = useProjectStore((state) => state.reset);
   const setPendingProjectName = useProjectStore((state) => state.setPendingProjectName);
+  const switchProject = useProjectStore((state) => state.switchProject);
   const setProjectName = useProjectStore((state) => state.setProjectName);
   const setStatus = useProjectStore((state) => state.setStatus);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
@@ -141,7 +142,7 @@ export const useHomeScreenController = () => {
       return;
     }
 
-    setProjectName(CREATING_PROJECT_SLUG);
+    switchProject(CREATING_PROJECT_SLUG);
     setPendingProjectName(CREATING_PENDING_KEY);
     setStatus("planning");
     addMessage(createUserMessage(trimmed));
@@ -153,7 +154,7 @@ export const useHomeScreenController = () => {
     isCreating,
     router,
     setPendingProjectName,
-    setProjectName,
+    switchProject,
     setStatus,
   ]);
 

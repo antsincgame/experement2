@@ -150,4 +150,58 @@ describe("validateGeneratedProject", () => {
       ])
     );
   });
+
+  it("does not treat string literals in JSX as import specifiers", () => {
+    const projectPath = createTempProject();
+
+    writeProjectFile(
+      projectPath,
+      "package.json",
+      JSON.stringify(
+        {
+          dependencies: {
+            expo: "~55.0.9",
+            "expo-router": "~55.0.8",
+            react: "19.2.0",
+            "react-native": "0.83.4",
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    writeProjectFile(projectPath, "app/_layout.tsx", "export default function RootLayout() { return null; }\n");
+    writeProjectFile(projectPath, "app/(tabs)/_layout.tsx", "export default function TabsLayout() { return null; }\n");
+    writeProjectFile(projectPath, "app.json", "{}\n");
+    writeProjectFile(projectPath, "tsconfig.json", "{}\n");
+    writeProjectFile(projectPath, "babel.config.js", "module.exports = {};\n");
+    writeProjectFile(projectPath, "metro.config.js", "module.exports = {};\n");
+    writeProjectFile(projectPath, "tailwind.config.js", "module.exports = {};\n");
+    writeProjectFile(projectPath, "nativewind-env.d.ts", "/// <reference types=\"nativewind/types\" />\n");
+    writeProjectFile(projectPath, "expo-env.d.ts", "/// <reference types=\"expo/types\" />\n");
+    writeProjectFile(projectPath, "src/global.css", "@tailwind base;\n");
+    writeProjectFile(projectPath, ".gitignore", "node_modules/\n");
+
+    writeProjectFile(
+      projectPath,
+      "app/(tabs)/index.tsx",
+      [
+        'import { Text } from "react-native";',
+        "",
+        "export default function Home() {",
+        '  return <Text>Built from "scratch"</Text>;',
+        "}",
+        "",
+      ].join("\n")
+    );
+
+    const issues = validateGeneratedProject(projectPath, "tabs");
+
+    expect(issues).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_package_dependency" }),
+      ])
+    );
+  });
 });

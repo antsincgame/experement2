@@ -152,7 +152,7 @@ test("URL change persists in localStorage after Save", async ({ page }) => {
   const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
 
   if (hasInput) {
-    await firstInput.triple_click();
+    await firstInput.click({ clickCount: 3 });
     await firstInput.fill("http://localhost:9999");
 
     await saveSettings(page);
@@ -181,7 +181,7 @@ test("URL change is discarded when drawer closes without Save", async ({ page })
   const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
 
   if (hasInput) {
-    await firstInput.triple_click();
+    await firstInput.click({ clickCount: 3 });
     await firstInput.fill("http://localhost:8888");
     await closeSettings(page);
     await page.waitForTimeout(300);

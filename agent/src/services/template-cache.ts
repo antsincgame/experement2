@@ -136,32 +136,37 @@ export const initTemplateCache = async (): Promise<void> => {
   if (cacheInitPromise) return cacheInitPromise;
 
   cacheInitPromise = (async () => {
-    const templatePath = getTemplatePath();
-    const nodeModulesPath = path.join(templatePath, "node_modules");
+    try {
+      const templatePath = getTemplatePath();
+      const nodeModulesPath = path.join(templatePath, "node_modules");
 
-    if (fs.existsSync(nodeModulesPath)) {
-      console.log("[TemplateCache] Cache already exists, skipping init");
+      if (fs.existsSync(nodeModulesPath)) {
+        console.log("[TemplateCache] Cache already exists, skipping init");
+        cacheReady = true;
+        return;
+      }
+
+      console.log("[TemplateCache] Creating pre-warmed Expo template...");
+
+      fs.mkdirSync(templatePath, { recursive: true });
+
+      for (const [filePath, content] of Object.entries(BOILERPLATE_FILES)) {
+        const fullPath = path.join(templatePath, filePath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, content, "utf-8");
+      }
+
+      writeScaffoldUiFiles(templatePath);
+
+      console.log("[TemplateCache] Running npm install (this may take a minute)...");
+      await npmInstall(templatePath);
+
       cacheReady = true;
-      return;
+      console.log("[TemplateCache] Template cache ready");
+    } catch (error) {
+      cacheInitPromise = null;
+      throw error;
     }
-
-    console.log("[TemplateCache] Creating pre-warmed Expo template...");
-
-    fs.mkdirSync(templatePath, { recursive: true });
-
-    for (const [filePath, content] of Object.entries(BOILERPLATE_FILES)) {
-      const fullPath = path.join(templatePath, filePath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, content, "utf-8");
-    }
-
-    writeScaffoldUiFiles(templatePath);
-
-    console.log("[TemplateCache] Running npm install (this may take a minute)...");
-    await npmInstall(templatePath);
-
-    cacheReady = true;
-    console.log("[TemplateCache] Template cache ready");
   })();
 
   return cacheInitPromise;

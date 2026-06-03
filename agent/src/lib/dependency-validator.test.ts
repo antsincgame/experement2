@@ -22,4 +22,13 @@ describe("validateDependencies", () => {
     const { valid } = await validateDependencies(["zustand@^4.5.0"]);
     expect(valid).toContain("zustand@^4.5.0");
   });
+
+  it("rejects command-injection characters in the full dependency string", async () => {
+    const { valid, rejected } = await validateDependencies([
+      "foo@1.0.0;calc.exe",
+      "bar && evil",
+    ]);
+    expect(valid).toHaveLength(0);
+    expect(rejected).toEqual(expect.arrayContaining(["foo@1.0.0;calc.exe", "bar && evil"]));
+  });
 });

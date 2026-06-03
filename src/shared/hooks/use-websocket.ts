@@ -1,5 +1,5 @@
 ﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL and scoped request metadata.
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import type { ChatMessage } from "@/features/chat/schemas/message.schema";
 import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
 import {
@@ -30,6 +30,50 @@ interface WsRuntime {
 }
 
 const createRequestId = (): string => crypto.randomUUID();
+
+const STALE_ACTIVE_STATUSES = new Set([
+  "planning",
+  "scaffolding",
+  "generating",
+  "analyzing",
+  "building",
+  "iterating",
+]);
+
+/** After reconnect, nudge preview for projects stuck in non-terminal UI states. */
+const resyncActiveProjectAfterReconnect = (): void => {
+  const { projectName, status } = useProjectStore.getState();
+  if (!projectName || !STALE_ACTIVE_STATUSES.has(status)) {
+    return;
+  }
+
+  const { lmStudioUrl, model, editorModel } = useSettingsStore.getState();
+  const runtime = getRuntime();
+  const socket = runtime.socket;
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  const payload = JSON.stringify({
+    type: "start_preview",
+    requestId: createRequestId(),
+    projectName,
+    lmStudioUrl,
+    ...(model ? { model } : {}),
+    ...(editorModel ? { editorModel } : {}),
+  });
+
+  try {
+    socket.send(payload);
+    logInfo("websocket", `Resync start_preview for ${projectName} (${status})`);
+  } catch (error) {
+    enqueueMessage(payload);
+    logWarn(
+      "websocket",
+      `Resync preview failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+};
 
 const GLOBAL_SCOPE = globalThis as Record<string, unknown>;
 const WS_RUNTIME_KEY = "__af_ws_runtime__";
@@ -196,6 +240,8 @@ const ensureConnected = (): void => {
         }
       }
     }
+
+    resyncActiveProjectAfterReconnect();
   };
 
   socket.onmessage = (event) => {
@@ -248,8 +294,6 @@ const initializeRuntime = (): void => {
   }, 500);
 };
 
-initializeRuntime();
-
 export const disposeWebSocketRuntime = (): void => {
   const runtime = getRuntime();
   runtime.settingsUnsubscribe?.();
@@ -261,6 +305,13 @@ export const disposeWebSocketRuntime = (): void => {
 };
 
 export const useWebSocket = () => {
+  useEffect(() => {
+    initializeRuntime();
+    return () => {
+      disposeWebSocketRuntime();
+    };
+  }, []);
+
   const send = useCallback((message: OutgoingWsMessage): boolean => {
     const runtime = getRuntime();
     const socket = runtime.socket;

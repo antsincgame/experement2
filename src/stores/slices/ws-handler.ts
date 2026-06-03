@@ -19,6 +19,8 @@ import {
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
 import type {
+  AppStatus,
+  ProjectEntry,
   ProjectStoreGet,
   ProjectStoreSet,
 } from "../project-store.types";
@@ -102,6 +104,24 @@ const applyErrorState = (
   store.setStatus("error");
 };
 
+const patchProjectListEntry = (
+  set: StoreSet,
+  get: StoreGet,
+  projectName: string,
+  patch: Partial<Pick<ProjectEntry, "status" | "port">>
+): void => {
+  const state = get();
+  if (!state.projectList.some((project) => project.name === projectName)) {
+    return;
+  }
+
+  set({
+    projectList: state.projectList.map((project) =>
+      project.name === projectName ? { ...project, ...patch } : project
+    ),
+  });
+};
+
 const applyPreviewStatus = (
   store: ReturnType<StoreGet>,
   previewStatus: "stopped" | "starting" | "ready" | "error",
@@ -148,9 +168,12 @@ export const createWsHandler = (
       log({ level: "info", source: "websocket", message: "Connected to agent" });
       break;
 
-    case "status":
+    case "status": {
+      const statusProject = getMessageProjectName(msg);
       if (!matchesActiveProject(get, msg)) {
-        if (get().projectName && !getMessageProjectName(msg)) {
+        if (statusProject) {
+          patchProjectListEntry(set, get, statusProject, { status: msg.status });
+        } else if (get().projectName) {
           log({ level: "warn", source: "ws", message: `Ignored unscoped status event: ${msg.status}` });
         }
         break;
@@ -173,6 +196,7 @@ export const createWsHandler = (
       }
       log({ level: "info", source: "status", message: `Status → ${msg.status}` });
       break;
+    }
 
     case "plan_chunk": {
       if (!matchesActiveProject(get, msg)) break;
@@ -268,14 +292,25 @@ export const createWsHandler = (
         break;
       }
       const existing = store.projectList.find((p) => p.name === projectName);
-      set({ projectName, pendingProjectName: null });
+      const entryStatus: AppStatus = existing?.status ?? store.status ?? "generating";
       store.addProject({
         name: projectName,
         displayName: existing?.displayName ?? projectName,
-        status: existing?.status ?? store.status ?? "generating",
+        status: entryStatus,
         port: existing?.port ?? null,
         createdAt: existing?.createdAt ?? Date.now(),
       });
+
+      if (!pending && !isActive) {
+        log({
+          level: "info",
+          source: "pipeline",
+          message: `Scaffold complete (background): ${projectName}`,
+        });
+        break;
+      }
+
+      set({ projectName, pendingProjectName: null });
       store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
@@ -354,6 +389,10 @@ export const createWsHandler = (
 
     case "preview_ready": {
       if (!matchesActiveProject(get, msg)) {
+        patchProjectListEntry(set, get, msg.projectName, {
+          status: "ready",
+          port: msg.port,
+        });
         break;
       }
       const currentProject = get().projectName;
@@ -402,10 +441,38 @@ export const createWsHandler = (
       log({ level: "info", source: "editor", message: `Block applied: ${msg.filepath}` });
       break;
 
+    case "iteration_result": {
+      const applied = msg.appliedBlocks ?? 0;
+      const failed = msg.failedBlocks ?? 0;
+      const errors = msg.errors ?? [];
+      const resultProject = getMessageProjectName(msg);
+      if (!isActive && resultProject) {
+        const terminalStatus: AppStatus =
+          failed > 0 || errors.length > 0 ? "error" : "ready";
+        patchProjectListEntry(set, get, resultProject, { status: terminalStatus });
+      }
+      if (applied > 0 && failed === 0 && errors.length === 0) {
+        emitChat(createAssistantMessage(`Applied ${applied} changes [ok]`));
+      } else if (failed > 0 || errors.length > 0) {
+        const failureCount = Math.max(failed, errors.length, 1);
+        emitChat(createErrorMessage(
+          `Applied ${applied} changes, ${failureCount} errors`,
+          errors.join("\n") || undefined
+        ));
+      }
+      break;
+    }
+
     case "iteration_complete": {
       const { applied, failed } = msg;
       const errors = msg.errors ?? [];
       const hasFailure = failed > 0 || errors.length > 0;
+      const iterationProject = getMessageProjectName(msg);
+      if (!isActive && iterationProject) {
+        patchProjectListEntry(set, get, iterationProject, {
+          status: hasFailure ? "error" : "ready",
+        });
+      }
       if (hasFailure) {
         const failureCount = Math.max(failed, errors.length, 1);
         emitChat(createErrorMessage(`Applied ${applied} changes, ${failureCount} errors`, errors.join("\n") || undefined));

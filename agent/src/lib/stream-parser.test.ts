@@ -600,6 +600,18 @@ describe("parseStream", () => {
     });
   });
 
+  it("flushes unclosed thinking buffer at end of stream", async () => {
+    const input = "<think>Still reasoning without a close tag";
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      type: "thinking",
+      content: "Still reasoning without a close tag",
+    });
+  });
+
   // Additional: empty REPLACE block -- parser requires both buffers to be truthy,
   // so an empty replace means no yield (replaceBuffer is "" which is falsy)
   it("does not yield when REPLACE block is empty (truthy check)", async () => {

@@ -30,21 +30,30 @@ projectRouter.get("/", (_req, res) => {
     return;
   }
 
-  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
-  const projects = entries
-    .filter((entry) => (
-      entry.isDirectory() &&
-      entry.name !== "template_cache" &&
-      !entry.name.startsWith(".")
-    ))
-    .map((entry) => ({
-      name: entry.name,
-      displayName: entry.name,
-      createdAt: fs.statSync(path.join(wsRoot, entry.name)).birthtimeMs,
-    }))
-    .sort((left, right) => right.createdAt - left.createdAt);
+  try {
+    const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
+    const projects = entries
+      .filter((entry) => (
+        entry.isDirectory() &&
+        entry.name !== "template_cache" &&
+        !entry.name.startsWith(".")
+      ))
+      .map((entry) => ({
+        name: entry.name,
+        displayName: entry.name,
+        createdAt: fs.statSync(path.join(wsRoot, entry.name)).birthtimeMs,
+      }))
+      .sort((left, right) => right.createdAt - left.createdAt);
 
-  res.json({ data: projects });
+    res.json({ data: projects });
+  } catch (error) {
+    // A transient FS fault (e.g. a project removed mid-listing) must not leak
+    // a stack trace; report a clean 500 instead.
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to list projects",
+      code: "WORKSPACE_READ_FAILED",
+    });
+  }
 });
 
 // DELETE all projects (wipe workspace)
@@ -59,16 +68,23 @@ projectRouter.delete("/all", (req, res) => {
     return;
   }
 
-  const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
-  let deleted = 0;
-  for (const entry of entries) {
-    if (entry.isDirectory() && entry.name !== "template_cache" && !entry.name.startsWith(".")) {
-      fs.rmSync(path.join(wsRoot, entry.name), { recursive: true, force: true });
-      deleted++;
+  try {
+    const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
+    let deleted = 0;
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name !== "template_cache" && !entry.name.startsWith(".")) {
+        fs.rmSync(path.join(wsRoot, entry.name), { recursive: true, force: true });
+        deleted++;
+      }
     }
-  }
 
-  res.json({ data: { deleted } });
+    res.json({ data: { deleted } });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to delete projects",
+      code: "WORKSPACE_DELETE_FAILED",
+    });
+  }
 });
 
 projectRouter.get("/:name/files", (req, res) => {

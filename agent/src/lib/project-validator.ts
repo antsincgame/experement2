@@ -1,6 +1,7 @@
 // Validates plans and generated projects against the shared contract before they reach build verification.
 import fs from "fs";
 import path from "path";
+import { Project, ScriptKind, SyntaxKind, type InterfaceDeclaration } from "ts-morph";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import {
   getBareModuleName,
@@ -24,18 +25,48 @@ export interface ValidationIssue {
 
 const SOURCE_FILE_PATTERN = /\.(ts|tsx|js|jsx)$/;
 
-const IMPORT_PATTERN =
-  /\b(?:import|export)\b[\s\S]*?\bfrom\s+["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
+const scriptKindForPath = (filePath: string): ScriptKind => {
+  if (filePath.endsWith(".tsx")) return ScriptKind.TSX;
+  if (filePath.endsWith(".jsx")) return ScriptKind.JSX;
+  if (filePath.endsWith(".js")) return ScriptKind.JS;
+  return ScriptKind.TS;
+};
 
-const collectImportSpecifiers = (content: string): string[] => {
+const collectImportSpecifiers = (content: string, filePath: string): string[] => {
   const specifiers: string[] = [];
+  const project = new Project({ useInMemoryFileSystem: true, compilerOptions: { jsx: 2 } });
+  const sourceFile = project.createSourceFile(filePath, content, {
+    overwrite: true,
+    scriptKind: scriptKindForPath(filePath),
+  });
 
-  for (const match of content.matchAll(IMPORT_PATTERN)) {
-    const specifier = match[1] ?? match[2];
+  for (const decl of sourceFile.getImportDeclarations()) {
+    const specifier = decl.getModuleSpecifierValue();
     if (specifier) {
       specifiers.push(specifier);
     }
   }
+
+  for (const decl of sourceFile.getExportDeclarations()) {
+    const specifier = decl.getModuleSpecifierValue();
+    if (specifier) {
+      specifiers.push(specifier);
+    }
+  }
+
+  sourceFile.forEachDescendant((node) => {
+    if (!node.isKind(SyntaxKind.CallExpression)) {
+      return;
+    }
+    const call = node.asKindOrThrow(SyntaxKind.CallExpression);
+    if (!call.getExpression().isKind(SyntaxKind.ImportKeyword)) {
+      return;
+    }
+    const arg = call.getArguments()[0];
+    if (arg?.isKind(SyntaxKind.StringLiteral)) {
+      specifiers.push(arg.getLiteralText());
+    }
+  });
 
   return specifiers;
 };
@@ -231,7 +262,7 @@ const validateSourceFileImports = (
   }
   const issues: ValidationIssue[] = [];
 
-  for (const originalSpecifier of collectImportSpecifiers(content)) {
+  for (const originalSpecifier of collectImportSpecifiers(content, filePath)) {
     const specifier = originalSpecifier.trim();
 
     if (specifier.startsWith("@/src/")) {
@@ -340,24 +371,38 @@ export interface ContractViolation {
 const IMPORT_SHAPE_REGEX = /import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
 const DESTRUCTURE_HOOK_REGEX = /const\s+\{\s*([^}]+)\s*\}\s*=\s*(use[A-Za-z0-9_]+)\s*\(/g;
 
-/** Extract interface/type keys from store source code via regex (fallback when ts-morph fails) */
+const collectTopLevelInterfaceKeys = (iface: InterfaceDeclaration): string[] =>
+  iface.getProperties().map((property) => property.getName());
+
+/** Extract store interface keys via ts-morph (handles nested property types in values). */
 const extractStoreKeysFromSource = (
   projectPath: string,
   storePath: string,
 ): string[] => {
   try {
     const fullPath = path.join(projectPath, storePath);
-    if (!fs.existsSync(fullPath)) return [];
-    const content = fs.readFileSync(fullPath, "utf-8");
-
-    // Match interface body: interface XStore { key1: type; key2: type; ... }
-    const ifaceMatch = content.match(/interface\s+\w+(?:Store|State)\s*\{([^}]+)\}/);
-    if (ifaceMatch) {
-      const body = ifaceMatch[1];
-      return body.split(/[;\n]/).map((line: string) => line.trim().split(/[:(]/)[0].trim()).filter(Boolean);
+    if (!fs.existsSync(fullPath)) {
+      return [];
     }
-  } catch { /* ignore */ }
-  return [];
+    const content = fs.readFileSync(fullPath, "utf-8");
+    const project = new Project({ useInMemoryFileSystem: true, compilerOptions: { jsx: 2 } });
+    const sourceFile = project.createSourceFile(storePath, content, {
+      overwrite: true,
+      scriptKind: scriptKindForPath(storePath),
+    });
+
+    const storeIface = sourceFile.getInterfaces().find((iface) =>
+      /(?:Store|State)$/.test(iface.getName())
+    );
+    if (storeIface) {
+      return collectTopLevelInterfaceKeys(storeIface);
+    }
+
+    const fallback = sourceFile.getInterfaces().find((iface) => iface.getProperties().length >= 3);
+    return fallback ? collectTopLevelInterfaceKeys(fallback) : [];
+  } catch {
+    return [];
+  }
 };
 
 /**

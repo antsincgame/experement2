@@ -10,7 +10,7 @@ const DELETE_MARKER = "DELETE:";
 // <think> (Qwen3 / LM Studio).
 const THINKING_TAGS: ReadonlyArray<{ open: string; close: string }> = [
   { open: "<thinking>", close: "</thinking>" },
-  { open: "<think>", close: "</think>" },
+  { open: "\u003cthink\u003e", close: "\u003c/think\u003e" },
   { open: "<think>", close: "</think>" },
 ];
 
@@ -112,6 +112,14 @@ export async function* parseStream(
       type: "new_file",
       content: stripCodeFences(state.codeBuffer),
     };
+  }
+
+  if (state.mode === "thinking") {
+    if (state.thinkingBuffer.trim()) {
+      yield { type: "thinking", content: state.thinkingBuffer };
+    }
+    state.mode = "idle";
+    state.thinkingBuffer = "";
   }
 }
 

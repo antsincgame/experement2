@@ -27,6 +27,12 @@ describe("stripThinkingFromText", () => {
     expect(stripThinkingFromText(raw)).toBe("Final enhanced prompt here.");
   });
 
+  it("preserves JSON before a closed redacted_thinking block", () => {
+    const json = '{"name":"demo-app","files":[]}';
+    const raw = `${json}${redactedOpen}plan notes${redactedClose}`;
+    expect(stripThinkingFromText(raw)).toBe(json);
+  });
+
   it("unwraps markdown fences", () => {
     const raw = "```markdown\nA sleek Tamagui notes app.\n```";
     expect(stripThinkingFromText(raw)).toBe("A sleek Tamagui notes app.");

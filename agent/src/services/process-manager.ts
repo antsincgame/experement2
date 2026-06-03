@@ -174,8 +174,8 @@ export const npmInstall = async (
 ): Promise<void> => {
   const npmCmd = isWindows ? "npm.cmd" : "npm";
   const args = packages?.length
-    ? ["install", ...packages]
-    : ["install"];
+    ? ["install", "--ignore-scripts", ...packages]
+    : ["install", "--ignore-scripts"];
 
   return new Promise((resolve, reject) => {
     let settled = false;

@@ -69,6 +69,24 @@ describe("embedTexts", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null when vectors have mismatched dimensions (ragged response)", async () => {
+    const fetchFn = vi.fn(async () => okResponse([[1, 2], [3, 4, 5]]));
+    const result = await embedTexts(["a", "b"], {
+      model: "m",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns null when a vector contains a non-finite component", async () => {
+    const fetchFn = vi.fn(async () => okResponse([[1, 2], [3, Number.NaN]]));
+    const result = await embedTexts(["a", "b"], {
+      model: "m",
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    expect(result).toBeNull();
+  });
+
   it("returns null for a disallowed (SSRF) host", async () => {
     const fetchFn = vi.fn();
     const result = await embedTexts(["a"], {

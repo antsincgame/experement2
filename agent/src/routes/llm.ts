@@ -8,8 +8,8 @@ import { stripThinkingFromText } from "../lib/strip-thinking.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
-// Cache models list to avoid hammering LM Studio during generation
-let modelsCache: { data: unknown; timestamp: number } | null = null;
+// Cache models list per base URL to avoid cross-host pollution during generation
+const modelsCacheByUrl = new Map<string, { data: unknown; timestamp: number }>();
 const MODELS_CACHE_TTL_MS = 10_000;
 
 export const llmRouter = Router();
@@ -117,13 +117,14 @@ llmRouter.get("/models", async (req, res) => {
     return;
   }
 
+  const cached = modelsCacheByUrl.get(baseUrl);
   // Return cached result during active generation to avoid hammering LM Studio
   if (
     getActiveRequestCount() > 0 &&
-    modelsCache &&
-    Date.now() - modelsCache.timestamp < MODELS_CACHE_TTL_MS
+    cached &&
+    Date.now() - cached.timestamp < MODELS_CACHE_TTL_MS
   ) {
-    res.json(modelsCache.data);
+    res.json(cached.data);
     return;
   }
 
@@ -142,7 +143,7 @@ llmRouter.get("/models", async (req, res) => {
     const json = await response.json();
     const models = Array.isArray(json.data) ? json.data : [];
     const result = { data: { models, status: "connected" } };
-    modelsCache = { data: result, timestamp: Date.now() };
+    modelsCacheByUrl.set(baseUrl, { data: result, timestamp: Date.now() });
     res.json(result);
   } catch (err) {
     const result = {

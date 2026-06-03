@@ -38,8 +38,27 @@ const FILE_LINE_PATTERN = /(?:at\s+)?([^\s(]+\.(?:tsx?|jsx?|css|json)):(\d+)/;
 const METRO_FILE_PATTERN = /(?:in|from)\s+['"]?([^\s'"]+\.(?:tsx?|jsx?))['"]?/;
 const UNABLE_RESOLVE_PATTERN = /Unable to resolve module\s+["']?([^"'\s]+)["']?.*from\s+["']?([^"'\s:]+)["']?/;
 
+// Tamagui's static compiler logs "Error in <file> parse, skipping ..." (Warning 001
+// in the Tamagui docs) when it cannot statically optimize a component and bails out
+// to runtime. The bundle still succeeds, so these lines contain "Error"/"Unexpected
+// token" but are NOT fatal. Treating them as build errors triggers futile autofix on
+// a working app and floods the chat. Keep this list narrow: only known soft bailouts.
+const NON_FATAL_PATTERNS = [
+  /Error in .*parse, skipping/i,
+  /Tamagui[^\n]*skipping/i,
+  /skipping[^\n]*not found in path/i,
+] as const;
+
+/** True for Metro/Tamagui lines that look like errors but do not fail the bundle. */
+export const isNonFatalLine = (line: string): boolean =>
+  NON_FATAL_PATTERNS.some((pattern) => pattern.test(line));
+
 const isErrorLine = (line: string): boolean =>
-  ERROR_PATTERNS.some((pattern) => pattern.test(line));
+  !isNonFatalLine(line) && ERROR_PATTERNS.some((pattern) => pattern.test(line));
+
+/** A multi-line chunk is fatal only if at least one of its lines is a fatal error. */
+const hasFatalErrorLine = (text: string): boolean =>
+  text.split("\n").some((line) => isErrorLine(line));
 
 const isNoiseLine = (line: string): boolean => {
   const trimmed = line.trim();
@@ -102,6 +121,11 @@ export const parseMetroError = (output: string): ParsedError | null => {
   const stackLines: string[] = [];
 
   for (const l of lines) {
+    // Never let a non-fatal Tamagui bailout define the error type/file/stack.
+    if (isNonFatalLine(l)) {
+      continue;
+    }
+
     for (const pattern of ERROR_PATTERNS) {
       const match = l.match(pattern);
       if (match) {
@@ -164,12 +188,16 @@ export const watchProcess = (
   let errorBuffer = "";
   let successTimeout: NodeJS.Timeout | null = null;
   let errorFlushTimeout: NodeJS.Timeout | null = null;
+  // Dedup identical errors within one build so a repeated Metro diagnostic does not
+  // flood the chat ("ошибки кучами"). Reset on success so a new failure is reported.
+  let lastErrorSignature = "";
 
   const checkForError = (text: string): void => {
     errorBuffer += text;
 
-    // Check both current chunk AND accumulated buffer for error patterns
-    if (isErrorLine(text) || isErrorLine(errorBuffer)) {
+    // Only react to FATAL error lines; non-fatal Tamagui bailouts are ignored even
+    // when they appear alongside benign output.
+    if (hasFatalErrorLine(text) || hasFatalErrorLine(errorBuffer)) {
       if (successTimeout) {
         clearTimeout(successTimeout);
         successTimeout = null;
@@ -179,7 +207,8 @@ export const watchProcess = (
       if (errorFlushTimeout) clearTimeout(errorFlushTimeout);
       errorFlushTimeout = setTimeout(() => {
         const parsed = parseMetroError(errorBuffer);
-        if (parsed) {
+        if (parsed && parsed.raw !== lastErrorSignature) {
+          lastErrorSignature = parsed.raw;
           callback({ type: "build_error", error: parsed.raw });
         }
         errorBuffer = "";
@@ -201,6 +230,7 @@ export const watchProcess = (
         errorFlushTimeout = null;
       }
       errorBuffer = "";
+      lastErrorSignature = "";
       successTimeout = setTimeout(() => {
         callback({ type: "build_success" });
       }, 2000);

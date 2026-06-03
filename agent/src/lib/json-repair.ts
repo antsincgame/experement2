@@ -19,10 +19,28 @@ export const repairJson = (raw: string): string => {
     text = text.replace(/<(?:think|thinking|redacted_thinking)>[\s\S]*$/i, "").trim();
   }
 
-  // Strip markdown code fences
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-  if (fenceMatch) {
-    text = fenceMatch[1].trim();
+  // Prefer ```json fences; fall back to any fence that parses as JSON
+  const jsonFenceMatches = [...text.matchAll(/```json\s*\n?([\s\S]*?)```/gi)];
+  for (const match of jsonFenceMatches) {
+    const candidate = match[1].trim();
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      /* try next fence */
+    }
+  }
+
+  const fenceMatches = [...text.matchAll(/```(?:json)?\s*\n?([\s\S]*?)```/g)];
+  for (const match of fenceMatches) {
+    const candidate = match[1].trim();
+    try {
+      JSON.parse(candidate);
+      text = candidate;
+      break;
+    } catch {
+      /* try next fence */
+    }
   }
 
   // Extract JSON object/array if surrounded by text

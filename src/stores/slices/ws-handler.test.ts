@@ -297,6 +297,27 @@ describe("createWsHandler", () => {
     expect(harness.getState().messages[0].content).toBe("Designing alpha");
   });
 
+  it("updates sidebar status for a background project without changing the active view", () => {
+    const harness = createHarness();
+    harness.getState().addProject({
+      name: "beta",
+      displayName: "Beta",
+      status: "generating",
+      port: null,
+      createdAt: 2,
+    });
+
+    harness.handle({
+      type: "status",
+      requestId: REQUEST_ID,
+      projectName: "beta",
+      status: "ready",
+    });
+
+    expect(harness.getState().status).toBe("ready");
+    expect(harness.getState().projectList.find((p) => p.name === "beta")?.status).toBe("ready");
+  });
+
   it("treats iteration errors as terminal failures and clears preview", () => {
     const harness = createHarness();
     harness.getState().setPreview("http://localhost:3100/preview/alpha/", 8081);

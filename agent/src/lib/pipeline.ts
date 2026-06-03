@@ -581,7 +581,10 @@ const _createProjectInner = async (
   let buildError: string | null = null;
   let autoFixAttempts = 0;
   const MAX_BUILD_AUTOFIX = 3;
-  const BUILD_TIMEOUT = 60000; // 60s for first build (Metro is slow)
+  // First web bundle with heavy deps (Tamagui + chart-kit + svg + reanimated) on a
+  // cold Metro routinely needs 60-120s. A too-short timeout produced a fake
+  // "Metro build timed out" error that autofix could not act on.
+  const BUILD_TIMEOUT = 120000;
 
   // clearCache=true for initial project build
   const { port: expoPort } = await startExpo(projectSlug, projectPath, (event) => {
@@ -618,6 +621,13 @@ const _createProjectInner = async (
     autoFixAttempts++;
     const parsed = parseMetroError(buildError);
     if (!parsed) break;
+
+    // Non-actionable failures (Metro timeout, crashes with no source location) parse
+    // to file "unknown". Running autofix on them just emits a confusing "Could not fix"
+    // with no real attempt, so stop the loop and let the honest build error surface.
+    if (!parsed.file || parsed.file === "unknown") {
+      break;
+    }
 
     emitBuildScoped(buildId, {
       type: "autofix_start",
@@ -738,6 +748,7 @@ const _createProjectInner = async (
       previewStatus: "error",
       buildId,
     });
+    killExpo(projectSlug);
   }
 
   // Git commit the successful state
