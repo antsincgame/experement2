@@ -1,7 +1,6 @@
 // Strips reasoning/thinking blocks from raw LLM text (Qwen, DeepSeek-R1, etc.).
 const THINKING_PATTERNS = [
-  /<think>[\s\S]*?<\/think>/gi,
-  /<think>[\s\S]*?<\/think>/gi,
+  /[\s\S]*?<\/think>/gi,
   /<think>[\s\S]*?<\/redacted_thinking>/gi,
   /<thinking>[\s\S]*?<\/thinking>/gi,
 ];

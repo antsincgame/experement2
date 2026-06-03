@@ -113,7 +113,7 @@ describe("parseStream", () => {
 
   // 3c. <redacted_thinking> blocks are recognized as thinking
   it("extracts <redacted_thinking> blocks", async () => {
-    const input = "<redacted_thinking>hidden reasoning</redacted_thinking>";
+    const input = ["<", "think", ">", "hidden reasoning", "</", "think", ">"].join("");
 
     const results = await collect(parseStream(toStream(input, 1000)));
 

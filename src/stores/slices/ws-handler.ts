@@ -1,6 +1,13 @@
 // Maps validated WebSocket events onto store actions so project lifecycle and preview runtime stay in sync.
-import { isCreationSession, isPendingCreation } from "@/shared/lib/creation-flow";
-import { createEmptyChat, migrateCreatingChatToProject } from "@/stores/project-store.helpers";
+import {
+  CREATING_PROJECT_SLUG,
+  isCreationSession,
+  isPendingCreation,
+} from "@/shared/lib/creation-flow";
+import {
+  createEmptyChat,
+  migrateCreatingChatToProject,
+} from "@/stores/project-store.helpers";
 import {
   createAssistantMessage,
   createReasoningMessage,
@@ -61,6 +68,22 @@ const matchesActiveProject = (
   return messageProjectName === currentProjectName;
 };
 
+/** Project key for chat cache: explicit WS scope, or creation session slug. */
+export const resolveChatTargetProject = (
+  get: StoreGet,
+  msg: IncomingWsMessage
+): string | null => {
+  const explicit = getMessageProjectName(msg);
+  if (explicit) {
+    return explicit;
+  }
+  const state = get();
+  if (isCreationSession(state) && state.projectName) {
+    return state.projectName;
+  }
+  return null;
+};
+
 const applyErrorState = (
   store: ReturnType<StoreGet>,
   options: {
@@ -107,15 +130,15 @@ export const createWsHandler = (
   const log = useSettingsStore.getState().addErrorLog;
 
   const isActive = matchesActiveProject(get, msg);
-  const targetProjectName = getMessageProjectName(msg);
+  const chatProject = resolveChatTargetProject(get, msg);
   // Route a chat message to the active conversation, or — when the event belongs
   // to a project the user has switched away from — silently into that project's
   // cache so its generation/iteration history is not lost.
   const emitChat = (message: ChatMessage): void => {
     if (isActive) {
       store.addMessage(message);
-    } else if (targetProjectName) {
-      store.appendBackgroundMessage(targetProjectName, message);
+    } else if (chatProject) {
+      store.appendBackgroundMessage(chatProject, message);
     }
   };
 
@@ -161,12 +184,48 @@ export const createWsHandler = (
     }
 
     case "plan_complete": {
-      if (!matchesActiveProject(get, msg)) break;
       const pending = get().pendingProjectName;
       const plan = msg.plan;
       const planName = typeof plan.name === "string" ? plan.name : null;
+      const cacheName = getMessageProjectName(msg) ?? planName;
       const displayName =
         typeof plan.displayName === "string" ? plan.displayName : planName;
+
+      if (!isActive && cacheName) {
+        const current = get();
+        let projectChats = current.projectChats;
+        const creatingEntry = projectChats[CREATING_PROJECT_SLUG];
+        if (creatingEntry && planName) {
+          projectChats = migrateCreatingChatToProject(projectChats, planName, {
+            ...current,
+            messages: creatingEntry.messages,
+            streamingContent: creatingEntry.streamingContent,
+          });
+        }
+        set({ projectChats });
+        store.appendBackgroundMessage(
+          cacheName,
+          createSystemMessage("Plan created [ok]", false)
+        );
+        if (planName) {
+          const existing = store.projectList.find((p) => p.name === planName);
+          store.addProject({
+            name: planName,
+            displayName: displayName ?? planName,
+            status: existing?.status ?? current.status ?? "generating",
+            port: existing?.port ?? null,
+            createdAt: existing?.createdAt ?? Date.now(),
+          });
+        }
+        log({
+          level: "info",
+          source: "pipeline",
+          message: `Plan complete (background): ${cacheName}`,
+        });
+        break;
+      }
+
+      if (!matchesActiveProject(get, msg)) break;
 
       if (isPendingCreation(pending) && planName) {
         const current = get();
@@ -195,7 +254,7 @@ export const createWsHandler = (
       }
 
       store.clearStreamingContent();
-      store.addMessage(createSystemMessage("Plan created [ok]", false));
+      emitChat(createSystemMessage("Plan created [ok]", false));
       log({ level: "info", source: "pipeline", message: "Plan complete" });
       break;
     }

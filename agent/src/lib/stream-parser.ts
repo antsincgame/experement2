@@ -6,11 +6,11 @@ const REPLACE_MARKER = ">>>>>>> REPLACE";
 const FILEPATH_MARKER = "filepath:";
 const DELETE_MARKER = "DELETE:";
 
-// Reasoning-model variants: <thinking> (our prompt), <think> (Qwen3), and
-// <redacted_thinking> (some Anthropic-compatible local backends).
+// Reasoning-model variants: <thinking> (editor),  (DeepSeek-R1),
+// <think> (Qwen3 / LM Studio).
 const THINKING_TAGS: ReadonlyArray<{ open: string; close: string }> = [
   { open: "<thinking>", close: "</thinking>" },
-  { open: "<redacted_thinking>", close: "</redacted_thinking>" },
+  { open: "<think>", close: "</think>" },
   { open: "<think>", close: "</think>" },
 ];
 

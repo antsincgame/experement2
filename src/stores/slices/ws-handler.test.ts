@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import type { ProjectChat, ProjectState } from "../project-store.types";
-import { createWsHandler } from "./ws-handler";
+import { createWsHandler, resolveChatTargetProject } from "./ws-handler";
 
 const addErrorLog = vi.fn();
 
@@ -269,6 +269,18 @@ describe("createWsHandler", () => {
     const betaMessages = harness.getState().projectChats.beta?.messages ?? [];
     expect(betaMessages).toHaveLength(1);
     expect(betaMessages[0].content).toBe("Designing beta");
+  });
+
+  it("resolveChatTargetProject falls back to creation session projectName", () => {
+    const harness = createHarness();
+    harness.getState().setProjectName("__creating__");
+
+    const resolved = resolveChatTargetProject(() => harness.getState(), {
+      type: "thinking",
+      content: "x",
+    } as IncomingWsMessage);
+
+    expect(resolved).toBe("__creating__");
   });
 
   it("appends to the active chat when the event matches the active project", () => {

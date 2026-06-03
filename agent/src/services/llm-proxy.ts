@@ -39,9 +39,8 @@ interface CompletionRequest {
 export const toApiResponseFormat = (
   format?: { type: "json_object" }
 ): ApiResponseFormat | undefined => {
-  if (!format) {
-    return undefined;
-  }
+  // json_object is an internal hint only; LM Studio rejects it on the wire.
+  void format;
   return undefined;
 };
 
