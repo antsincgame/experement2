@@ -23,6 +23,20 @@ const ANALYZE_RESPONSE = [
   "}",
 ];
 
+// Minimal valid plan so create_project requests aren't mis-served the iteration
+// diff (which would fail JSON parsing and surface a confusing plan error).
+const PLAN_RESPONSE = [
+  '{"name":"e2e-plan-app","displayName":"E2E Plan App",',
+  '"description":"A deterministic single-screen app for E2E.",',
+  '"files":[{"path":"app/index.tsx","type":"screen",',
+  '"description":"Single home screen rendering a title and a counter.","dependencies":[]}],',
+  '"extraDependencies":[],',
+  '"theme":{"style":"premium","background":"#F8FAFC","surface":"#FFFFFF",',
+  '"primary":"#6366F1","primaryText":"#0F172A","secondaryText":"#64748B",',
+  '"accent":"#6366F1","cardRadius":20,"buttonRadius":28,"isDark":false},',
+  '"navigation":{"type":"stack","screens":[{"path":"app/index.tsx","name":"Home","icon":"home"}]}}',
+];
+
 const readJsonBody = (request) =>
   new Promise((resolve, reject) => {
     let body = "";
@@ -83,9 +97,12 @@ const server = http.createServer(async (request, response) => {
       const body = await readJsonBody(request);
       if (body.stream) {
         const systemPrompt = body.messages?.[0]?.content ?? "";
-        const chunks = systemPrompt.includes("expert code analyzer")
-          ? ANALYZE_RESPONSE
-          : ITERATION_RESPONSE;
+        let chunks = ITERATION_RESPONSE;
+        if (systemPrompt.includes("application architect")) {
+          chunks = PLAN_RESPONSE;
+        } else if (systemPrompt.includes("expert code analyzer")) {
+          chunks = ANALYZE_RESPONSE;
+        }
         await writeSse(response, chunks);
         return;
       }

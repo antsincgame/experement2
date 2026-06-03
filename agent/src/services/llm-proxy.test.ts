@@ -1,6 +1,6 @@
 // Verifies model discovery cache behavior so transient LM Studio failures do not poison future requests.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearModelCache, completeNonStreaming, toApiResponseFormat } from "./llm-proxy.js";
+import { clearModelCache, completeNonStreaming, streamCompletion, toApiResponseFormat } from "./llm-proxy.js";
 
 const mockModelsResponse = (ids: string[]) => ({
   ok: true,
@@ -109,5 +109,38 @@ describe("toApiResponseFormat", () => {
   it("maps json_object to omitted (prompt-based JSON)", () => {
     expect(toApiResponseFormat({ type: "json_object" })).toBeUndefined();
     expect(toApiResponseFormat()).toBeUndefined();
+  });
+});
+
+describe("streamCompletion header timeout (silent-freeze guard)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    delete process.env.LLM_HEADER_TIMEOUT_MS;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("fails fast with LLM_TIMEOUT when no response headers arrive within budget", async () => {
+    process.env.LLM_HEADER_TIMEOUT_MS = "1000";
+    vi.useFakeTimers();
+
+    // A model that never sends headers — but honors the abort signal, like a real
+    // fetch would. Without the header timeout this awaits forever (the silent hang).
+    const fetchMock = vi.fn((_url: string, opts: { signal: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        opts.signal.addEventListener("abort", () =>
+          reject(new Error("This operation was aborted"))
+        );
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = streamCompletion(
+      [{ role: "user", content: "plan a notes app" }],
+      { lmStudioUrl: "http://127.0.0.1:1234", model: "qwen3-coder", taskId: "freeze-test" }
+    );
+    const assertion = expect(promise).rejects.toThrow(/LLM_TIMEOUT/);
+    await vi.advanceTimersByTimeAsync(1_001);
+    await assertion;
   });
 });

@@ -106,10 +106,21 @@ export const streamCompletion = async (
   // Auto-retry with exponential backoff (3 attempts: 2s, 4s, 8s)
   const MAX_RETRIES = 3;
   const BACKOFF_BASE = 2000;
+  // Ceiling on the wait for the FIRST response headers. LM Studio blocks the POST
+  // while it loads/swaps a model (the MoE planner swap can be slow), and the idle
+  // timer below only arms AFTER headers arrive — so without this a stalled model
+  // load freezes the request forever with no error (the silent "Plan" hang).
+  // Generous enough for a cold large-model load, finite so it can never hang.
+  const HEADER_TIMEOUT_MS = Number(process.env.LLM_HEADER_TIMEOUT_MS) || 120_000;
   let response: FetchResponse | undefined;
   let lastError = "";
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let headerTimedOut = false;
+    const headerTimer = setTimeout(() => {
+      headerTimedOut = true;
+      controller.abort();
+    }, HEADER_TIMEOUT_MS);
     try {
       response = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
@@ -117,10 +128,23 @@ export const streamCompletion = async (
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+      clearTimeout(headerTimer);
       break; // success — exit retry loop
     } catch (fetchError) {
+      clearTimeout(headerTimer);
       const msg = fetchError instanceof Error ? fetchError.message : String(fetchError);
       lastError = msg;
+
+      if (headerTimedOut) {
+        // No headers within budget — a stuck/loading model, not a user cancel.
+        // Fail fast with a clear message instead of looping another 120s.
+        activeControllers.delete(taskId);
+        activeRequestCount = Math.max(0, activeRequestCount - 1);
+        throw new Error(
+          `LLM_TIMEOUT: ${baseUrl} sent no response within ${HEADER_TIMEOUT_MS / 1000}s ` +
+          `(the model may be loading or stuck). Try a smaller/faster model.`
+        );
+      }
 
       if (msg.includes("abort") || msg.includes("cancel")) {
         // User aborted — don't retry

@@ -148,3 +148,35 @@ describe("planApp re-plan on shallow output", () => {
     expect(plan.name).toBe("thin");
   });
 });
+
+// Reproduces the "model thought a bit, then everything froze silently" reports:
+// when the model emits only reasoning (or nothing usable), the planner must throw
+// a clear error rather than return garbage or hang.
+describe("planApp surfaces a clear error instead of silently stalling", () => {
+  it("throws when the model returns only a thinking block (no JSON)", async () => {
+    await expect(
+      planApp({
+        description: "expense tracker",
+        complete: async () => streamOf("<think>Let me design this app...</think>"),
+      })
+    ).rejects.toThrow(/invalid JSON|parse/i);
+  });
+
+  it("throws when the model returns an unclosed thinking block then stops", async () => {
+    await expect(
+      planApp({
+        description: "expense tracker",
+        complete: async () => streamOf("<think>still reasoning and then the stream stopped"),
+      })
+    ).rejects.toThrow(/invalid JSON|parse/i);
+  });
+
+  it("throws when the model returns an empty response", async () => {
+    await expect(
+      planApp({
+        description: "expense tracker",
+        complete: async () => streamOf(""),
+      })
+    ).rejects.toThrow(/invalid JSON|parse/i);
+  });
+});
