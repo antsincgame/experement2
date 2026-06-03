@@ -29,6 +29,7 @@ import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug, summarize
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
 import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import { recordFix } from "./error-fix-store.js";
+import { markErrorReported } from "./reported-error.js";
 
 interface CreateOptions {
   description: string;
@@ -284,6 +285,9 @@ export const createProject = async (
       status: "error",
       ...scope,
     });
+    // Mark the error so the queue's generic catch does not surface a duplicate
+    // system_error: this handler already reported it with full context.
+    markErrorReported(error);
     throw error;
   }
 };

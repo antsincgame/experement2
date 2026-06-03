@@ -16,6 +16,7 @@ import {
 import { formatZodError } from "./lib/request-validation.js";
 import { assertLlmUrl } from "./lib/llm-url.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
+import { isErrorReported } from "./lib/reported-error.js";
 import { waitForMetroReady } from "./lib/metro-ready.js";
 import { projectRouter } from "./routes/project.js";
 import { llmRouter } from "./routes/llm.js";
@@ -245,6 +246,11 @@ const runQueuedOperation = <T>(
       });
     })
     .catch((error) => {
+      // A deep handler (e.g. the create pipeline) may have already surfaced this
+      // error to the client with full context; avoid a duplicate system_error.
+      if (isErrorReported(error)) {
+        return;
+      }
       runWithEventScope(eventScope, () => {
         sendSystemErrorToClient(
           clientId,

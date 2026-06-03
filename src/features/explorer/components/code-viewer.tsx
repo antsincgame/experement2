@@ -90,7 +90,8 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleSave]);
 
-  if (!filepath && status === "generating") {
+  const isStreamingPhase = status === "generating" || status === "planning";
+  if (!filepath && isStreamingPhase && streamingContent.length > 0) {
     return (
       <View className="flex-1" style={{ backgroundColor: "#0A0A0A", minHeight: 0 }}>
         <ScrollView style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ padding: 16 }}>
@@ -103,7 +104,7 @@ const CodeViewer = ({ filepath }: CodeViewerProps) => {
               marginBottom: 8,
             }}
           >
-            Generating...
+            {status === "planning" ? "Planning…" : "Generating..."}
           </Text>
           <Text
             style={{

@@ -1,5 +1,5 @@
 // Adds contract-aware plan validation so invalid or unrecoverable planner JSON fails before generation starts.
-import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
+import { streamCompletion, abortTask, type CompleteFn } from "../services/llm-proxy.js";
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
 import { validateAppPlan } from "./project-validator.js";
@@ -87,6 +87,11 @@ const runPlannerOnce = async (
     { role: "user" as const, content: userContent },
   ];
 
+  // Own the task id so the timeout below can actually abort the HTTP request.
+  // Without this, breaking the for-await only stops *reading* — LM Studio keeps
+  // generating and the orphaned controller is dropped from the abort registry,
+  // so even the user's Stop button can no longer cancel it.
+  const taskId = crypto.randomUUID();
   let fullJson = "";
   const generator = await complete(messages, {
     temperature,
@@ -94,6 +99,7 @@ const runPlannerOnce = async (
     topP,
     lmStudioUrl,
     model,
+    taskId,
     responseFormat: { type: "json_object" },
   });
 
@@ -105,8 +111,9 @@ const runPlannerOnce = async (
   for await (const chunk of generator) {
     fullJson += chunk;
     if (Date.now() - startedAt > MAX_PLAN_DURATION_MS) {
-      // Stop consuming; breaking the for-await runs the stream's cleanup and
-      // releases the LLM request slot. We surface a clear error below.
+      // Abort the live request BEFORE breaking: once the for-await teardown runs,
+      // the controller is removed from the registry and can no longer be aborted.
+      abortTask(taskId);
       timedOut = true;
       break;
     }
