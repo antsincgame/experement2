@@ -27,10 +27,17 @@ export const dedupeProjectSlug = (
 
 const fileLabel = (path: string): string => path.split("/").pop() ?? path;
 
+/** First sentence of a description, trimmed to keep the brief scannable. */
+const firstSentence = (text: string, max = 110): string => {
+  const sentence = text.split(/(?<=[.!?])\s/)[0]?.trim() ?? text.trim();
+  return sentence.length > max ? `${sentence.slice(0, max - 1).trimEnd()}…` : sentence;
+};
+
 /**
- * Build a short, human-readable summary of the plan for the chat "reasoning"
- * bubble, so the user sees the planner's intent (screens, components, state)
- * instead of only a raw file list.
+ * Build a warm, human-readable design brief of the plan for the chat "reasoning"
+ * bubble, so the user reads it like a senior engineer describing the build —
+ * not a raw file list. Per-screen intent comes from the model's own descriptions
+ * (zero extra tokens). Keeps the labeled summary lines stable for downstream UI.
  */
 export const summarizePlanForChat = (plan: AppPlan): string => {
   const byType = (type: string): AppPlan["files"] =>
@@ -40,9 +47,23 @@ export const summarizePlanForChat = (plan: AppPlan): string => {
   const stores = byType("store");
   const hooks = byType("hook");
 
+  const navType = plan.navigation?.type ?? "stack";
+  const themeStyle = plan.theme?.style ?? "premium";
+
   const lines: string[] = [`Planned **${plan.displayName}** — ${plan.description}`];
+
+  // One-line "what we're building" sentence so the brief reads conversationally.
+  const pieces: string[] = [`a ${themeStyle} ${navType} app`];
+  if (screens.length > 0) pieces.push(`${screens.length} screen${screens.length > 1 ? "s" : ""}`);
+  if (components.length > 0) pieces.push(`${components.length} reusable component${components.length > 1 ? "s" : ""}`);
+  if (stores.length > 0) pieces.push(`${stores.length} Zustand store${stores.length > 1 ? "s" : ""}`);
+  lines.push("", `Building ${pieces.join(", ")}.`, "");
+
   if (screens.length > 0) {
-    lines.push(`Screens (${screens.length}): ${screens.map((f) => f.path).join(", ")}`);
+    lines.push(`Screens (${screens.length}):`);
+    for (const screen of screens) {
+      lines.push(`• ${fileLabel(screen.path)} — ${firstSentence(screen.description)}`);
+    }
   }
   if (components.length > 0) {
     lines.push(`Components (${components.length}): ${components.map((f) => fileLabel(f.path)).join(", ")}`);
@@ -55,6 +76,7 @@ export const summarizePlanForChat = (plan: AppPlan): string => {
     lines.push(`Libraries: ${plan.extraDependencies.join(", ")}`);
   }
   lines.push(`Total: ${plan.files.length} files.`);
+  lines.push("", "Scaffolding the project, then writing each file with a live preview as it builds.");
   return lines.join("\n");
 };
 

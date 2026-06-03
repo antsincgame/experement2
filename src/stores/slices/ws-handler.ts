@@ -344,7 +344,9 @@ export const createWsHandler = (
 
     case "generation_complete":
       if (isActive) store.clearStreamingContent();
-      emitChat(createAssistantMessage(`Generated ${msg.filesCount} files [ok]`));
+      emitChat(createAssistantMessage(
+        `Done — wrote ${msg.filesCount} files. Spinning up the live preview now…`
+      ));
       log({ level: "info", source: "generator", message: `Generated ${msg.filesCount} files` });
       break;
 

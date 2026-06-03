@@ -40,6 +40,29 @@ describe("summarizePlanForChat", () => {
     expect(summary).toContain("Libraries: zustand");
     expect(summary).toContain("Total: 5 files.");
   });
+
+  it("reads as a design brief: a 'Building …' sentence and per-screen intent", () => {
+    const plan = {
+      name: "notes",
+      displayName: "Notes",
+      description: "A notes app",
+      extraDependencies: ["zustand"],
+      theme: { style: "premium" },
+      navigation: { type: "tabs", screens: [] },
+      files: [
+        { path: "app/(tabs)/index.tsx", type: "screen", description: "List of notes with search.", dependencies: [] },
+        { path: "src/components/NoteCard.tsx", type: "component", description: "card", dependencies: [] },
+        { path: "src/stores/noteStore.ts", type: "store", description: "store", dependencies: [] },
+      ],
+    } as unknown as AppPlan;
+
+    const summary = summarizePlanForChat(plan);
+
+    expect(summary).toContain("Building a premium tabs app");
+    expect(summary).toContain("1 reusable component");
+    expect(summary).toContain("\u2022 index.tsx \u2014 List of notes with search.");
+    expect(summary).toContain("Scaffolding the project");
+  });
 });
 
 describe("summarizeOutput", () => {

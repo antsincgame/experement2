@@ -42,6 +42,8 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
   const isUser = message.role === "user";
   const isStreaming = message.status === "streaming";
   const isError = message.isError === true;
+  // Actionable = points at a real source file the editor can open and fix.
+  const isActionableError = typeof message.errorFile === "string" && message.errorFile.trim().length > 0;
 
   if (isError && !isUser) {
     return (
@@ -123,29 +125,38 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
             </View>
           )}
 
-          {/* Action buttons */}
+          {/* Action buttons. The "Fix" button only appears for actionable errors —
+              ones that point at a real source file. Non-actionable failures
+              (timeouts, "could not fix", preview failures) self-heal during build
+              and offer no button, so it is never unclear when Fix will help. */}
           <View
-            className="flex-row gap-2 px-3 py-2.5"
+            className="flex-row items-center gap-2 px-3 py-2.5"
             style={{ borderTopWidth: 1, borderTopColor: "rgba(255, 51, 102, 0.1)" }}
           >
-            <Pressable
-              onPress={() => onFixError?.(
-                message.content,
-                message.errorDetails,
-                message.errorFile,
-              )}
-              className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg"
-              style={{
-                backgroundColor: "rgba(0, 229, 255, 0.1)",
-                borderWidth: 1,
-                borderColor: "rgba(0, 229, 255, 0.25)",
-              }}
-            >
-              <Wrench size={12} color="#00E5FF" strokeWidth={2} />
-              <Text style={{ color: "#00E5FF", fontSize: 11, fontWeight: "600" }}>
-                Fix Error
+            {isActionableError ? (
+              <Pressable
+                onPress={() => onFixError?.(
+                  message.content,
+                  message.errorDetails,
+                  message.errorFile,
+                )}
+                className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg"
+                style={{
+                  backgroundColor: "rgba(0, 229, 255, 0.1)",
+                  borderWidth: 1,
+                  borderColor: "rgba(0, 229, 255, 0.25)",
+                }}
+              >
+                <Wrench size={12} color="#00E5FF" strokeWidth={2} />
+                <Text style={{ color: "#00E5FF", fontSize: 11, fontWeight: "600" }}>
+                  Fix this file
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={{ color: "#8888AA", fontSize: 10, fontStyle: "italic" }}>
+                Auto-recovered during build — no action needed.
               </Text>
-            </Pressable>
+            )}
 
             <Pressable
               onPress={() => copyToClipboard(message.errorDetails || message.content)}
