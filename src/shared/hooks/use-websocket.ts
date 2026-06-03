@@ -8,6 +8,7 @@ import {
 } from "@/shared/schemas/ws-messages";
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { isCreatingRoute } from "@/shared/lib/creation-flow";
 
 const logError = (source: string, message: string, details?: string) => {
   useSettingsStore.getState().addErrorLog({ level: "error", source, message, details });
@@ -43,7 +44,9 @@ const STALE_ACTIVE_STATUSES = new Set([
 /** After reconnect, nudge preview for projects stuck in non-terminal UI states. */
 const resyncActiveProjectAfterReconnect = (): void => {
   const { projectName, status } = useProjectStore.getState();
-  if (!projectName || !STALE_ACTIVE_STATUSES.has(status)) {
+  // The "__creating__" slug is a UI placeholder for an in-flight creation; the
+  // backend has no such project, so resyncing a preview for it would 404.
+  if (!projectName || isCreatingRoute(projectName) || !STALE_ACTIVE_STATUSES.has(status)) {
     return;
   }
 
@@ -390,6 +393,9 @@ export const useWebSocket = () => {
   }, [send]);
 
   const startPreview = useCallback((projectName: string) => {
+    if (!projectName || isCreatingRoute(projectName)) {
+      return;
+    }
     const { lmStudioUrl, model, editorModel } = useSettingsStore.getState();
     send({
       type: "start_preview",
