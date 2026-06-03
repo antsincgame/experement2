@@ -81,6 +81,17 @@ describe("assessPlanDepth", () => {
     ]);
     expect(assessPlanDepth(plan).thin).toBe(false);
   });
+
+  it("does NOT count auto-generated layouts as screens", () => {
+    const plan = makePlan([
+      { path: "app/_layout.tsx", type: "screen" },        // auto-generated, not a screen
+      { path: "app/(tabs)/_layout.tsx", type: "screen" }, // auto-generated, not a screen
+      { path: "app/index.tsx", type: "screen" },          // the only real screen
+      { path: "src/types/index.ts", type: "type" },
+    ]);
+    // Only 1 real screen → must not be flagged thin (no needless re-plan, no hang).
+    expect(assessPlanDepth(plan).thin).toBe(false);
+  });
 });
 
 const thinPlan = JSON.stringify({

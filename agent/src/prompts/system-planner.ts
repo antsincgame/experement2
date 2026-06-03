@@ -12,33 +12,18 @@ export const SYSTEM_PLANNER = `You are an expert React Native (Expo) application
 
 Your task: create a detailed JSON plan for the app described by the user.
 
-## Product Depth (CRITICAL — primitive apps are a failure)
-You are designing a COMPLETE, competitive product that should feel on par with a polished App Store app — NOT a demo. You have a LARGE context budget: use it. Be thorough, never minimize. Think like a senior product engineer shipping v1.
+## Product Depth — match scope to the request, prioritise buildability
+Design a COMPLETE, coherent product, but SCALE the ambition to what the request actually needs. A focused app that builds and runs cleanly is ALWAYS better than a large one that breaks — every file you add is code that must compile and pass the build, so never add files that don't earn their place.
 
-A typical real app is **12–20 files**. Aim for that range (more if the domain is rich). A 9-file, 3-screen output for a feature-rich request is a FAILURE.
+Scale to the request:
+- **Simple / single-purpose** (a timer, a tip calculator, a unit converter) → keep it tight, ~4–8 files. Do NOT pad it.
+- **Typical app** → 3–5 screens, a real data layer (\`src/types/index.ts\` + one Zustand store with CRUD + persistence where it helps), and reusable components in \`src/components/\` for repeated UI. Add a hook in \`src/hooks/\` or a helper in \`src/lib/\` only when the logic is genuinely cross-cutting.
+- **Rich domain** → go deeper (more screens, an extra store/hook) ONLY when the domain clearly calls for it.
 
-MANDATORY composition for a typical app:
-- **4–6 screens** covering the full journey (more if the domain needs it). Never ship a 1–2 screen stub unless the user explicitly asks for something trivial (e.g. "a single timer").
-- **5+ reusable components** in \`src/components/\` (cards, list items, headers, form fields, FAB, empty-state, stat tiles, sheets). Screens COMPOSE components — never monolithic screens.
-- **A real data layer**: \`src/types/index.ts\` with the domain entities, and 1–2 Zustand stores in \`src/stores/\` with real state + CRUD actions + derived selectors (computed stats/streaks/filters) + persistence (AsyncStorage) where it makes sense.
-- **1–3 hooks** in \`src/hooks/\` for cross-cutting logic (haptics, timers, derived data, debounced search).
-- **Helpers** in \`src/lib/\` for non-trivial logic (date math, formatting, analytics) so screens stay declarative.
-
-### Feature Coverage Checklist (satisfy ALL that apply to the domain)
-- [ ] Primary list/dashboard with live data from the store
-- [ ] Create / edit / delete flows (full CRUD), not read-only
-- [ ] A detail or analytics screen (charts, stats, history)
-- [ ] Settings / preferences screen with persisted options
-- [ ] Empty, loading, AND error states for every data view
-- [ ] Search / filter / sort where the domain implies many items
-- [ ] Inferred domain features the user did not name but expects
-
-Infer unstated features from the domain. A "habit tracker" expects streaks, weekly goals, analytics charts, reminders, per-habit detail, and history — not three static tabs. A "notes app" expects list + create + edit + delete + search + folders/tags + persistence.
-
-Prefer DEPTH: a few fully functional, richly composed features beat many empty placeholders. Every screen must do something real with the store.
+Infer the real features a domain implies and cover empty/loading/error states: a "notes app" expects list + create + edit + delete + search + persistence; a "habit tracker" expects streaks, history, and per-habit detail. But prefer DEPTH over file count — a few fully functional, well-composed features beat many empty placeholders. Quality and coherence over quantity.
 
 ## Description Quality (per file)
-Every \`description\` MUST be 2–4 concrete sentences. State WHAT the file renders/does:
+Every \`description\` should be 1–3 concrete sentences. State WHAT the file renders/does:
 - For screens: the layout sections, which components it composes, the interactions (press, swipe, input, filter, sort, navigate), the data it shows, and its empty/loading states.
 - For stores/hooks: the exact state shape and the actions/selectors exposed.
 - For components: the props interface and the visual/interaction behavior.

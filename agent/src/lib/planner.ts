@@ -6,6 +6,10 @@ import { validateAppPlan } from "./project-validator.js";
 import { safeJsonParse } from "./json-repair.js";
 import { stripThinkingFromText } from "./strip-thinking.js";
 
+// Hard ceiling so a slow model on an oversized prompt can never hang the Plan
+// stage forever — a runaway plan becomes a clear error, not an infinite spinner.
+const MAX_PLAN_DURATION_MS = 180_000;
+
 interface PlannerOptions {
   description: string;
   temperature?: number;
@@ -32,8 +36,16 @@ const countByType = (plan: AppPlan, predicate: (path: string, type: string) => b
  * never force needless complexity. Triggers a single richer re-plan when a
  * multi-screen app lacks the data layer or reusable components a real product needs.
  */
+// Auto-generated layout files (app/_layout.tsx, app/(tabs)/_layout.tsx) are written
+// by the generator, not the model, so they must NOT count as screens — otherwise a
+// simple one-screen app looks "multi-screen" and gets needlessly re-planned.
+const isRealScreen = (path: string): boolean =>
+  path.startsWith("app/") &&
+  /\.(tsx|jsx)$/.test(path) &&
+  !/(?:^|\/)_layout\.(?:tsx|jsx)$/.test(path);
+
 export const assessPlanDepth = (plan: AppPlan): PlanDepthAssessment => {
-  const screens = countByType(plan, (path) => path.startsWith("app/") && /\.(tsx|jsx)$/.test(path));
+  const screens = countByType(plan, (path) => isRealScreen(path));
   const components = countByType(plan, (path) => path.includes("/components/"));
   const stores = countByType(plan, (path) => path.includes("/stores/"));
   const reasons: string[] = [];
@@ -55,10 +67,10 @@ export const assessPlanDepth = (plan: AppPlan): PlanDepthAssessment => {
 };
 
 const buildDepthFeedback = (reasons: string[]): string =>
-  `\n\nYour previous plan was TOO SHALLOW: ${reasons.join("; ")}. ` +
-  `Produce a RICHER, more complete plan now: add more screens, real reusable components in src/components/, ` +
-  `a proper data layer (src/types + Zustand store with CRUD and derived selectors), and end-to-end flows ` +
-  `(list → detail → create → edit → delete → settings) with empty/loading/error states. Aim for 12-20 files.`;
+  `\n\nThe previous plan looks shallow: ${reasons.join("; ")}. ` +
+  `Add the missing pieces — a real data layer (src/types + a Zustand store with CRUD where it helps) ` +
+  `and a few reusable components in src/components/ for repeated UI — plus the core list → detail → ` +
+  `create/edit flow with empty/loading/error states. Keep it focused and buildable: quality over file count.`;
 
 const PLAN_USER_PROMPT = (description: string): string =>
   `/no_think\nCreate an app plan for: ${description}\n\nRespond with ONLY a JSON object. No thinking, no explanation, no markdown.`;
@@ -87,9 +99,17 @@ const runPlannerOnce = async (
 
   let planChunkBuffer = "";
   let planLastSend = Date.now();
+  const startedAt = Date.now();
+  let timedOut = false;
 
   for await (const chunk of generator) {
     fullJson += chunk;
+    if (Date.now() - startedAt > MAX_PLAN_DURATION_MS) {
+      // Stop consuming; breaking the for-await runs the stream's cleanup and
+      // releases the LLM request slot. We surface a clear error below.
+      timedOut = true;
+      break;
+    }
     if (!streamChunks) continue;
     planChunkBuffer += chunk;
     if (Date.now() - planLastSend > 100) {
@@ -99,6 +119,13 @@ const runPlannerOnce = async (
     }
   }
   if (streamChunks && planChunkBuffer) onChunk?.(planChunkBuffer);
+
+  if (timedOut) {
+    throw new Error(
+      `Planner exceeded ${MAX_PLAN_DURATION_MS / 1000}s — the model is producing an oversized plan. ` +
+      `Try a simpler request or a faster model.`
+    );
+  }
 
   // Strip reasoning-model blocks (<think>, <thinking>, redacted_thinking) and
   // markdown fences via the shared utility so planner/editor behave identically.
@@ -137,16 +164,16 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
 
   const plan = await runPlannerOnce(options, basePrompt, true);
 
-  // One bounded, silent re-plan if the first plan is hollow. The retry does not
-  // stream to the UI (avoids a confusing double plan feed) and falls back to the
-  // first plan if it fails, so depth enforcement never breaks a working plan.
+  // One bounded re-plan if the first plan is hollow. It streams to the UI (so the
+  // Plan stage shows live progress instead of appearing frozen) and falls back to
+  // the first plan if it fails, so depth enforcement never breaks a working plan.
   const depth = assessPlanDepth(plan);
   if (!depth.thin) {
     return plan;
   }
 
   try {
-    return await runPlannerOnce(options, basePrompt + buildDepthFeedback(depth.reasons), false);
+    return await runPlannerOnce(options, basePrompt + buildDepthFeedback(depth.reasons), true);
   } catch {
     return plan;
   }
