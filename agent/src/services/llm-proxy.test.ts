@@ -1,6 +1,6 @@
 // Verifies model discovery cache behavior so transient LM Studio failures do not poison future requests.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearModelCache, completeNonStreaming } from "./llm-proxy.js";
+import { clearModelCache, completeNonStreaming, toApiResponseFormat } from "./llm-proxy.js";
 
 const mockModelsResponse = (ids: string[]) => ({
   ok: true,
@@ -80,5 +80,34 @@ describe("llm-proxy model caching", () => {
       model?: string;
     };
     expect(body.model).toBe("qwen3-coder-32b");
+  });
+
+  it("does not send json_object to LM Studio (unsupported response_format)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockModelsResponse(["qwen3-coder-32b"]))
+      .mockResolvedValueOnce(mockCompletionResponse("{}"));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await completeNonStreaming(
+      [{ role: "user", content: "plan" }],
+      {
+        lmStudioUrl: "http://127.0.0.1:1234",
+        responseFormat: { type: "json_object" },
+      }
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string) as {
+      response_format?: { type: string };
+    };
+    expect(body.response_format).toBeUndefined();
+  });
+});
+
+describe("toApiResponseFormat", () => {
+  it("maps json_object to omitted (prompt-based JSON)", () => {
+    expect(toApiResponseFormat({ type: "json_object" })).toBeUndefined();
+    expect(toApiResponseFormat()).toBeUndefined();
   });
 });

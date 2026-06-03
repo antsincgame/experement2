@@ -16,15 +16,34 @@ interface ChatMessage {
   content: string;
 }
 
+/** Wire format accepted by LM Studio and most local OpenAI-compat servers. */
+type ApiResponseFormat =
+  | { type: "text" }
+  | { type: "json_schema"; json_schema: { name: string; schema: Record<string, unknown> } };
+
 interface CompletionRequest {
   messages: ChatMessage[];
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
   stream?: boolean;
-  response_format?: { type: "json_object" };
+  response_format?: ApiResponseFormat;
   model?: string;
 }
+
+/**
+ * Internal callers may request json_object (OpenAI). LM Studio only allows
+ * json_schema or text — sending json_object yields HTTP 400. JSON shape is
+ * enforced via system prompts + safeJsonParse instead.
+ */
+export const toApiResponseFormat = (
+  format?: { type: "json_object" }
+): ApiResponseFormat | undefined => {
+  if (!format) {
+    return undefined;
+  }
+  return undefined;
+};
 
 type FetchResponse = globalThis.Response;
 
@@ -69,8 +88,9 @@ export const streamCompletion = async (
     ...(resolvedModel ? { model: resolvedModel } : {}),
   };
 
-  if (options.responseFormat) {
-    body.response_format = options.responseFormat;
+  const apiResponseFormat = toApiResponseFormat(options.responseFormat);
+  if (apiResponseFormat) {
+    body.response_format = apiResponseFormat;
   }
 
   // Guard: prevent absurdly large payloads from crashing fetch
@@ -273,8 +293,9 @@ export const completeNonStreaming = async (
     model: resolvedModel,
   };
 
-  if (options.responseFormat) {
-    body.response_format = options.responseFormat;
+  const apiResponseFormat = toApiResponseFormat(options.responseFormat);
+  if (apiResponseFormat) {
+    body.response_format = apiResponseFormat;
   }
 
   let lastError: Error | null = null;
