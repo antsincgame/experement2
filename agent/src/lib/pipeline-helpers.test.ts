@@ -131,4 +131,22 @@ describe("autoHealPlanDependencies", () => {
     expect(added?.type).toBe("type");
     expect(added?.description).toContain("Auto-added");
   });
+
+  it("heals EmptyState referenced by tabs but omitted from plan.files", () => {
+    const plan = makePlan([
+      file("src/types/index.ts", []),
+      file("app/(tabs)/index.tsx", [
+        "src/components/ProfileCard.tsx",
+        "src/components/EmptyState.tsx",
+      ]),
+      file("app/(tabs)/matches.tsx", ["src/components/EmptyState.tsx"]),
+      file("src/components/ProfileCard.tsx", ["src/types/index.ts"]),
+    ]);
+
+    autoHealPlanDependencies(plan);
+
+    const empty = plan.files.find((f) => f.path === "src/components/EmptyState.tsx");
+    expect(empty?.type).toBe("component");
+    expect(empty?.dependencies).toContain("src/types/index.ts");
+  });
 });

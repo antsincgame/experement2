@@ -31,6 +31,8 @@ interface ProjectScreenContentProps {
   handleSelectProject: (name: string) => void;
   isResuming: boolean;
   resumeStatus: ProjectResumeStatus | null;
+  showResumeBanner: boolean;
+  resumeProjectName: string | null;
   openFile: (path: string) => void;
   openFiles: string[];
   projectList: ProjectEntry[];
@@ -62,6 +64,8 @@ export const ProjectScreenContent = ({
   handleSelectProject,
   isResuming,
   resumeStatus,
+  showResumeBanner,
+  resumeProjectName,
   openFile,
   openFiles,
   projectList,
@@ -165,9 +169,9 @@ export const ProjectScreenContent = ({
         </View>
       )}
 
-      {resumeStatus?.canResume && routeProjectName && !isCreatingRoute(routeProjectName) && (
+      {showResumeBanner && resumeStatus && resumeProjectName && (
         <ResumeGenerationBanner
-          projectName={routeProjectName}
+          projectName={resumeProjectName}
           missingFileCount={resumeStatus.missingFileCount}
           totalPlanFiles={resumeStatus.totalPlanFiles}
           isResuming={isResuming || isGenerationActive(status)}

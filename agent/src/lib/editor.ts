@@ -109,22 +109,41 @@ export const editProject = async (
     model,
   });
 
-  const actionJson = await collectStream(analyzeGen);
-  // Thinking models (Qwen, DeepSeek-R1) prepend reasoning even with /no_think;
-  // strip it before attempting to parse the JSON action.
-  const cleanedJson = stripThinkingFromText(actionJson);
-
-  let action: EditAction;
-  try {
-    const parsed = safeJsonParse(cleanedJson);
+  const parseAnalyzeAction = (raw: string): EditAction | null => {
+    const cleaned = stripThinkingFromText(raw);
+    const parsed = safeJsonParse(cleaned);
     if (parsed === null) {
-      throw new Error("Editor analysis returned unrecoverable JSON");
+      return null;
     }
-    action = EditActionSchema.parse(parsed);
-  } catch (err) {
-    throw new Error(
-      `Editor analysis failed: ${err instanceof Error ? err.message : "Invalid JSON"}\n${cleanedJson.slice(0, 300)}`
+    const result = EditActionSchema.safeParse(parsed);
+    return result.success ? result.data : null;
+  };
+
+  let action = parseAnalyzeAction(await collectStream(analyzeGen));
+
+  if (!action) {
+    const retryGen = await complete(
+      [
+        ...analyzeMessages,
+        {
+          role: "user" as const,
+          content:
+            "/no_think\nYour previous reply was not valid JSON. Respond with ONLY one JSON object matching the edit-action schema. No markdown, no prose.",
+        },
+      ],
+      {
+        temperature: 0,
+        maxTokens: 4096,
+        responseFormat: { type: "json_object" },
+        lmStudioUrl,
+        model,
+      },
     );
+    action = parseAnalyzeAction(await collectStream(retryGen));
+  }
+
+  if (!action) {
+    throw new Error("Editor analysis returned unrecoverable JSON");
   }
 
   onAnalysis?.(action);

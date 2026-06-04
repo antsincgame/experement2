@@ -3,6 +3,7 @@ import { streamCompletion, abortTask, type CompleteFn } from "../services/llm-pr
 import { AppPlanSchema, type AppPlan } from "../schemas/app-plan.schema.js";
 import { SYSTEM_PLANNER } from "../prompts/system-planner.js";
 import { validateAppPlan } from "./project-validator.js";
+import { autoHealPlanDependencies } from "./pipeline-helpers.js";
 import { safeJsonParse } from "./json-repair.js";
 import { stripThinkingFromText } from "./strip-thinking.js";
 
@@ -152,6 +153,10 @@ const runPlannerOnce = async (
       .join("; ");
     throw new Error(`Plan validation failed: ${issues}`);
   }
+
+  // Heal before semantic validation — models often reference shared components
+  // (e.g. EmptyState) in dependencies without listing them in plan.files.
+  autoHealPlanDependencies(result.data);
 
   const semanticIssues = validateAppPlan(result.data);
   if (semanticIssues.length > 0) {

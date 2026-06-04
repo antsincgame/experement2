@@ -40,8 +40,14 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const plan = useProjectStore((state) => state.plan);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
-  const { resumeStatus, isResuming, handleResumeGeneration } =
-    useProjectGeneration(routeProjectName);
+  const {
+    resumeStatus,
+    isResuming,
+    handleResumeGeneration,
+    showResumeBanner,
+    resumeProjectName,
+    tryContinueFromChat,
+  } = useProjectGeneration(routeProjectName);
   const previousPreviewStatus = useRef(previewStatus);
   const previousPreviewBuildId = useRef<string | null>(previewBuildId);
   const activeProjectRef = useRef<string | null>(null);
@@ -133,8 +139,11 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
 
   const handleChatSend = useCallback((text: string) => {
     addMessage(createUserMessage(text));
+    if (tryContinueFromChat(text)) {
+      return;
+    }
     iterate(text);
-  }, [addMessage, iterate]);
+  }, [addMessage, iterate, tryContinueFromChat]);
 
   const handleSelectProject = useCallback((selectedName: string) => {
     router.push(`/project/${encodeURIComponent(selectedName)}`);
@@ -167,6 +176,8 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
     handleSelectProject,
     isResuming,
     resumeStatus,
+    showResumeBanner,
+    resumeProjectName,
     openFile,
     openFiles,
     projectList,

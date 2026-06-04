@@ -114,25 +114,51 @@ export const summarizePlanForChat = (plan: AppPlan): string => {
  * file but missing from plan.files, append an inferred file entry. Mutates
  * plan.files in place, matching the original pipeline behavior.
  */
+const inferPlanFileType = (dep: string): AppPlan["files"][number]["type"] => {
+  if (dep.includes("/hooks/")) return "hook";
+  if (dep.includes("/stores/")) return "store";
+  if (dep.includes("/types/") || dep.includes("/lib/")) return "type";
+  if (dep.startsWith("app/")) return "screen";
+  return "component";
+};
+
+const defaultDepsForInferredFile = (
+  dep: string,
+  inferredType: AppPlan["files"][number]["type"],
+  planFilePaths: Set<string>,
+): string[] => {
+  if (inferredType === "type") return [];
+  const typesPath = "src/types/index.ts";
+  if (dep === typesPath || !planFilePaths.has(typesPath)) return [];
+  return [typesPath];
+};
+
+/**
+ * Auto-heal the plan: for every src/ or app/ dependency referenced by a planned
+ * file but missing from plan.files, append an inferred file entry. Mutates
+ * plan.files in place. Runs in a loop so transitive references are covered.
+ */
 export const autoHealPlanDependencies = (plan: AppPlan): void => {
   const planFilePaths = new Set(plan.files.map((f) => f.path));
-  for (const file of [...plan.files]) {
-    for (const dep of file.dependencies) {
-      if (!dep.startsWith("src/") && !dep.startsWith("app/")) continue;
-      if (planFilePaths.has(dep)) continue;
-      const inferredType = dep.includes("/hooks/") ? "hook"
-        : dep.includes("/stores/") ? "store"
-        : dep.includes("/types/") ? "type"
-        : dep.includes("/components/") ? "component"
-        : dep.includes("/lib/") ? "type"
-        : "component";
-      plan.files.push({
-        path: dep,
-        type: inferredType as "hook" | "store" | "type" | "component" | "screen",
-        description: `Auto-added: referenced by ${file.path}`,
-        dependencies: inferredType === "type" ? [] : ["src/types/index.ts"].filter((t) => planFilePaths.has(t) || dep !== t),
-      });
-      planFilePaths.add(dep);
+  let added = true;
+
+  while (added) {
+    added = false;
+    for (const file of [...plan.files]) {
+      for (const dep of file.dependencies) {
+        if (!dep.startsWith("src/") && !dep.startsWith("app/")) continue;
+        if (planFilePaths.has(dep)) continue;
+
+        const inferredType = inferPlanFileType(dep);
+        plan.files.push({
+          path: dep,
+          type: inferredType,
+          description: `Auto-added: referenced by ${file.path}`,
+          dependencies: defaultDepsForInferredFile(dep, inferredType, planFilePaths),
+        });
+        planFilePaths.add(dep);
+        added = true;
+      }
     }
   }
 };
