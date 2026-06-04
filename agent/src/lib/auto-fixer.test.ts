@@ -31,6 +31,32 @@ describe("autoFix (safety guards)", () => {
     expect(result.lastError).toContain("no editable source file");
   });
 
+  it("bails on a node_modules crash with a clear web-incompatible reason (no model call)", async () => {
+    let called = false;
+    const complete: CompleteFn = async () => {
+      called = true;
+      return streamOf("");
+    };
+
+    // A native-only module crashes the Expo web bundle from inside node_modules
+    // (e.g. expo-contacts reading PermissionStatus.UNDETERMINED). Autofix cannot edit
+    // node_modules, so it must bail instantly with a named, actionable reason.
+    const error: MetroError = {
+      type: "TypeError",
+      file: "node_modules/expo-contacts/src/ExpoContactsNext.web.ts",
+      line: "8",
+      raw: "TypeError: Cannot read properties of undefined (reading 'UNDETERMINED')",
+    };
+
+    const result = await autoFix({ projectName: "vitest-nm", error, complete });
+
+    expect(called).toBe(false);
+    expect(result.success).toBe(false);
+    expect(result.attempts).toBe(0);
+    expect(result.lastError).toContain("not web-compatible");
+    expect(result.lastError).toContain("expo-contacts");
+  });
+
   it("never throws when the model echoes an absolute/node_modules path", async () => {
     const projectName = makeTempProjectName("autofix-unsafe");
     writeFile(projectName, "app/index.tsx", "export const x = 1;\n");

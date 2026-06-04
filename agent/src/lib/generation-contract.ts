@@ -98,6 +98,42 @@ export const EXPO_SDK_EXTRA_PINS: Record<string, string> = {
   "expo-local-authentication": "~55.0.8",
 };
 
+/**
+ * Native-only device/hardware/permission modules that CRASH the Expo WEB bundle.
+ * Their web entry points read native constants at module load (e.g.
+ * `PermissionStatus.UNDETERMINED` off an undefined object), which kills the whole
+ * web preview with no fallback — and autofix can't help because the failure is in
+ * node_modules, not project code.
+ *
+ * The scaffold's metro.config.js aliases each of these to a web-safe stub ON WEB
+ * (see services/template-cache.ts), so the bundle ALWAYS builds no matter where an
+ * app imports them (screen, store, service, hook). iOS/Android are unaffected — they
+ * resolve the real module. These therefore STAY in SAFE_EXTRA_DEPENDENCIES (apps may
+ * use them for real on device); the stub only shields the web preview.
+ *
+ * Single source of truth: the Metro resolver, the autofix diagnostic, and tests all
+ * key off this list.
+ */
+export const WEB_INCOMPATIBLE_MODULES = [
+  "expo-contacts",
+  "expo-camera",
+  "expo-location",
+  "expo-sensors",
+  "expo-notifications",
+  "expo-local-authentication",
+  "expo-calendar",
+  "expo-barcode-scanner",
+  "expo-image-picker",
+  "react-native-maps",
+  "expo-maps",
+] as const;
+
+/** True when `specifier` is (or is a subpath of) a web-incompatible native module. */
+export const isWebIncompatibleModule = (specifier: string): boolean => {
+  const bare = getBareModuleName(specifier);
+  return (WEB_INCOMPATIBLE_MODULES as readonly string[]).includes(bare);
+};
+
 export const REQUIRED_TEMPLATE_FILES = [
   "app.json",
   "tsconfig.json",

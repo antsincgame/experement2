@@ -7,6 +7,7 @@ import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
 import { SYSTEM_AUTOFIX } from "../prompts/system-editor.js";
 import { applySearchReplace } from "./search-replace.js";
 import { isUnsafeEditPath } from "./editor.js";
+import { getBareModuleName } from "./generation-contract.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 
 export interface MetroError {
@@ -106,6 +107,20 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
   // blocks (often echoing stack-trace paths), so bail out early with a clear reason.
   const targetFile = error.file?.trim();
   if (!targetFile || targetFile === "unknown" || isUnsafeEditPath(targetFile)) {
+    // When the failing file is inside node_modules, the bundle broke in a dependency,
+    // not project code — autofix can't edit it. Most often a native-only module that
+    // isn't web-safe (the scaffold's metro.config aliases the known ones to a web stub;
+    // an unknown one slipping through lands here). Surface a clear, named reason and
+    // bail instantly instead of wasting an attempt and timing out Metro on a recompile.
+    const normalized = targetFile?.replace(/\\/g, "/");
+    if (normalized && /(?:^|\/)node_modules(?:\/|$)/.test(normalized)) {
+      const moduleName = getBareModuleName(normalized.split("node_modules/").pop() ?? normalized);
+      return {
+        success: false,
+        attempts: 0,
+        lastError: `A dependency is not web-compatible and broke the preview (${moduleName}). It needs a web-safe stub for the Expo web bundle.`,
+      };
+    }
     return {
       success: false,
       attempts: 0,
