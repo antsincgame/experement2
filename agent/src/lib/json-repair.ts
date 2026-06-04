@@ -76,6 +76,79 @@ export const repairJson = (raw: string): string => {
   return text;
 };
 
+/**
+ * Recovers JSON that a model cut off mid-stream (token budget) by balancing the
+ * open brackets/strings of the partial object instead of giving up. A local
+ * planner running with a large max_tokens routinely truncates before the closing
+ * brace, which left `safeJsonParse` returning `null` and the planner throwing
+ * "invalid JSON" on an otherwise mostly-complete plan.
+ *
+ * Walks from the first `{`/`[`, tracks string + bracket state, terminates an open
+ * string, drops a dangling comma, then appends the missing closers. If a dangling
+ * key/colon still makes it unparseable, it backtracks to the previous structural
+ * boundary (comma or opening bracket) and retries, salvaging the largest valid
+ * prefix. Returns `null` when there is nothing meaningful to recover.
+ */
+export const balanceTruncatedJson = (raw: string): string | null => {
+  const firstBrace = raw.indexOf("{");
+  const firstBracket = raw.indexOf("[");
+  const starts = [firstBrace, firstBracket].filter((index) => index >= 0);
+  if (starts.length === 0) {
+    return null;
+  }
+
+  // Start at the first structural char; drop a dangling closing code fence.
+  let body = raw.slice(Math.min(...starts)).replace(/\s*`{3,}\s*$/, "");
+
+  for (let attempt = 0; attempt < 60 && body.length > 0; attempt++) {
+    const stack: string[] = [];
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < body.length; i++) {
+      const ch = body[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      else if (ch === "{") stack.push("}");
+      else if (ch === "[") stack.push("]");
+      else if (ch === "}" || ch === "]") stack.pop();
+    }
+
+    let candidate = inString ? `${body}"` : body;
+    candidate = candidate.replace(/\s+$/, "").replace(/,$/, "");
+    for (let i = stack.length - 1; i >= 0; i--) {
+      candidate += stack[i];
+    }
+
+    try {
+      JSON.parse(candidate);
+      // Reject trivial recoveries that discarded all content (e.g. "{" -> "{}").
+      if (candidate.replace(/[\s{}\[\],]/g, "").length === 0) {
+        return null;
+      }
+      return candidate;
+    } catch {
+      const lastComma = body.lastIndexOf(",");
+      const lastObject = body.lastIndexOf("{");
+      const lastArray = body.lastIndexOf("[");
+      const boundary = Math.max(lastComma, lastObject, lastArray);
+      if (boundary <= 0) {
+        return null;
+      }
+      // Drop a trailing comma + its partial element; keep an opening bracket so it
+      // can be closed empty on the next pass.
+      body = boundary === lastComma ? body.slice(0, boundary) : body.slice(0, boundary + 1);
+    }
+  }
+
+  return null;
+};
+
 export const safeJsonParse = (raw: string): unknown | null => {
   // Try 1: direct parse
   try {
@@ -94,6 +167,14 @@ export const safeJsonParse = (raw: string): unknown | null => {
     if (braceStart >= 0 && braceEnd > braceStart) {
       const candidate = raw.slice(braceStart, braceEnd + 1);
       return JSON.parse(repairJson(candidate));
+    }
+  } catch { /* continue */ }
+
+  // Try 4: salvage JSON truncated mid-stream by balancing open brackets/strings.
+  try {
+    const balanced = balanceTruncatedJson(raw);
+    if (balanced !== null) {
+      return JSON.parse(balanced);
     }
   } catch { /* give up */ }
 

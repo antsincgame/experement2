@@ -106,9 +106,31 @@ describe("llm-proxy model caching", () => {
 });
 
 describe("toApiResponseFormat", () => {
-  it("maps json_object to omitted (prompt-based JSON)", () => {
+  it("maps json_object to omitted by default (prompt-based JSON)", () => {
     expect(toApiResponseFormat({ type: "json_object" })).toBeUndefined();
     expect(toApiResponseFormat()).toBeUndefined();
+  });
+
+  it("emits a permissive json_schema when LLM_JSON_SCHEMA=true", () => {
+    const previous = process.env.LLM_JSON_SCHEMA;
+    process.env.LLM_JSON_SCHEMA = "true";
+    try {
+      expect(toApiResponseFormat({ type: "json_object" })).toEqual({
+        type: "json_schema",
+        json_schema: {
+          name: "structured_response",
+          schema: { type: "object", additionalProperties: true },
+        },
+      });
+      // No format requested → still omitted even when opted in.
+      expect(toApiResponseFormat()).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.LLM_JSON_SCHEMA;
+      } else {
+        process.env.LLM_JSON_SCHEMA = previous;
+      }
+    }
   });
 });
 

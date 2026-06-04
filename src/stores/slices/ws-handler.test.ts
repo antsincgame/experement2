@@ -178,6 +178,7 @@ const createHarness = () => {
     addProject: (entry) => setState((current) => ({ projectList: [...current.projectList, entry] })),
     removeProject: () => undefined,
     switchProject: () => undefined,
+    beginCreation: () => undefined,
     reset: () => undefined,
     handleWsMessage: () => undefined,
   };

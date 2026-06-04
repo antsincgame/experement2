@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../features/chat/schemas/message.schema";
 import {
   applyProjectFileSnapshot,
+  buildCreationStartState,
+  buildPersistedProjectChats,
   buildProjectSwitchState,
 } from "./project-store.helpers";
 import type { ProjectState } from "./project-store.types";
@@ -95,6 +97,7 @@ const createState = (): ProjectState => ({
   addProject: () => undefined,
   removeProject: () => undefined,
   switchProject: () => undefined,
+  beginCreation: () => undefined,
   reset: () => undefined,
   handleWsMessage: () => undefined,
 });
@@ -113,6 +116,72 @@ describe("applyProjectFileSnapshot", () => {
     expect(snapshot.fileContents).toEqual({
       "index.tsx": "next",
     });
+  });
+});
+
+describe("buildCreationStartState", () => {
+  it("drops a stale __creating__ chat and starts from an empty conversation", () => {
+    const state = createState();
+    state.projectName = "__creating__";
+    state.messages = [createMessage("old failed creation message")];
+    state.streamingContent = "stale stream";
+    state.projectChats = {
+      ...state.projectChats,
+      __creating__: {
+        messages: [createMessage("old failed creation message")],
+        versions: [],
+        fileTree: [],
+        openFiles: [],
+        activeFile: null,
+        fileContents: {},
+        streamingContent: "stale stream",
+        previewUrl: null,
+        previewPort: null,
+      },
+    };
+
+    const next = buildCreationStartState(state);
+
+    expect(next.projectName).toBe("__creating__");
+    expect(next.status).toBe("planning");
+    expect(next.plan).toBeNull();
+    expect(next.messages).toEqual([]);
+    expect(next.streamingContent).toBe("");
+    expect(next.projectChats?.["__creating__"]?.messages).toEqual([]);
+    // A real, unrelated project's chat is preserved.
+    expect(next.projectChats?.beta?.messages).toEqual([createMessage("beta message")]);
+  });
+});
+
+describe("buildPersistedProjectChats", () => {
+  it("never persists the transient __creating__ placeholder chat", () => {
+    const persisted = buildPersistedProjectChats({
+      alpha: {
+        messages: [createMessage("alpha")],
+        versions: [],
+        fileTree: [],
+        openFiles: [],
+        activeFile: null,
+        fileContents: {},
+        streamingContent: "",
+        previewUrl: null,
+        previewPort: null,
+      },
+      __creating__: {
+        messages: [createMessage("in-flight creation")],
+        versions: [],
+        fileTree: [],
+        openFiles: [],
+        activeFile: null,
+        fileContents: {},
+        streamingContent: "",
+        previewUrl: null,
+        previewPort: null,
+      },
+    });
+
+    expect(Object.keys(persisted)).toEqual(["alpha"]);
+    expect(persisted.__creating__).toBeUndefined();
   });
 });
 

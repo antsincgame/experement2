@@ -27,9 +27,8 @@ export const useHomeScreenController = () => {
   const reset = useProjectStore((state) => state.reset);
   const setPendingProjectName = useProjectStore((state) => state.setPendingProjectName);
   const setPendingCreationRequestId = useProjectStore((state) => state.setPendingCreationRequestId);
-  const switchProject = useProjectStore((state) => state.switchProject);
+  const beginCreation = useProjectStore((state) => state.beginCreation);
   const setProjectName = useProjectStore((state) => state.setProjectName);
-  const setPlan = useProjectStore((state) => state.setPlan);
   const setStatus = useProjectStore((state) => state.setStatus);
   const enhancerEnabled = useSettingsStore((state) => state.enhancerEnabled);
   const enhancerModel = useSettingsStore((state) => state.enhancerModel);
@@ -47,7 +46,13 @@ export const useHomeScreenController = () => {
   const enhanceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (status === "error" && pendingProjectName === CREATING_PENDING_KEY) {
+    // A creation can fail with only the placeholder slug still active (the
+    // project-screen effect clears pendingProjectName but leaves projectName as
+    // "__creating__"), so reset on EITHER marker — otherwise the "homeless"
+    // placeholder lingers and the next creation inherits it.
+    const stuckCreation =
+      pendingProjectName === CREATING_PENDING_KEY || projectName === CREATING_PROJECT_SLUG;
+    if (status === "error" && stuckCreation) {
       const lastError = useProjectStore.getState().messages
         .filter(m => m.isError).at(-1);
       setCreationError(lastError?.content.slice(0, 200) ?? "Project creation failed");
@@ -151,10 +156,11 @@ export const useHomeScreenController = () => {
       return;
     }
 
-    setPlan(null);
-    switchProject(CREATING_PROJECT_SLUG);
+    // Clean slate: clears any stale "__creating__" chat and resets the workspace
+    // (also sets plan=null, status="planning") so the new project never inherits a
+    // previous failed creation's conversation.
+    beginCreation();
     setPendingProjectName(CREATING_PENDING_KEY);
-    setStatus("planning");
     addMessage(createUserMessage(trimmed));
     // Scope this creation's WS events by its requestId so a previous run's late
     // events can't hijack the new session.
@@ -163,14 +169,12 @@ export const useHomeScreenController = () => {
     router.replace(`/project/${encodeURIComponent(CREATING_PROJECT_SLUG)}`);
   }, [
     addMessage,
+    beginCreation,
     createProject,
     isCreating,
     router,
     setPendingProjectName,
     setPendingCreationRequestId,
-    setPlan,
-    switchProject,
-    setStatus,
   ]);
 
   const handleOpenProject = useCallback((name: string) => {

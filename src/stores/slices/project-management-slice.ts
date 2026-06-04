@@ -5,6 +5,7 @@ import type {
   ProjectStoreSet,
 } from "../project-store.types";
 import {
+  buildCreationStartState,
   buildProjectRemovalState,
   buildProjectSwitchState,
   createEmptyChat,
@@ -49,6 +50,11 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
 
   switchProject: (projectName: string) =>
     set((state) => buildProjectSwitchState(state, projectName)),
+
+  // Begin a fresh creation: persist the active project, discard any stale
+  // "__creating__" placeholder chat, and reset the live workspace to empty so the
+  // new project never inherits a previous failed creation's conversation.
+  beginCreation: () => set((state) => buildCreationStartState(state)),
 
   reset: () =>
     set({
