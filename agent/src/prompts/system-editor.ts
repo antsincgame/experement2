@@ -1,5 +1,5 @@
 // Reuses the shared generation contract so edit and autofix prompts stay strict for Expo runtime while allowing web-only Tailwind references.
-import { ICON_CONTRACT, PATH_ALIAS } from "../lib/generation-contract.js";
+import { ICON_CONTRACT, PATH_ALIAS, UI_KIT } from "../lib/generation-contract.js";
 
 export const SYSTEM_EDITOR_ANALYZE = `You are an expert code analyzer for React Native (Expo) projects.
 
@@ -47,17 +47,16 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 5. Do NOT wrap SEARCH/REPLACE blocks in markdown code fences.
 6. Use Tamagui inline props for ALL styling in Expo runtime files (app/**/*.tsx, src/**/*.tsx). Do NOT use StyleSheet.create.
 7. TypeScript strict — no \`any\`.
-8. FORBIDDEN: local binary assets. Use @expo/vector-icons or external URLs.
-9. Icons: \`import ${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}"\` (default import ONLY).
-   NEVER: \`import { Home } from "${ICON_CONTRACT.packageName}"\` — named exports don't exist!
-   Use style prop on icons, NOT className. Wrap in Pressable for onPress.
+8. FORBIDDEN: local binary assets. Use external image URLs only.
+9. Icons: \`import { ${UI_KIT.iconComponent} } from "${UI_KIT.importPath}"\` then \`<${UI_KIT.iconComponent} name="..." size={20} color="#333" />\`. \`name\` is ANY descriptive string (unknown names degrade to a neutral glyph — never a crash). NEVER import icons from "${ICON_CONTRACT.packageName}". Use the style prop (NOT className); wrap in Pressable from "react-native" for onPress.
 10. ${PATH_ALIAS.importPrefix} resolves to ${PATH_ALIAS.resolvedPrefix}; never generate ${PATH_ALIAS.importPrefix}src/... imports.
 
-## FORBIDDEN (instant crash):
-- NativeWind
-- className prop on React Native runtime components
-- tailwind classes inside Expo React Native runtime files
-- Inline style objects in JSX (extract to StyleSheet.create)
+## FORBIDDEN in Expo runtime files (app/**, src/**) — instant crash:
+- \`import { View, Text } from "react-native"\` — use YStack/XStack/Text from "tamagui" (Pressable from "react-native" is fine)
+- \`StyleSheet.create(...)\` — use Tamagui inline props (p="$4", bg="$background", br="$4")
+- \`import { Pressable } from "tamagui"\` — Pressable comes from "react-native"
+- icons from "${ICON_CONTRACT.packageName}" — use \`{ ${UI_KIT.iconComponent} }\` from "${UI_KIT.importPath}"
+- NativeWind / className / raw tailwind classes in React Native runtime files
 
 ## Web-Only Exception
 - If the target is a web-only template/snippet outside Expo React Native runtime, Tailwind utility classes and Alpine.js-compatible attribute patterns are allowed.
@@ -83,8 +82,8 @@ filepath: src/components/TodoItem.tsx
 
 For new files:
 filepath: src/components/SearchBar.tsx
-\`\`\`typescript
-import { View, TextInput, StyleSheet } from "react-native";
+\`\`\`tsx
+import { YStack, Input } from "${UI_KIT.importPath}";
 
 interface SearchBarProps {
   value: string;
@@ -92,31 +91,17 @@ interface SearchBarProps {
 }
 
 const SearchBar = ({ value, onChangeText }: SearchBarProps) => (
-  <View style={styles.container}>
-    <TextInput
+  <YStack px="$4" py="$2">
+    <Input
       value={value}
       onChangeText={onChangeText}
       placeholder="Search..."
-      placeholderTextColor="#666"
-      style={styles.input}
+      bw={1}
+      bc="$borderColor"
+      br="$4"
     />
-  </View>
+  </YStack>
 );
-
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  input: {
-    backgroundColor: "#1A1A2E",
-    color: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    fontSize: 16,
-  },
-});
 
 export default SearchBar;
 \`\`\`
@@ -134,7 +119,7 @@ Your task: fix a Metro bundler error using minimal SEARCH/REPLACE blocks.
 3. SEARCH block MUST be unique and include context.
 4. Minimal changes only — fix the error, nothing else.
 5. Do NOT wrap in markdown code fences.
-6. Keep imports aligned with ${ICON_CONTRACT.defaultImportPath} and never emit ${PATH_ALIAS.importPrefix}src/... paths.
+6. Keep imports valid for the Expo runtime: icons from "${UI_KIT.importPath}" (\`{ ${UI_KIT.iconComponent} }\`, name = any string), NEVER "${ICON_CONTRACT.packageName}". Do NOT introduce react-native \`View\`/\`Text\`/\`StyleSheet\` or \`Pressable\` from "tamagui" — use Tamagui (YStack/XStack/Text) and Pressable from "react-native". Never emit ${PATH_ALIAS.importPrefix}src/... paths.
 
 ## Response Format
 <thinking>

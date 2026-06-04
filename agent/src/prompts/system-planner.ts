@@ -4,6 +4,7 @@ import {
   PATH_ALIAS,
   SAFE_EXTRA_DEPENDENCIES,
   SUPPORTED_NAVIGATION_TYPES,
+  UI_KIT,
 } from "../lib/generation-contract.js";
 
 const SAFE_EXTRA_DEPENDENCIES_LIST = [...SAFE_EXTRA_DEPENDENCIES].join(", ");
@@ -70,7 +71,7 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 - Use TypeScript string unions (type Mode = 'work' | 'break'), NOT enums
 - Zustand stores: export named (export const useStore = create(...))
 9. NEVER reference local binary assets (images, fonts). Use:
-   - ${ICON_CONTRACT.defaultImportPath} for icons
+   - the runtime "${UI_KIT.importPath}" ${UI_KIT.iconComponent} (any descriptive string name) for icons
    - External URLs (picsum.photos, via.placeholder.com) for placeholder images
 10. Keep files under 200 lines each
 11. Every component must have typed props interface
@@ -82,9 +83,7 @@ NEVER build manual bottom tabs — use expo-router <Tabs>.
 14. CRITICAL: If ANY file uses types/interfaces defined in another file (like src/types/index.ts),
     that types file MUST be listed in the \`dependencies\` array of the file using it.
     Usually, ALMOST ALL components, hooks, and stores should have "src/types/index.ts" in their dependencies array.
-15. Icons: use ${ICON_CONTRACT.packageName} with DEFAULT import (${ICON_CONTRACT.defaultImportName} from "${ICON_CONTRACT.defaultImportPath}")
-    ICON NAMES MUST BE ONE OF: home, settings, user, search, plus, star, heart, clock, calendar, list, edit, trash-2, file-text, image, bell, mail, map-pin, cloud, zap, activity, bar-chart-2, pie-chart, dollar-sign, shopping-cart, tag, bookmark, award, music, play, square, circle, hash, grid, layers, filter, coffee, droplet, thermometer, eye, lock, globe, compass, gift, flag.
-    DO NOT invent icon names like "calculator", "chef-hat", "palette", "pill", "dice", "leaf", "brain". Use the closest match from the list above.
+15. Icons: for navigation.screens[].icon use ANY descriptive lowercase name as a plain string (e.g. "home", "calculator", "heart", "bar-chart-2", "compass"). The runtime ${UI_KIT.iconComponent} from "${UI_KIT.importPath}" accepts any name and degrades gracefully — do NOT restrict to a fixed list, and do NOT reference ${ICON_CONTRACT.packageName}.
 16. Supported navigation types only: ${SUPPORTED_NAVIGATION_TYPES.join(", ")}
 17. navigation.screens[].path is REQUIRED and must point to a file in files[]
 18. navigation.screens[].name is the HUMAN-READABLE screen title. navigation.screens[].path defines the actual route segment and must match the generated file path. For file "app/(tabs)/settings.tsx", path stays "app/(tabs)/settings.tsx" while name can be "Settings".
