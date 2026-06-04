@@ -3,6 +3,9 @@ import type { ChildProcess } from "child_process";
 
 const METRO_ERROR_MAX_LENGTH = 500;
 const MAX_STACK_LINES = 5;
+// Wait briefly after a "Bundled" line before declaring success, so a trailing
+// fatal error in a following chunk can still cancel it.
+const SUCCESS_DEBOUNCE_MS = 2000;
 
 export type BuildStatus = "building" | "success" | "error" | "idle";
 export type BuildIssueCategory =
@@ -222,8 +225,15 @@ export const watchProcess = (
 
     callback({ type: "build_log", message: text });
 
-    // Check for success (Metro "Bundled" message)
-    if (text.includes("Bundled") && !text.toLowerCase().includes("error")) {
+    // Treat as a successful bundle only when the chunk carries no FATAL error line.
+    // The previous `!includes("error")` guard masked real failures whose text lacks
+    // the literal substring "error" (e.g. "Unexpected token", "Unable to resolve
+    // module", "Module not found") when they share a chunk with a "Bundled" line.
+    if (
+      text.includes("Bundled") &&
+      !hasFatalErrorLine(text) &&
+      !hasFatalErrorLine(errorBuffer + text)
+    ) {
       if (successTimeout) clearTimeout(successTimeout);
       if (errorFlushTimeout) {
         clearTimeout(errorFlushTimeout);
@@ -233,7 +243,7 @@ export const watchProcess = (
       lastErrorSignature = "";
       successTimeout = setTimeout(() => {
         callback({ type: "build_success" });
-      }, 2000);
+      }, SUCCESS_DEBOUNCE_MS);
       return;
     }
 

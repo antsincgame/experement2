@@ -2,7 +2,8 @@
 import fs from "fs";
 import path from "path";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
-import { findFreePort } from "../lib/port-finder.js";
+import { findFreePort, isPortFree } from "../lib/port-finder.js";
+import { setPreviewPort } from "../lib/event-bus.js";
 import { watchProcess, type LogCallback } from "./log-watcher.js";
 
 interface ManagedProcess {
@@ -95,16 +96,17 @@ export const startExpo = async (
 
   const cleanup = watchProcess(child, onLog);
 
-  activeProcesses.set(projectName, {
-    process: child,
-    port,
-    projectName,
-    cleanup,
-  });
+  const managed: ManagedProcess = { process: child, port, projectName, cleanup };
+  activeProcesses.set(projectName, managed);
 
   child.on("exit", (code) => {
     cleanup();
-    activeProcesses.delete(projectName);
+    // Only forget THIS bundler if a newer one for the same slug hasn't replaced
+    // it — a late exit from the old process must not evict the new entry.
+    if (activeProcesses.get(projectName) === managed) {
+      activeProcesses.delete(projectName);
+      setPreviewPort(projectName, null);
+    }
     onLog({
       type: "build_log",
       message: `[Metro] Process exited with code ${code}`,
@@ -123,10 +125,14 @@ export const startExpoClearCache = async (
   // Singleton: kill ALL running bundlers before starting a new one
   killAll();
 
+  // The previous bundler for this slug was just killed but may not have released
+  // the socket yet; fall back to a fresh port instead of crashing with EADDRINUSE.
+  const boundPort = (await isPortFree(port)) ? port : await findFreePort();
+
   const npxCmd = isWindows ? "npx.cmd" : "npx";
   const child = spawn(
     npxCmd,
-    ["expo", "start", "--web", "--port", String(port), "-c"],
+    ["expo", "start", "--web", "--port", String(boundPort), "-c"],
     {
       cwd: projectPath,
       env: { ...process.env, BROWSER: "none" },
@@ -138,23 +144,22 @@ export const startExpoClearCache = async (
 
   const cleanup = watchProcess(child, onLog);
 
-  activeProcesses.set(projectName, {
-    process: child,
-    port,
-    projectName,
-    cleanup,
-  });
+  const managed: ManagedProcess = { process: child, port: boundPort, projectName, cleanup };
+  activeProcesses.set(projectName, managed);
 
   child.on("exit", (code) => {
     cleanup();
-    activeProcesses.delete(projectName);
+    if (activeProcesses.get(projectName) === managed) {
+      activeProcesses.delete(projectName);
+      setPreviewPort(projectName, null);
+    }
     onLog({
       type: "build_log",
       message: `[Metro] Process exited with code ${code}`,
     });
   });
 
-  return { port, process: child };
+  return { port: boundPort, process: child };
 };
 
 export const killExpo = (projectName: string): void => {
@@ -164,6 +169,9 @@ export const killExpo = (projectName: string): void => {
   killProcess(managed.process);
   managed.cleanup();
   activeProcesses.delete(projectName);
+  // Drop the stale proxy/port mapping so /preview/<name>/ 404s instead of
+  // proxying to a dead Metro port (502/503) until restart.
+  setPreviewPort(projectName, null);
 };
 
 const NPM_INSTALL_TIMEOUT_MS = 300_000; // 5 minutes (Tamagui is large)
@@ -379,5 +387,8 @@ export const killAll = (): void => {
       console.warn(`[ProcessManager] Failed to kill ${name}: ${err instanceof Error ? err.message : String(err)}`);
     }
     activeProcesses.delete(name);
+    // Clear the proxy/port mapping so a killed project's preview stops resolving
+    // to a now-dead Metro port.
+    setPreviewPort(name, null);
   }
 };

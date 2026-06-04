@@ -171,13 +171,24 @@ export const editProject = async (
     .map(([fp, code]) => `// === ${fp} ===\n${code}`)
     .join("\n\n");
 
+  // The analyzer lists files to CREATE in `newFiles`, but the generate step only
+  // ever saw the existing target files — so the model was never told to author
+  // them and the new files were silently never created. Surface them here.
+  const safeNewFiles = action.newFiles.filter((file) => !isUnsafeEditPath(file.path));
+  const newFilesContext =
+    safeNewFiles.length > 0
+      ? `\n\nFiles to CREATE (for each, output a \`filepath:\` line followed by a fenced code block with the COMPLETE file):\n${safeNewFiles
+          .map((file) => `- ${file.path}: ${file.description}`)
+          .join("\n")}`
+      : "";
+
   // ── STEP 2: Generate SEARCH/REPLACE ───────────────────
   const generateMessages = [
     { role: "system" as const, content: SYSTEM_EDITOR_GENERATE },
     ...recentChat.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     {
       role: "user" as const,
-      content: `Project skeleton:\n${skeleton.summary}\n\nTarget files:\n${fileContext}\n\nUser request: ${userRequest}`,
+      content: `Project skeleton:\n${skeleton.summary}\n\nTarget files:\n${fileContext}${newFilesContext}\n\nUser request: ${userRequest}`,
     },
   ];
 

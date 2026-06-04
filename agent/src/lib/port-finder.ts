@@ -1,6 +1,6 @@
 import net from "net";
 
-const isPortFree = (port: number): Promise<boolean> =>
+export const isPortFree = (port: number): Promise<boolean> =>
   new Promise((resolve) => {
     const server = net.createServer();
     server.once("error", () => resolve(false));

@@ -218,6 +218,38 @@ describe("watchProcess", () => {
     vi.useRealTimers();
   });
 
+  it("does not mask a non-'error' fatal that shares a chunk with 'Bundled'", async () => {
+    vi.useFakeTimers();
+    const proc = makeFakeProcess();
+    const callback = vi.fn<Parameters<LogCallback>>();
+    watchProcess(proc, callback);
+
+    // "Unable to resolve module" lacks the literal substring "error", so the old
+    // `!includes("error")` guard treated this as a clean bundle and dropped it.
+    emitStdout(proc, 'Web Bundled 1500ms\nUnable to resolve module "x" from "src/y.tsx"\n');
+    vi.advanceTimersByTime(300);
+
+    const errorCalls = callback.mock.calls.filter(([event]) => event.type === "build_error");
+    const successCalls = callback.mock.calls.filter(([event]) => event.type === "build_success");
+    expect(errorCalls).toHaveLength(1);
+    expect(successCalls).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
+  it("emits build_success for a clean Bundled line", async () => {
+    vi.useFakeTimers();
+    const proc = makeFakeProcess();
+    const callback = vi.fn<Parameters<LogCallback>>();
+    watchProcess(proc, callback);
+
+    emitStdout(proc, "Web Bundled 1200ms index.js\n");
+    vi.advanceTimersByTime(2100);
+
+    const successCalls = callback.mock.calls.filter(([event]) => event.type === "build_success");
+    expect(successCalls).toHaveLength(1);
+    vi.useRealTimers();
+  });
+
   it("deduplicates identical repeated errors within one build", async () => {
     vi.useFakeTimers();
     const proc = makeFakeProcess();

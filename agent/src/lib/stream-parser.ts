@@ -212,7 +212,10 @@ const processBuffer = (buffer: string, state: ParserState): number => {
     return afterMarker;
   }
 
-  const codeFenceMatch = buffer.match(/^```(?:typescript|tsx|ts|jsx|js)\n/);
+  // Accept ANY language tag (or a bare fence) after a filepath: header. The old
+  // allow-list missed the common `javascript` tag and bare ``` fences, so those
+  // new files were dropped char-by-char and silently never created.
+  const codeFenceMatch = buffer.match(/^```[a-zA-Z0-9_+-]*\n/);
   if (codeFenceMatch && state.currentFilepath) {
     state.mode = "new_file_code";
     state.codeBuffer = "";
