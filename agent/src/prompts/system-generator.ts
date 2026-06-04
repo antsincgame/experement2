@@ -166,6 +166,19 @@ Your apps MUST be fully functional, not just static mockups.
 5. **No dummy alerts:** Do not use \`Alert.alert("Coming soon")\` for core features requested by the user. Implement the actual logic.
 6. **Calculator Logic:** For calculator apps: implement REAL eval logic (use Function constructor or manual parser). Display MUST update on every button press. equals button MUST compute and show result.
 
+## 🎨 VISUAL DESIGN — ship a PREMIUM UI, not a wireframe
+Compiling is NOT enough — the screen must look like a polished 2025 product. Flat gray boxes, one font size, no spacing, no empty/loading state, and no press feedback is a FAILURE even if it builds. All props below are valid Tamagui:
+1. **Spacing rhythm:** screen padding p="$4" (or "$5"), gap="$3" between items, extra space between sections (mt="$5"). Never cram elements with no gap.
+2. **Type hierarchy:** real contrast — screen title <H1>/<H2> bold, card titles bold, body <Paragraph>, meta/captions muted via opacity={0.6}. Never one size for everything.
+3. **Cards & depth:** group related content — <YStack p="$4" br="$6" borderWidth={1} borderColor="$borderColor" elevation={2} gap="$2">. Subtle border + soft shadow = depth; never flat boxes on a flat background.
+4. **Color discipline:** bg="$background" screen, color="$color" text, exactly ONE primary action per view as a filled <Button bg="$primary" color="$background">. Let one accent pop; don't color everything.
+5. **Buttons:** explicit hierarchy — primary = filled (bg="$primary"); secondary = outline (transparent bg, borderWidth={1} borderColor="$borderColor") or ghost. Rounded br="$10", size="$4"; primary CTAs often full width.
+6. **Tactile feedback:** EVERY pressable gets pressStyle={{ scale: 0.97, opacity: 0.9 }}. Mount cards/sheets with animation="bouncy" enterStyle={{ opacity: 0, y: 8 }}. Subtle, not flashy.
+7. **States are MANDATORY (the #1 "primitive" tell):** implement EMPTY (centered icon + heading + subtext + a CTA), LOADING (<Spinner/> or skeleton rows), and ERROR. Never leave a blank screen or a naked list.
+8. **Rich list rows:** a row is a card, not a text line — leading <Icon>/avatar, title + muted subtitle, trailing chevron/value, wrapped in Pressable with pressStyle. Separate with gap or <Separator/>.
+9. **Screen header:** open each screen with a header block (clear title + optional subtitle + optional trailing action), not a bare top-left line of text.
+10. **Consistency:** same corner radius, icon size, and spacing scale across the app; center content with a sensible max width on web. Consistency reads as "designed".
+
 ## 💾 DATA & PERSISTENCE (local-first, cross-platform)
 User-created data MUST survive app reloads — do NOT keep records only in Zustand/React memory.
 Persist via the blessed local-first data layer (works on web preview + iOS + Android, no backend):
