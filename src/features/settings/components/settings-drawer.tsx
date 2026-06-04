@@ -10,8 +10,13 @@ import {
   type SettingsDraft,
   useSettingsStore,
 } from "@/stores/settings-store";
+import { LM_STUDIO_DEFAULT_URL } from "@/shared/lib/constants";
 import { defaultPersistedSettings } from "@/stores/settings-persist";
 import { useProjectStore } from "@/stores/project-store";
+
+/** LM Studio chat models only — hide embedding-only entries from role pickers. */
+const isChatModel = (id: string): boolean =>
+  !/embed/i.test(id);
 
 interface SettingsDrawerProps {
   visible: boolean;
@@ -83,25 +88,34 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
 
   const [models, setModels] = useState<LmModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [plannerDropdownOpen, setPlannerDropdownOpen] = useState(false);
   const [editorDropdownOpen, setEditorDropdownOpen] = useState(false);
   const [enhancerDropdownOpen, setEnhancerDropdownOpen] = useState(false);
   const [embeddingDropdownOpen, setEmbeddingDropdownOpen] = useState(false);
   const [polishDropdownOpen, setPolishDropdownOpen] = useState(false);
+  const [debouncedUrl, setDebouncedUrl] = useState(draft.lmStudioUrl);
 
   const fetchModels = useCallback(async () => {
+    const url = debouncedUrl.trim() || LM_STUDIO_DEFAULT_URL;
     setModelsLoading(true);
+    setModelsError(null);
     try {
-      setModels(await apiClient.listLmStudioModels());
-    } catch {
+      const result = await apiClient.testLlmConnection(url);
+      if (!result.ok) {
+        setModels([]);
+        setModelsError(result.error ?? "LM Studio недоступен — проверь URL и что сервер запущен");
+        return;
+      }
+      setModels(await apiClient.listModelsFromUrl(url));
+    } catch (err) {
       setModels([]);
+      setModelsError(err instanceof Error ? err.message : "Не удалось загрузить список моделей");
     } finally {
       setModelsLoading(false);
     }
-  }, []);
-
-  const [debouncedUrl, setDebouncedUrl] = useState(draft.lmStudioUrl);
+  }, [debouncedUrl]);
 
   useEffect(() => {
     if (!visible) return;
@@ -119,6 +133,15 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   useEffect(() => {
     if (visible) void fetchModels().catch(() => {});
   }, [visible, debouncedUrl, fetchModels]);
+
+  const chatModels = useMemo(
+    () => models.filter((m) => isChatModel(m.id)),
+    [models],
+  );
+  const embeddingModels = useMemo(
+    () => models.filter((m) => /embed/i.test(m.id)),
+    [models],
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -202,12 +225,13 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               </Pressable>
               <Pressable
                 onPress={() => {
-                  apiClient.testLlmConnection(draft.lmStudioUrl)
+                  void apiClient.testLlmConnection(draft.lmStudioUrl)
                     .then((result) => {
                       if (result.ok) {
-                        alert(`LLM connected! ${result.models} models available.`);
+                        alert(`LM Studio: ${result.models} моделей`);
+                        void fetchModels();
                       } else {
-                        alert(`LLM connection FAILED: ${result.error}`);
+                        alert(`Ошибка LM Studio: ${result.error}`);
                       }
                     });
                 }}
@@ -238,11 +262,20 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           </View>
 
           {/* Model Selectors */}
+          {modelsError ? (
+            <View className="flex-row items-center justify-between px-3 py-2 rounded-xl mb-2" style={{ backgroundColor: "rgba(255,136,68,0.08)", borderWidth: 1, borderColor: "rgba(255,136,68,0.2)" }}>
+              <Text style={{ fontSize: 10, color: "#FF8844", flex: 1 }} numberOfLines={2}>{modelsError}</Text>
+              <Pressable onPress={() => void fetchModels()} className="px-2 py-1 rounded" style={{ backgroundColor: "rgba(0,229,255,0.1)" }}>
+                <RefreshCw size={12} color="#00E5FF" />
+              </Pressable>
+            </View>
+          ) : null}
           <ModelSelector
             label="Generation Model (Code)"
             hint="Used only for the initial file-generation step (screens, components, stores). Contract/type fixes and Metro autofix use Editor/Fix below."
-            models={models}
+            models={chatModels}
             loading={modelsLoading}
+            modelsError={modelsError}
             open={modelDropdownOpen}
             onToggle={() => { setModelDropdownOpen(!modelDropdownOpen); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
             onSelect={(id) => { patchDraft({ model: id }); setModelDropdownOpen(false); }}
@@ -252,8 +285,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           <ModelSelector
             label="Planner Model (Architecture)"
             hint="Used only for the planning step. A smaller/faster model works well here."
-            models={models}
+            models={chatModels}
             loading={modelsLoading}
+            modelsError={modelsError}
             open={plannerDropdownOpen}
             onToggle={() => { setPlannerDropdownOpen(!plannerDropdownOpen); setModelDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
             onSelect={(id) => { patchDraft({ plannerModel: id }); setPlannerDropdownOpen(false); }}
@@ -263,8 +297,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           <ModelSelector
             label="Editor / Fix Model"
             hint="Contract validation, TypeScript type-fix, Metro autofix during create, and chat iterate. Pick a strong instruct/coder model. Auto = same as Generation."
-            models={models}
+            models={chatModels}
             loading={modelsLoading}
+            modelsError={modelsError}
             open={editorDropdownOpen}
             onToggle={() => { setEditorDropdownOpen(!editorDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
             onSelect={(id) => { patchDraft({ editorModel: id }); setEditorDropdownOpen(false); }}
@@ -352,8 +387,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             </View>
             <ModelSelector
               label="Enhancer Model"
-              models={models}
+              models={chatModels}
               loading={modelsLoading}
+              modelsError={modelsError}
               open={enhancerDropdownOpen}
               onToggle={() => { setEnhancerDropdownOpen(!enhancerDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
               onSelect={(id) => { patchDraft({ enhancerModel: id }); setEnhancerDropdownOpen(false); }}
@@ -389,8 +425,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             <ModelSelector
               label="Модель эмбеддингов (необязательно)"
               hint="Переопределение вручную. Пусто = авто из списка моделей LM Studio."
-              models={models}
+              models={embeddingModels.length > 0 ? embeddingModels : models}
               loading={modelsLoading}
+              modelsError={modelsError}
               open={embeddingDropdownOpen}
               onToggle={() => { setEmbeddingDropdownOpen(!embeddingDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); }}
               onSelect={(id) => { patchDraft({ embeddingModel: id }); setEmbeddingDropdownOpen(false); }}
@@ -427,8 +464,9 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
               <ModelSelector
                 label="Модель для Auto-polish"
                 hint="Отдельная модель для дизайн-итераций. Пусто = как у генерации."
-                models={models}
+                models={chatModels}
                 loading={modelsLoading}
+                modelsError={modelsError}
                 open={polishDropdownOpen}
                 onToggle={() => { setPolishDropdownOpen(!polishDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
                 onSelect={(id) => { patchDraft({ polishModel: id }); setPolishDropdownOpen(false); }}
@@ -452,6 +490,7 @@ interface ModelSelectorProps {
   hint?: string;
   models: LmModel[];
   loading: boolean;
+  modelsError?: string | null;
   open: boolean;
   onToggle: () => void;
   onSelect: (id: string) => void;
@@ -466,6 +505,7 @@ const ModelSelector = ({
   hint,
   models,
   loading,
+  modelsError,
   open,
   onToggle,
   onSelect,
@@ -473,6 +513,10 @@ const ModelSelector = ({
   autoLabel,
 }: ModelSelectorProps) => {
   const [manualInput, setManualInput] = useState(savedModel);
+
+  useEffect(() => {
+    setManualInput(savedModel);
+  }, [savedModel]);
 
   const displayLabel = loading
     ? "Loading models…"
@@ -528,46 +572,18 @@ const ModelSelector = ({
             ...(Platform.OS === "web" ? { boxShadow: "0 4px 16px rgba(0,0,0,0.5)" } : {}),
           })}
         >
-          {/* Manual entry */}
-          <View
-            className="px-3 py-2.5"
-            style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}
-          >
-            <Text style={{ fontSize: 9, color: "#8888AA", marginBottom: 6, fontWeight: "600" }}>
-              ENTER MODEL ID MANUALLY
-            </Text>
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={manualInput}
-                onChangeText={setManualInput}
-                placeholder="e.g. qwen2.5-coder-7b-instruct"
-                placeholderTextColor="#4A4A6A"
-                style={{
-                  flex: 1,
-                  fontSize: 11,
-                  color: "#C0C0D0",
-                  backgroundColor: "rgba(255,255,255,0.04)",
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.08)",
-                  borderRadius: 8,
-                  paddingHorizontal: 10,
-                  paddingVertical: 6,
-                }}
-                onSubmitEditing={handleManualCommit}
-              />
-              <Pressable
-                onPress={handleManualCommit}
-                className="px-3 py-1.5 rounded-lg"
-                style={{ backgroundColor: "rgba(0,229,255,0.12)", borderWidth: 1, borderColor: "rgba(0,229,255,0.25)" }}
-              >
-                <Text style={{ fontSize: 10, color: "#00E5FF", fontWeight: "700" }}>Set</Text>
-              </Pressable>
+          {/* LM Studio models — primary picker */}
+          {loading ? (
+            <View className="px-3 py-3">
+              <Text style={{ fontSize: 10, color: "#8888AA" }}>Загрузка моделей из LM Studio…</Text>
             </View>
-          </View>
-
-          {/* Fetched models list */}
-          {models.length > 0 ? (
-            <ScrollView style={{ maxHeight: 140 }}>
+          ) : models.length > 0 ? (
+            <ScrollView style={{ maxHeight: 200 }}>
+              <View className="px-3 py-2" style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" }}>
+                <Text style={{ fontSize: 9, color: "#00E5FF", fontWeight: "600" }}>
+                  МОДЕЛИ ИЗ LM STUDIO ({models.length})
+                </Text>
+              </View>
               {models.map((m) => (
                 <Pressable
                   key={m.id}
@@ -588,17 +604,47 @@ const ModelSelector = ({
                 </Pressable>
               ))}
             </ScrollView>
-          ) : loading ? (
-            <View className="px-3 py-3">
-              <Text style={{ fontSize: 10, color: "#8888AA" }}>Loading models from LM Studio…</Text>
-            </View>
           ) : (
             <View className="px-3 py-3">
-              <Text style={{ fontSize: 10, color: "#FF8844" }}>
-                No models found via API — enter the model ID manually above, or load a model in LM Studio first.
+              <Text style={{ fontSize: 10, color: "#FF8844", lineHeight: 14 }}>
+                {modelsError ?? "Список пуст — загрузите модель в LM Studio или укажите ID вручную ниже."}
               </Text>
             </View>
           )}
+
+          {/* Manual fallback — secondary */}
+          <View className="px-3 py-2.5">
+            <Text style={{ fontSize: 9, color: "#4A4A6A", marginBottom: 6, fontWeight: "600" }}>
+              ИЛИ УКАЖИТЕ ID ВРУЧНУЮ
+            </Text>
+            <View className="flex-row items-center gap-2">
+              <TextInput
+                value={manualInput}
+                onChangeText={setManualInput}
+                placeholder="qwen2.5-coder-7b-instruct"
+                placeholderTextColor="#4A4A6A"
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  color: "#C0C0D0",
+                  backgroundColor: "rgba(255,255,255,0.04)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                }}
+                onSubmitEditing={handleManualCommit}
+              />
+              <Pressable
+                onPress={handleManualCommit}
+                className="px-3 py-1.5 rounded-lg"
+                style={{ backgroundColor: "rgba(0,229,255,0.12)", borderWidth: 1, borderColor: "rgba(0,229,255,0.25)" }}
+              >
+                <Text style={{ fontSize: 10, color: "#00E5FF", fontWeight: "700" }}>OK</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       )}
 
