@@ -454,6 +454,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
       }
     }
 
+    try {
     const skeleton = buildProjectSkeleton(projectPath);
 
     const depContents = buildDependencyContext(projectName, fileSpec.dependencies);
@@ -561,9 +562,15 @@ Generate the complete code for: ${fileSpec.path}`;
 
     const extracted = extractCodeFromResponse(responseBuffer);
     if (extracted) {
-      writeFile(projectName, extracted.filepath, extracted.code);
-      generatedFiles.push(extracted.filepath);
-      onFileComplete?.(extracted.filepath);
+      if (extracted.filepath !== fileSpec.path) {
+        console.warn(
+          `[Generator] Model filepath "${extracted.filepath}" != plan "${fileSpec.path}" — writing to plan path`,
+        );
+      }
+      writeFile(projectName, fileSpec.path, extracted.code);
+      if (!generatedFiles.includes(fileSpec.path)) {
+        generatedFiles.push(fileSpec.path);
+      }
     } else {
       let code = responseBuffer
         .replace(/^```(?:typescript|tsx|ts|jsx|js)?\n?/, "")
@@ -575,13 +582,35 @@ Generate the complete code for: ${fileSpec.path}`;
 
       if (code.length > 10) {
         writeFile(projectName, fileSpec.path, code);
-        generatedFiles.push(fileSpec.path);
-        onFileComplete?.(fileSpec.path);
+        if (!generatedFiles.includes(fileSpec.path)) {
+          generatedFiles.push(fileSpec.path);
+        }
       } else {
         console.warn(`[Generator] Empty/tiny code for ${fileSpec.path} (${code.length} chars) — will fully regenerate`);
         writeFile(projectName, fileSpec.path, `${EMPTY_FILE_PLACEHOLDER}\n`);
+        if (!generatedFiles.includes(fileSpec.path)) {
+          generatedFiles.push(fileSpec.path);
+        }
+      }
+    }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Generator] Failed ${fileSpec.path}:`, message);
+      broadcast({
+        type: "build_event",
+        eventType: "self_healing",
+        message: `⚠️ ${fileSpec.path}: ${message.slice(0, 220)} — will retry in heal pass`,
+      });
+      const existing = readFile(projectName, fileSpec.path);
+      if (!existing || !existing.includes(EMPTY_FILE_PLACEHOLDER)) {
+        writeFile(projectName, fileSpec.path, `${EMPTY_FILE_PLACEHOLDER}\n`);
+      }
+      if (!generatedFiles.includes(fileSpec.path)) {
         generatedFiles.push(fileSpec.path);
       }
+    } finally {
+      // Always unblock the UI even when the model returns empty output, wrong filepath, or times out.
+      onFileComplete?.(fileSpec.path);
     }
   }
 

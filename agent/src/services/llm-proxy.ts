@@ -237,7 +237,8 @@ export const streamCompletion = async (
     const reader = responseBody!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    const IDLE_TIMEOUT_MS = 60_000;
+    const IDLE_TIMEOUT_MS =
+      Number(process.env.LLM_STREAM_IDLE_MS) || 180_000;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
     const resetIdleTimer = (): void => {

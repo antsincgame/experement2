@@ -15,6 +15,7 @@ import { autoFix } from "./auto-fixer.js";
 import { applyAutofixWithGate, countTypeErrors } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
 import { recordExemplar } from "./exemplar-store.js";
+import { buildResumeStatusMessage } from "./pipeline-resume-status.js";
 import { gitCommit, gitInit } from "./git.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { waitForBuildOutcome, runProjectQualityGates } from "./pipeline-gates.js";
@@ -119,6 +120,7 @@ export const runCodegenAndShip = async (
   });
   
   emitOperation({ type: "generation_complete", filesCount: files.length });
+  emitOperation(buildResumeStatusMessage(projectSlug));
   advanceGenerationCheckpoint(projectSlug, "codegen");
 
   // Repair signals for the learned-exemplar capture gate (path B). We only learn
@@ -279,6 +281,7 @@ export const runCodegenAndShip = async (
     const message = gateResult.errors.join("\n\n");
     emitOperation({ type: "system_error", error: message });
     emitOperation({ type: "status", status: "error" });
+    emitOperation(buildResumeStatusMessage(projectSlug));
     return { projectName: projectSlug, port: 0, plan };
   }
   
