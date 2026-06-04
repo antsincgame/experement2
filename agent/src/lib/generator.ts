@@ -282,6 +282,67 @@ export const extractCodeFromResponse = (response: string): { filepath: string; c
   return { filepath, code };
 };
 
+/** Marker written when a file's first generation returned empty; triggers full regen. */
+const EMPTY_FILE_PLACEHOLDER = "// EMPTY — awaiting retry";
+
+interface EmptyRegenContext {
+  projectName: string;
+  projectPath: string;
+  fileSpec: AppPlan["files"][number];
+  plan: AppPlan;
+}
+
+interface EmptyRegenOptions {
+  complete?: CompleteFn;
+  lmStudioUrl?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+/**
+ * Regenerate a file FROM SCRATCH after its first attempt came back empty. Unlike the
+ * truncation path, this sends the full plan/file intent + dependency contracts so the
+ * model rebuilds the whole file rather than "continuing" from a placeholder comment.
+ */
+const regenerateEmptyFile = async (
+  ctx: EmptyRegenContext,
+  options: EmptyRegenOptions,
+): Promise<string | null> => {
+  const complete = options.complete ?? streamCompletion;
+
+  const depContracts: Record<string, ExportContract[]> = {};
+  for (const depPath of ctx.fileSpec.dependencies) {
+    const contracts = extractExportContracts(path.join(ctx.projectPath, depPath));
+    if (contracts && contracts.length > 0) depContracts[depPath] = contracts;
+  }
+  const contractsBlock = Object.keys(depContracts).length > 0
+    ? `\n## Dependency Export Contracts (JSON)\n\`\`\`json\n${JSON.stringify(depContracts, null, 2)}\n\`\`\`\n`
+    : "";
+
+  const messages = [
+    { role: "system" as const, content: SYSTEM_GENERATOR },
+    {
+      role: "user" as const,
+      content: `/no_think\n${buildPlanContext(ctx.plan, ctx.fileSpec)}\n\n## Target File\nPath: ${ctx.fileSpec.path}\nType: ${ctx.fileSpec.type}\nDescription: ${ctx.fileSpec.description}\n${contractsBlock}\nThe previous attempt produced an EMPTY file. Generate the COMPLETE code for ${ctx.fileSpec.path} now. Output ONLY raw code — NO markdown fences, NO explanations. End the file with // EOF.`,
+    },
+  ];
+
+  const stream = await complete(messages, {
+    temperature: options.temperature ?? 0.4,
+    maxTokens: options.maxTokens ?? 65536,
+    lmStudioUrl: options.lmStudioUrl,
+    model: options.model,
+  });
+  const raw = await collectStream(stream);
+  const extracted = extractCodeFromResponse(raw);
+  if (extracted) return extracted.code;
+  return raw
+    .replace(/^```(?:tsx?|typescript|jsx?)?\s*\n?/, "")
+    .replace(/\n?```\s*$/, "")
+    .trim();
+};
+
 export const generateFiles = async (options: GeneratorOptions): Promise<string[]> => {
   const {
     projectName,
@@ -497,36 +558,55 @@ Generate the complete code for: ${fileSpec.path}`;
         generatedFiles.push(fileSpec.path);
         onFileComplete?.(fileSpec.path);
       } else {
-        console.warn(`[Generator] Empty/tiny code for ${fileSpec.path} (${code.length} chars) — will retry via truncation check`);
-        writeFile(projectName, fileSpec.path, "// EMPTY — awaiting retry\n");
+        console.warn(`[Generator] Empty/tiny code for ${fileSpec.path} (${code.length} chars) — will fully regenerate`);
+        writeFile(projectName, fileSpec.path, `${EMPTY_FILE_PLACEHOLDER}\n`);
         generatedFiles.push(fileSpec.path);
       }
     }
   }
 
-  // Smart Continuation — continues truncated files from where they left off
+  // Smart self-healing for incomplete files. Two distinct failure modes need two
+  // different prompts: an EMPTY placeholder must be generated FROM SCRATCH (a
+  // "continue where you left off" prompt would have the model continue from the
+  // literal placeholder comment — garbage), while a genuinely truncated file is
+  // continued from its tail. Mixing them is the subtle bug this split fixes.
   const MAX_TRUNCATION_RETRIES = 3;
   let truncationRetries = 0;
 
   while (truncationRetries < MAX_TRUNCATION_RETRIES) {
+    const empty: string[] = [];
     const truncated: string[] = [];
     for (const fp of generatedFiles) {
       if (AUTO_LAYOUT_FILES.has(fp)) continue;
       if (fp === "tamagui.config.ts") continue;
       const content = readFile(projectName, fp);
-      if (content && !content.includes("// EOF") && content.length > 20) {
+      if (!content) continue;
+      if (content.includes(EMPTY_FILE_PLACEHOLDER)) {
+        empty.push(fp);
+      } else if (!content.includes("// EOF") && content.length > 20) {
         truncated.push(fp);
       }
     }
 
-    if (truncated.length === 0) break;
-
+    if (empty.length === 0 && truncated.length === 0) break;
     truncationRetries++;
-    for (const tfp of truncated) {
-      broadcast({ type: "build_event", eventType: "self_healing", message: `🔄 Auto-Healing: Continuing truncated file ${tfp}` });
+
+    for (const fp of empty) {
+      broadcast({ type: "build_event", eventType: "self_healing", message: `🔄 Auto-Healing: Regenerating empty file ${fp}` });
+      const fileSpec = plan.files.find((f) => f.path === fp);
+      if (!fileSpec) continue;
+
+      const regenerated = await regenerateEmptyFile(
+        { projectName, projectPath, fileSpec, plan },
+        { complete, lmStudioUrl, model, temperature, maxTokens },
+      );
+      if (regenerated && regenerated.length > 10) {
+        writeFile(projectName, fp, sanitizeGeneratedCode(regenerated, fp));
+      }
     }
 
     for (const fp of truncated) {
+      broadcast({ type: "build_event", eventType: "self_healing", message: `🔄 Auto-Healing: Continuing truncated file ${fp}` });
       const fileSpec = plan.files.find((f) => f.path === fp);
       if (!fileSpec) continue;
 

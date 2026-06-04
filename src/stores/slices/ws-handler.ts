@@ -2,8 +2,6 @@
 import {
   CREATING_PROJECT_SLUG,
   getPlannedProjectSlug,
-  isCreatingRoute,
-  isCreationSession,
   isPendingCreation,
 } from "@/shared/lib/creation-flow";
 import {
@@ -390,9 +388,14 @@ export const createWsHandler = (
         break;
       }
       const eventType = msg.eventType;
-      const line = formatBuildEventLine(eventType, msg.message, msg.error);
-      const processKind = eventType === "moe_swap" ? "moe" : "build";
-      emitChat(createProcessMessage(processKind, line));
+      // Raw Metro stdout (`build_log`) arrives line-by-line and would flood the chat.
+      // Keep it in the diagnostic log, but only surface meaningful milestones to chat
+      // (model swaps, self-healing, RAG, and the build verdict) — "quiet success".
+      if (eventType !== "build_log") {
+        const line = formatBuildEventLine(eventType, msg.message, msg.error);
+        const processKind = eventType === "moe_swap" ? "moe" : "build";
+        emitChat(createProcessMessage(processKind, line));
+      }
       if (eventType === "build_error") {
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
       } else if (eventType === "build_success") {

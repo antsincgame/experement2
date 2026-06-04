@@ -158,5 +158,43 @@ describe("file-manager", () => {
     expect(path.isAbsolute(root)).toBe(true);
     expect(root).toContain("workspace");
   });
+
+  it("cloneTemplateInto hard-links node_modules but copies source files", async () => {
+    const fm = await loadModule();
+    const templatePath = path.join(fm.getWorkspaceRoot(), "template_cache");
+
+    // A source file (must be an independent copy) and a dep file (must be shared).
+    fs.mkdirSync(path.join(templatePath, "src"), { recursive: true });
+    fs.writeFileSync(path.join(templatePath, "src/App.tsx"), "export default 1;");
+    fs.mkdirSync(path.join(templatePath, "node_modules/tamagui"), { recursive: true });
+    fs.writeFileSync(path.join(templatePath, "node_modules/tamagui/index.js"), "module.exports={};");
+
+    const projectPath = fm.getProjectPath("cloned-app");
+    fm.cloneTemplateInto(templatePath, projectPath);
+
+    const srcDest = path.join(projectPath, "src/App.tsx");
+    const depDest = path.join(projectPath, "node_modules/tamagui/index.js");
+    expect(fs.existsSync(srcDest)).toBe(true);
+    expect(fs.existsSync(depDest)).toBe(true);
+
+    // node_modules file shares the inode (hard link); source file does not.
+    const depSrcInode = fs.statSync(path.join(templatePath, "node_modules/tamagui/index.js")).ino;
+    const srcSrcInode = fs.statSync(path.join(templatePath, "src/App.tsx")).ino;
+    expect(fs.statSync(depDest).ino).toBe(depSrcInode);
+    expect(fs.statSync(srcDest).ino).not.toBe(srcSrcInode);
+  });
+
+  it("cloneTemplateInto keeps projects isolated: editing a clone's source never touches the template", async () => {
+    const fm = await loadModule();
+    const templatePath = path.join(fm.getWorkspaceRoot(), "template_cache");
+    fs.mkdirSync(templatePath, { recursive: true });
+    fs.writeFileSync(path.join(templatePath, "app.json"), `{"expo":{"name":"t"}}`);
+
+    const projectPath = fm.getProjectPath("isolated-app");
+    fm.cloneTemplateInto(templatePath, projectPath);
+
+    fs.writeFileSync(path.join(projectPath, "app.json"), `{"expo":{"name":"changed"}}`);
+    expect(fs.readFileSync(path.join(templatePath, "app.json"), "utf-8")).toContain(`"name":"t"`);
+  });
 });
 

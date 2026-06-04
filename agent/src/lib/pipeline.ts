@@ -672,19 +672,11 @@ const _createProjectInner = async (
     return { projectName: projectSlug, port: 0, plan };
   }
 
-  // ── Step 5b: Quick typecheck before Metro (catches signature mismatches early)
-  try {
-    const typecheckResult = await runTypecheck(projectPath);
-    if (!typecheckResult.success) {
-      emitOperation({
-        type: "system_error",
-        error: `TypeScript errors:\n${typecheckResult.combinedOutput.slice(0, 1000)}`,
-      });
-      // Don't abort — try to build anyway, Metro may fix some issues
-    }
-  } catch {
-    // Typecheck failed to run — continue anyway
-  }
+  // NOTE: A pre-Metro typecheck used to run here, but Step 5's quality gate already
+  // runs `tsc --noEmit` as a HARD blocking gate (returns port:0 on failure), so by
+  // this point typecheck has provably passed on these unchanged files. Re-running it
+  // was dead work that added a full `tsc` (~tens of seconds) to every successful
+  // generation and only emitted a warning it could never reach. Removed for speed.
 
   // ── Step 6: Build Verification Loop ───────────────────
   const buildId = crypto.randomUUID();

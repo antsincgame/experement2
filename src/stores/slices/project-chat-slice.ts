@@ -2,6 +2,7 @@
 import {
   appendPlanStreamContent,
   createPlanStreamMessage,
+  createProcessMessage,
   createReasoningMessage,
   type ChatMessage,
 } from "@/features/chat/schemas/message.schema";
@@ -123,15 +124,8 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
             return next;
           }
         }
-        // Fallback: just append a done message.
-        return trimMessages([...next, {
-          id: crypto.randomUUID(),
-          role: "assistant" as const,
-          content: `✓ \`${filepath}\``,
-          timestamp: Date.now(),
-          status: "complete" as const,
-          processKind: "file" as const,
-        }]);
+        // Fallback: no "Writing..." message to update (e.g. trimmed) — append a fresh one.
+        return trimMessages([...next, createProcessMessage("file", `✓ \`${filepath}\``)]);
       };
 
       if (target === state.projectName) {

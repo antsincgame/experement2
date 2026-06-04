@@ -329,6 +329,25 @@ describe("createWsHandler", () => {
     expect(harness.getState().messages.some((m) => m.content.includes("Planner: test-model"))).toBe(true);
   });
 
+  it("keeps raw build_log out of chat but still logs it (quiet success)", () => {
+    const harness = createHarness();
+
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      eventType: "build_log",
+      message: "metro stdout noise line 1",
+    });
+
+    expect(harness.getState().messages.some((m) => m.content.includes("metro stdout noise"))).toBe(false);
+    expect(addErrorLog).toHaveBeenCalledWith({
+      level: "info",
+      source: "metro",
+      message: "metro stdout noise line 1",
+    });
+  });
+
   it("streams plan chunks into chat during planning", () => {
     const harness = createHarness();
     harness.getState().setStatus("planning");

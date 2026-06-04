@@ -176,9 +176,55 @@ export const getWorkspaceRoot = (): string => WORKSPACE_ROOT;
 export const projectExists = (projectName: string): boolean =>
   fs.existsSync(getProjectPath(projectName));
 
-export const copyDirectory = (src: string, dest: string): void => {
+/**
+ * Recursively recreate a directory tree, HARD-LINKING regular files instead of
+ * copying their bytes. Hard links share the underlying inode, so cloning a large
+ * read-only `node_modules` is near-instant and uses ~no extra disk — yet each
+ * project still owns its own directory entries, so a later `npm install` of extra
+ * deps adds NEW files (new inodes) without touching sibling projects. npm/Metro
+ * write atomically (temp + rename), which swaps the dir entry rather than mutating
+ * the shared inode, so the shared originals stay intact. Any per-file failure
+ * (cross-device EXDEV, symlink, EPERM) transparently falls back to a byte copy.
+ */
+const hardlinkTree = (src: string, dest: string): void => {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      hardlinkTree(srcPath, destPath);
+    } else if (entry.isSymbolicLink()) {
+      // Preserve symlinks (npm/pnpm .bin) by dereferencing into a real copy.
+      fs.cpSync(srcPath, destPath, { recursive: true, dereference: true });
+    } else {
+      try {
+        fs.linkSync(srcPath, destPath);
+      } catch {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+};
+
+/**
+ * Scaffold a fresh project from the warm template. The heavy `node_modules` tree
+ * is hard-linked (instant, disk-cheap); everything else is byte-copied so the
+ * project can freely mutate its own source/config. This is the core generation↔
+ * preview cache: every project shares the one pre-installed dependency set.
+ */
+export const cloneTemplateInto = (src: string, dest: string): void => {
   const destinationPath = assertWorkspacePath(dest);
-  ensureDir(path.join(destinationPath, "placeholder"));
-  fs.cpSync(path.resolve(src), destinationPath, { recursive: true });
+  const srcPath = path.resolve(src);
+  fs.mkdirSync(destinationPath, { recursive: true });
+
+  for (const entry of fs.readdirSync(srcPath, { withFileTypes: true })) {
+    const entrySrc = path.join(srcPath, entry.name);
+    const entryDest = path.join(destinationPath, entry.name);
+    if (entry.name === "node_modules" && entry.isDirectory()) {
+      hardlinkTree(entrySrc, entryDest);
+    } else {
+      fs.cpSync(entrySrc, entryDest, { recursive: true });
+    }
+  }
 };
 

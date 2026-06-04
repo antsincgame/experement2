@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FolderOpen, Settings, Sparkles, Wifi, WifiOff, Zap } from "lucide-react-native";
-import { useSettingsStore } from "@/stores/settings-store";
 import SuggestionChips from "@/features/chat/components/suggestion-chips";
 import { MoeIndicator } from "@/features/chat/components/moe-indicator";
 import SettingsDrawer from "@/features/settings/components/settings-drawer";

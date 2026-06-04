@@ -1,7 +1,7 @@
 ﻿// Builds generated Expo templates from the shared contract so runtime scaffolding stays version-locked with prompts.
 import fs from "fs";
 import path from "path";
-import { getWorkspaceRoot, copyDirectory, getProjectPath } from "./file-manager.js";
+import { getWorkspaceRoot, cloneTemplateInto, getProjectPath } from "./file-manager.js";
 import { npmInstall } from "./process-manager.js";
 import {
   TEMPLATE_PACKAGE_DEPENDENCIES,
@@ -190,8 +190,8 @@ export const createProjectFromCache = async (
     fs.rmSync(projectPath, { recursive: true, force: true });
   }
 
-  console.log(`[TemplateCache] Copying template -> ${projectName}...`);
-  copyDirectory(templatePath, projectPath);
+  console.log(`[TemplateCache] Cloning template -> ${projectName} (hard-linked deps)...`);
+  cloneTemplateInto(templatePath, projectPath);
 
   // Always (re)write the scaffold surfaces so projects copied from an older warm
   // cache still receive the safe <Icon> wrapper, the "@/ui" barrel, and the

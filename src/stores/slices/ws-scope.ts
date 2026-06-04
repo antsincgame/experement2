@@ -4,7 +4,6 @@ import {
   getPlannedProjectSlug,
   isCreatingRoute,
   isCreationSession,
-  isPendingCreation,
 } from "@/shared/lib/creation-flow";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import type { ProjectStoreGet } from "../project-store.types";
