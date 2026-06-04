@@ -96,6 +96,48 @@ describe("editProject (integration, injected fake model)", () => {
     expect(calls).toBe(1); // only the analyze call — generation is skipped
   });
 
+  it("creates files listed in newFiles by surfacing them to the generate step", async () => {
+    writeFile(projectName, "app/index.tsx", `export default function Home() { return null; }`);
+
+    const analysisObj = {
+      thinking: "t",
+      action: "read_files" as const,
+      files: ["app/index.tsx"],
+      newFiles: [{ path: "src/components/SearchBar.tsx", description: "A search input" }],
+      filesToDelete: [],
+      newDependencies: [],
+    };
+    const newFileBlock = [
+      "filepath: src/components/SearchBar.tsx",
+      "```tsx",
+      "export const SearchBar = () => null;",
+      "```",
+    ].join("\n");
+
+    let generateSawNewFile = false;
+    const complete: CompleteFn = async (messages) => {
+      const user = messages.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+      if (user.includes("Target files:")) {
+        generateSawNewFile = user.includes("src/components/SearchBar.tsx");
+        return streamOf(newFileBlock);
+      }
+      return streamOf(JSON.stringify(analysisObj));
+    };
+
+    const result = await editProject({
+      projectName,
+      userRequest: "add a search bar",
+      chatHistory: [],
+      complete,
+    });
+
+    // The generate prompt must carry the planned new file, and it must be written.
+    expect(generateSawNewFile).toBe(true);
+    expect(fileExists(projectName, "src/components/SearchBar.tsx")).toBe(true);
+    expect(readFile(projectName, "src/components/SearchBar.tsx") ?? "").toContain("SearchBar");
+    expect(result.appliedBlocks).toBeGreaterThanOrEqual(1);
+  });
+
   it("deletes files the analysis flags in filesToDelete", async () => {
     writeFile(projectName, "src/old.ts", "export const x = 1;");
 

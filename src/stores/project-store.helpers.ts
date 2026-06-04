@@ -204,6 +204,49 @@ export const buildProjectSwitchState = (
   };
 };
 
+/**
+ * Starts a brand-new creation from a clean slate. Persists the currently-active
+ * REAL project (so its chat is not lost), drops any stale "__creating__"
+ * placeholder chat left by a previous failed/aborted creation, and resets the
+ * live workspace to empty. Without this, switching to the placeholder slug
+ * re-hydrated the previous broken creation's messages, so a new project "landed"
+ * in the old, homeless project's chat (AUDIT C2).
+ */
+export const buildCreationStartState = (
+  state: ProjectState
+): Partial<ProjectState> => {
+  const persisted = persistCurrentProjectSnapshot(state);
+  const { [CREATING_PROJECT_SLUG]: _stalePlaceholder, ...projectChats } = persisted;
+
+  return {
+    projectName: CREATING_PROJECT_SLUG,
+    status: "planning",
+    previewStatus: "stopped",
+    plan: null,
+    projectChats: {
+      ...projectChats,
+      [CREATING_PROJECT_SLUG]: createEmptyChat(),
+    },
+    messages: [],
+    fileTree: [],
+    openFiles: [],
+    activeFile: null,
+    fileContents: {},
+    fileDrafts: {},
+    versions: [],
+    currentVersion: 0,
+    streamingContent: "",
+    generationFiles: [],
+    generationProgress: 0,
+    currentGeneratingFile: null,
+    previewUrl: null,
+    previewPort: null,
+    previewBuildId: null,
+    previewRevision: 0,
+    lastPreviewError: null,
+  };
+};
+
 // Diff payloads can be large; drop them from persisted history so localStorage
 // stays within quota. The summary text remains, and disk is the source of truth.
 const stripHeavyMessageFields = (
@@ -215,7 +258,11 @@ export const buildPersistedProjectChats = (
   projectChats: Record<string, ProjectChat>
 ): Record<string, ProjectChat> =>
   Object.fromEntries(
-    Object.entries(projectChats).map(([name, chat]) => [
+    Object.entries(projectChats)
+      // Never persist the transient "__creating__" placeholder — persisting it
+      // resurrects a failed creation's chat into the next session.
+      .filter(([name]) => name !== CREATING_PROJECT_SLUG)
+      .map(([name, chat]) => [
       name,
       {
         messages: stripHeavyMessageFields(chat.messages.slice(-50)),

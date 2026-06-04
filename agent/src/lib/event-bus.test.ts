@@ -2,9 +2,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   broadcast,
+  getPreviewPort,
   handlePreviewRequest,
   registerClient,
   runWithEventScope,
+  setPreviewPort,
   unregisterClient,
 } from "./event-bus.js";
 
@@ -120,6 +122,14 @@ describe("event-bus", () => {
       projectName: "demo-app",
       requestId: "1f4f0f3b-8d07-47c8-8681-5a5a9afcb1f1",
     });
+  });
+
+  it("clears the preview port mapping when set to null (killExpo/killAll path)", () => {
+    setPreviewPort("clearme", 5005);
+    expect(getPreviewPort("clearme")).toBe(5005);
+
+    setPreviewPort("clearme", null);
+    expect(getPreviewPort("clearme")).toBeNull();
   });
 
   it("rejects preview requests without a project name", () => {

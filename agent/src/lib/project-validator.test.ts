@@ -61,6 +61,55 @@ describe("validateAppPlan", () => {
     );
   });
 
+  it("accepts extensionless and alias dependencies that resolve to planned files", () => {
+    const plan: AppPlan = {
+      name: "demo-app",
+      displayName: "Demo App",
+      description: "Demo",
+      extraDependencies: [],
+      files: [
+        {
+          path: "app/index.tsx",
+          type: "screen",
+          description: "Home",
+          // Extensionless src dep + alias dep — the natural form models emit.
+          dependencies: ["src/stores/itemStore", "@/components/ItemCard"],
+        },
+        { path: "src/stores/itemStore.ts", type: "store", description: "Store", dependencies: [] },
+        { path: "src/components/ItemCard.tsx", type: "component", description: "Card", dependencies: [] },
+      ],
+      navigation: { type: "stack", screens: [] },
+    };
+
+    const issues = validateAppPlan(plan);
+    expect(issues.filter((issue) => issue.code === "missing_dependency_file")).toEqual([]);
+    expect(issues.filter((issue) => issue.code === "invalid_dependency_reference")).toEqual([]);
+  });
+
+  it("now catches a genuinely missing alias dependency (previously skipped)", () => {
+    const plan: AppPlan = {
+      name: "demo-app",
+      displayName: "Demo App",
+      description: "Demo",
+      extraDependencies: [],
+      files: [
+        {
+          path: "app/index.tsx",
+          type: "screen",
+          description: "Home",
+          dependencies: ["@/stores/missingStore"],
+        },
+      ],
+      navigation: { type: "stack", screens: [] },
+    };
+
+    expect(validateAppPlan(plan)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "missing_dependency_file" }),
+      ])
+    );
+  });
+
   it("rejects tabs screens outside app/(tabs)", () => {
     const plan: AppPlan = {
       name: "demo-app",

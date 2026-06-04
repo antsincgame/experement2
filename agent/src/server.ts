@@ -446,87 +446,49 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
         emitPreviewEvent({ ...payload, buildId });
       };
 
-      // Fast path: if project is already running, health-check then register
       const pName = message.projectName as string;
-      const existingPort = getActivePort(pName);
-      if (existingPort) {
-        console.log(`[WS] Project ${pName} running on port ${existingPort}, verifying...`);
+      const announceReady = (port: number): void => {
+        setPreviewPort(pName, port);
         emitBuildScopedEvent({
-          type: "preview_status",
-          previewStatus: "starting",
+          type: "preview_ready",
+          port,
+          proxyUrl: `/preview/${encodeURIComponent(pName)}/`,
         });
-        // A tracked port can still be mid-bundle (Expo + Tamagui first build takes
-        // tens of seconds), so allow the full ready window instead of a quick probe.
-        waitForMetroReady(existingPort, 60)
-          .then((healthy) => runWithEventScope(previewEventScope, () => {
-            if (healthy) {
-              setPreviewPort(pName, existingPort);
-              emitBuildScopedEvent({
-                type: "preview_ready",
-                port: existingPort,
-                proxyUrl: `/preview/${encodeURIComponent(pName)}/`,
-              });
-              emitBuildScopedEvent({
-                type: "preview_status",
-                previewStatus: "ready",
-              });
-              emitBuildScopedEvent({
-                type: "status",
-                status: "ready",
-                previewStatus: "ready",
-              });
-            } else {
-              console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
-              sendSystemErrorToClient(
-                clientId,
-                `Metro is not responding on port ${existingPort}`,
-                "start_preview",
-                previewEventScope,
-                { buildId }
-              );
-              emitBuildScopedEvent({
-                type: "preview_status",
-                previewStatus: "error",
-                error: `Metro is not responding on port ${existingPort}`,
-              });
-              emitBuildScopedEvent({
-                type: "status",
-                status: "error",
-                previewStatus: "error",
-              });
-            }
-          }))
-          .catch((error) => runWithEventScope(previewEventScope, () => {
-            const errorMessage = error instanceof Error
-              ? error.message
-              : "Failed to verify preview health";
-            sendSystemErrorToClient(
-              clientId,
-              errorMessage,
-              "start_preview",
-              previewEventScope,
-              { buildId }
-            );
-            emitBuildScopedEvent({
-              type: "preview_status",
-              previewStatus: "error",
-              error: errorMessage,
-            });
-            emitBuildScopedEvent({
-              type: "status",
-              status: "error",
-              previewStatus: "error",
-            });
-          }));
-        return;
-      }
+        emitBuildScopedEvent({ type: "preview_status", previewStatus: "ready" });
+        emitBuildScopedEvent({ type: "status", status: "ready", previewStatus: "ready" });
+      };
+      const announceUnhealthy = (errorMessage: string): void => {
+        sendSystemErrorToClient(clientId, errorMessage, "start_preview", previewEventScope, { buildId });
+        emitBuildScopedEvent({ type: "preview_status", previewStatus: "error", error: errorMessage });
+        emitBuildScopedEvent({ type: "status", status: "error", previewStatus: "error" });
+      };
 
+      // Run BOTH the already-running re-attach AND the cold start through the
+      // per-project queue, so a concurrent iterate/revert on this project (which
+      // calls the singleton killAll) cannot kill the bundler between the health
+      // check and the preview_ready we announce.
       runQueuedOperation(
         clientId,
         getProjectOperationQueueKey(message.projectName),
         `start_preview:${message.projectName}`,
         "start_preview",
         async () => {
+          // Fast path: project already running — health-check and re-attach.
+          const existingPort = getActivePort(pName);
+          if (existingPort) {
+            console.log(`[WS] Project ${pName} running on port ${existingPort}, verifying...`);
+            emitBuildScopedEvent({ type: "preview_status", previewStatus: "starting" });
+            // A tracked port can still be mid-bundle (Expo + Tamagui first build
+            // takes tens of seconds), so allow the full ready window.
+            if (await waitForMetroReady(existingPort, 60)) {
+              announceReady(existingPort);
+            } else {
+              console.log(`[WS] Port ${existingPort} not healthy for ${pName}`);
+              announceUnhealthy(`Metro is not responding on port ${existingPort}`);
+            }
+            return;
+          }
+
           if (!projectExists(message.projectName)) {
             throw new Error(`Project not found: ${message.projectName}`);
           }
@@ -610,43 +572,10 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
 
           // Wait for Metro to actually accept requests before announcing preview.
           // First Expo + Tamagui bundle can take well over 30s on a cold start.
-          const healthy = await waitForMetroReady(port, 60);
-
-          if (healthy) {
-            setPreviewPort(message.projectName, port);
-            emitBuildScopedEvent({
-              type: "preview_ready",
-              port,
-              proxyUrl: `/preview/${encodeURIComponent(message.projectName)}/`,
-            });
-            emitBuildScopedEvent({
-              type: "preview_status",
-              previewStatus: "ready",
-            });
-            emitBuildScopedEvent({
-              type: "status",
-              status: "ready",
-              previewStatus: "ready",
-            });
+          if (await waitForMetroReady(port, 60)) {
+            announceReady(port);
           } else {
-            const errorMessage = `Metro did not become healthy on port ${port}`;
-            sendSystemErrorToClient(
-              clientId,
-              errorMessage,
-              "start_preview",
-              previewEventScope,
-              { buildId }
-            );
-            emitBuildScopedEvent({
-              type: "preview_status",
-              previewStatus: "error",
-              error: errorMessage,
-            });
-            emitBuildScopedEvent({
-              type: "status",
-              status: "error",
-              previewStatus: "error",
-            });
+            announceUnhealthy(`Metro did not become healthy on port ${port}`);
           }
         },
         undefined,

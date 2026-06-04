@@ -125,6 +125,7 @@ export interface ProjectStateActions {
   addProject: (entry: ProjectEntry) => void;
   removeProject: (name: string) => void;
   switchProject: (name: string) => void;
+  beginCreation: () => void;
   reset: () => void;
   handleWsMessage: (msg: IncomingWsMessage) => void;
 }

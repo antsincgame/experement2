@@ -936,21 +936,28 @@ export const revertVersion = async (
       previewStatus: "starting",
       buildId,
     });
-    await startExpoClearCache(projectName, projectPath, port, (event) => {
-      emitProject({
-        type: "build_event",
-        buildId,
-        eventType: event.type,
-        message: event.message,
-        error: event.error,
-        previewStatus: "starting",
-      });
-    });
-    setPreviewPort(projectName, port);
+    // startExpoClearCache may bind a fresh port if the old one is still releasing,
+    // so announce the actual port it bound, not the stale captured one.
+    const { port: restartedPort } = await startExpoClearCache(
+      projectName,
+      projectPath,
+      port,
+      (event) => {
+        emitProject({
+          type: "build_event",
+          buildId,
+          eventType: event.type,
+          message: event.message,
+          error: event.error,
+          previewStatus: "starting",
+        });
+      }
+    );
+    setPreviewPort(projectName, restartedPort);
     emitProject({
       type: "preview_ready",
       buildId,
-      port,
+      port: restartedPort,
       proxyUrl: `/preview/${encodeURIComponent(projectName)}/`,
     });
     emitProject({

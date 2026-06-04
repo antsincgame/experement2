@@ -31,17 +31,29 @@ interface CompletionRequest {
   model?: string;
 }
 
+/** Permissive object schema: constrains decoding to a JSON object without
+ * over-restricting the shape (planner/editor shapes are validated separately). */
+const PERMISSIVE_JSON_SCHEMA = {
+  name: "structured_response",
+  schema: { type: "object", additionalProperties: true },
+} as const;
+
 /**
- * Internal callers may request json_object (OpenAI). LM Studio only allows
- * json_schema or text — sending json_object yields HTTP 400. JSON shape is
- * enforced via system prompts + safeJsonParse instead.
+ * Internal callers may request json_object (OpenAI). LM Studio rejects json_object
+ * on the wire (HTTP 400) but accepts json_schema. Structured output is OFF by
+ * default — many local OpenAI-compat servers reject response_format entirely, and
+ * JSON shape is already enforced via system prompts + safeJsonParse. Set
+ * LLM_JSON_SCHEMA=true to opt in to server-side guided decoding (a permissive
+ * json_schema), which sharply cuts malformed/truncated planner output on servers
+ * that support it.
  */
 export const toApiResponseFormat = (
   format?: { type: "json_object" }
 ): ApiResponseFormat | undefined => {
-  // json_object is an internal hint only; LM Studio rejects it on the wire.
-  void format;
-  return undefined;
+  if (!format || process.env.LLM_JSON_SCHEMA !== "true") {
+    return undefined;
+  }
+  return { type: "json_schema", json_schema: PERMISSIVE_JSON_SCHEMA };
 };
 
 type FetchResponse = globalThis.Response;

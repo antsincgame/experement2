@@ -600,6 +600,44 @@ describe("parseStream", () => {
     });
   });
 
+  // Additional: javascript fence (most common tag a model picks) — previously dropped
+  it("parses new file with a javascript code fence", async () => {
+    const input = [
+      "filepath: src/util.js\n",
+      "```javascript\n",
+      "module.exports = { ok: true };\n",
+      "```",
+    ].join("");
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      filepath: "src/util.js",
+      type: "new_file",
+      content: "module.exports = { ok: true };",
+    });
+  });
+
+  // Additional: bare (language-less) fence — previously dropped char-by-char
+  it("parses new file with a bare code fence", async () => {
+    const input = [
+      "filepath: src/config.ts\n",
+      "```\n",
+      "export const X = 1;\n",
+      "```",
+    ].join("");
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toEqual({
+      filepath: "src/config.ts",
+      type: "new_file",
+      content: "export const X = 1;",
+    });
+  });
+
   it("flushes unclosed thinking buffer at end of stream", async () => {
     const input = "<think>Still reasoning without a close tag";
 
