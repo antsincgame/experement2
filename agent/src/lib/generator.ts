@@ -11,6 +11,7 @@ import { formatDiagnosticsForPrompt, type TypeDiagnostic } from "./typecheck.js"
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import { getGenerationContext } from "./rag-retrieve.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
+import { buildGoldenExampleBlock } from "./golden-examples.js";
 import { broadcast } from "./event-bus.js";
 import {
   BOILERPLATE_TEMPLATES,
@@ -486,13 +487,21 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
       message: `🧠 ${ragContext.semantic ? "Semantic" : "Keyword"} RAG Context loaded for ${fileSpec.path}`,
     });
 
+    // Golden few-shot exemplar (win-rate lever #4): inject ONE hand-vetted, perfect
+    // working file the model can mirror. Additive — no match → "" → byte-identical prompt.
+    const goldenExample = buildGoldenExampleBlock({
+      type: fileSpec.type,
+      description: fileSpec.description,
+    });
+    const goldenExampleBlock = goldenExample ? `\n\n${goldenExample}` : "";
+
     const userMessage = `
 ${buildPlanContext(plan, fileSpec)}
 
 ## Project Skeleton
 ${skeleton.summary}
 
-${relevantDocs}
+${relevantDocs}${goldenExampleBlock}
 
 ## Target File
 Path: ${fileSpec.path}
