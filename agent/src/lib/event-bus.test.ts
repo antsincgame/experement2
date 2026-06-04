@@ -64,6 +64,34 @@ describe("event-bus", () => {
     expect(clientB.send).not.toHaveBeenCalled();
   });
 
+  it("fans out scoped events when the originating client disconnected (reconnect)", () => {
+    const clientA = createMockSocket();
+    const clientB = createMockSocket();
+
+    registerClient("client-a", clientA as never);
+    registerClient("client-b", clientB as never);
+
+    broadcast(
+      {
+        type: "system_error",
+        error: "AI server disconnected: LLM_SERVER_DOWN",
+        status: "error",
+      },
+      {
+        clientId: "client-gone",
+        projectName: "demo-app",
+        requestId: "1f4f0f3b-8d07-47c8-8681-5a5a9afcb1f1",
+      }
+    );
+
+    expect(clientA.send).toHaveBeenCalledTimes(1);
+    expect(clientB.send).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(clientA.send.mock.calls[0]?.[0] ?? "{}")).toMatchObject({
+      type: "system_error",
+      projectName: "demo-app",
+    });
+  });
+
   it("uses explicit scope for async-style deliveries without relying on AsyncLocalStorage", () => {
     const clientA = createMockSocket();
     const clientB = createMockSocket();

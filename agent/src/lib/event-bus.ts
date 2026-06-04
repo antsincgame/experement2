@@ -80,23 +80,36 @@ const safeSend = (clientId: string, ws: WebSocket, data: string): void => {
   }
 };
 
+const fanOutToOpenClients = (data: string): void => {
+  for (const [clientId, ws] of clients.entries()) {
+    if (ws.readyState === WebSocket.OPEN) {
+      safeSend(clientId, ws, data);
+    }
+  }
+};
+
 export const broadcast = (
   message: Record<string, unknown>,
   scope?: EventScope
 ): void => {
   const effectiveScope = getEffectiveScope(scope);
   const scopedMessage = mergeScopeIntoMessage(message, effectiveScope);
+  const data = JSON.stringify(scopedMessage);
+
   if (effectiveScope?.clientId) {
-    sendScopedToClient(effectiveScope.clientId, scopedMessage);
+    const ws = clients.get(effectiveScope.clientId);
+    if (ws?.readyState === WebSocket.OPEN) {
+      sendScopedToClient(effectiveScope.clientId, scopedMessage, effectiveScope);
+      return;
+    }
+    // User navigated to /project/__creating__ and the browser opened a new WS
+    // before the pipeline finished — deliver errors/progress to live clients so
+    // the Plan stage does not hang silently.
+    fanOutToOpenClients(data);
     return;
   }
 
-  const data = JSON.stringify(scopedMessage);
-  for (const [clientId, ws] of clients.entries()) {
-    if (ws.readyState === WebSocket.OPEN) {
-      safeSend(clientId, ws, data);
-    }
-  }
+  fanOutToOpenClients(data);
 };
 
 export const sendToClient = (
