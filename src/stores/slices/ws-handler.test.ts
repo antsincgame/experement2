@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import type { ProjectChat, ProjectState } from "../project-store.types";
-import { createWsHandler, resolveChatTargetProject } from "./ws-handler";
+import { createWsHandler } from "./ws-handler";
+import { resolveChatTargetProject } from "./ws-scope";
 
 const addErrorLog = vi.fn();
 
@@ -57,6 +58,27 @@ vi.mock("@/features/chat/schemas/message.schema", () => ({
     isError: true,
     errorDetails,
     file,
+  }),
+  createProcessMessage: (kind: string, content: string) => ({
+    id: `process:${kind}:${content}`,
+    role: "assistant",
+    content,
+    timestamp: Date.now(),
+    status: "complete",
+    processKind: kind,
+  }),
+  createPlanStreamMessage: (chunk: string) => ({
+    id: "plan-stream",
+    role: "assistant",
+    content: chunk,
+    timestamp: Date.now(),
+    status: "streaming",
+    processKind: "plan",
+  }),
+  appendPlanStreamContent: (message: { content: string }, chunk: string) => ({
+    ...message,
+    content: message.content + chunk,
+    status: "streaming",
   }),
 }));
 
@@ -154,6 +176,36 @@ const createHarness = () => {
     setPendingProjectName: (pendingProjectName) => setState({ pendingProjectName }),
     setPendingCreationRequestId: (pendingCreationRequestId) => setState({ pendingCreationRequestId }),
     appendStreamingContent: (chunk) => setState((current) => ({ streamingContent: current.streamingContent + chunk })),
+    appendPlanStreamChunk: (chunk) => setState((current) => {
+      const messages = [...current.messages];
+      const planIndex = messages.findIndex(
+        (m) => m.processKind === "plan" && m.status === "streaming",
+      );
+      if (planIndex >= 0) {
+        messages[planIndex] = {
+          ...messages[planIndex],
+          content: messages[planIndex].content + chunk,
+        };
+      } else {
+        messages.push({
+          id: "plan",
+          role: "assistant",
+          content: chunk,
+          processKind: "plan",
+          status: "streaming",
+          timestamp: 1,
+        });
+      }
+      return {
+        messages,
+        streamingContent: current.streamingContent + chunk,
+      };
+    }),
+    finalizePlanStream: () => setState((current) => ({
+      messages: current.messages.map((m) =>
+        m.processKind === "plan" ? { ...m, status: "complete" as const } : m
+      ),
+    })),
     clearStreamingContent: () => setState({ streamingContent: "" }),
     startGenerationFile: (path) => setState((current) => ({
       generationFiles: current.generationFiles.some((f) => f.path === path)
@@ -173,6 +225,50 @@ const createHarness = () => {
       ),
     })),
     resetGenerationFiles: () => setState({ generationFiles: [] }),
+    syncProjectWorkspace: (name, patch) => setState((current) => ({
+      projectChats: {
+        ...current.projectChats,
+        [name]: { ...(current.projectChats[name] ?? {}), ...patch },
+      },
+      ...(current.projectName === name ? patch : {}),
+    })),
+    appendReasoningMessage: (thinking: string, target?: string | null) => {
+      setState((current) => {
+        const name = target ?? current.projectName;
+        if (!name) {
+          return {};
+        }
+        const entry = {
+          id: `r:${thinking}`,
+          role: "assistant" as const,
+          content: "",
+          thinking,
+          timestamp: 1,
+          status: "complete" as const,
+        };
+        if (name === current.projectName) {
+          return {
+            messages: [...current.messages, entry],
+            projectChats: {
+              ...current.projectChats,
+              [name]: {
+                ...(current.projectChats[name] ?? { messages: [] }),
+                messages: [...(current.projectChats[name]?.messages ?? []), entry],
+              },
+            },
+          };
+        }
+        return {
+          projectChats: {
+            ...current.projectChats,
+            [name]: {
+              ...(current.projectChats[name] ?? { messages: [] }),
+              messages: [...(current.projectChats[name]?.messages ?? []), entry],
+            },
+          },
+        };
+      });
+    },
     toggleFileTree: () => undefined,
     toggleTerminal: () => undefined,
     addProject: (entry) => setState((current) => ({ projectList: [...current.projectList, entry] })),
@@ -200,7 +296,7 @@ describe("createWsHandler", () => {
     addErrorLog.mockReset();
   });
 
-  it("ignores unscoped build events when a project is active", () => {
+  it("attributes unscoped build events to the active project", () => {
     const harness = createHarness();
 
     harness.handle({
@@ -210,11 +306,48 @@ describe("createWsHandler", () => {
     });
 
     expect(harness.getState().previewStatus).toBe("stopped");
+    expect(harness.getState().messages.some((m) => m.processKind === "build")).toBe(true);
     expect(addErrorLog).toHaveBeenCalledWith({
-      level: "warn",
-      source: "ws",
-      message: "Ignored unscoped build event: build_success",
+      level: "info",
+      source: "metro",
+      message: "Build success",
     });
+  });
+
+  it("mirrors scoped build_event into chat as a process message", () => {
+    const harness = createHarness();
+
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      eventType: "moe_swap",
+      message: "Planner: test-model",
+    });
+
+    expect(harness.getState().messages.some((m) => m.content.includes("Planner: test-model"))).toBe(true);
+  });
+
+  it("streams plan chunks into chat during planning", () => {
+    const harness = createHarness();
+    harness.getState().setStatus("planning");
+
+    harness.handle({
+      type: "plan_chunk",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      chunk: '{"name":',
+    });
+    harness.handle({
+      type: "plan_chunk",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      chunk: '"app"}',
+    });
+
+    const planMessage = harness.getState().messages.find((m) => m.processKind === "plan");
+    expect(planMessage?.content).toBe('{"name":"app"}');
+    expect(planMessage?.status).toBe("streaming");
   });
 
   it("clears stale preview state when preview status becomes error", () => {
@@ -272,10 +405,10 @@ describe("createWsHandler", () => {
     // beta's cached chat received the reasoning message
     const betaMessages = harness.getState().projectChats.beta?.messages ?? [];
     expect(betaMessages).toHaveLength(1);
-    expect(betaMessages[0].content).toBe("Designing beta");
+    expect(betaMessages[0].thinking).toBe("Designing beta");
   });
 
-  it("resolveChatTargetProject falls back to creation session projectName", () => {
+  it("resolveChatTargetProject falls back to creation placeholder slug", () => {
     const harness = createHarness();
     harness.getState().setProjectName("__creating__");
 
@@ -298,7 +431,7 @@ describe("createWsHandler", () => {
     });
 
     expect(harness.getState().messages).toHaveLength(1);
-    expect(harness.getState().messages[0].content).toBe("Designing alpha");
+    expect(harness.getState().messages[0].thinking).toBe("Designing alpha");
   });
 
   it("updates sidebar status for a background project without changing the active view", () => {

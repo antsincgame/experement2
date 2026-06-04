@@ -9,9 +9,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Bot, Code2, FolderOpen, Settings, Sparkles, Wifi, WifiOff, Zap } from "lucide-react-native";
+import { FolderOpen, Settings, Sparkles, Wifi, WifiOff, Zap } from "lucide-react-native";
 import { useSettingsStore } from "@/stores/settings-store";
 import SuggestionChips from "@/features/chat/components/suggestion-chips";
+import { MoeIndicator } from "@/features/chat/components/moe-indicator";
 import SettingsDrawer from "@/features/settings/components/settings-drawer";
 import NeonBackground from "@/shared/components/effects/neon-background";
 import FlowerOfLife from "@/shared/components/sacred-geometry/flower-of-life";
@@ -231,7 +232,7 @@ export const HomeScreenContent = ({
                 className="flex-row items-center justify-between px-4 py-3"
                 style={{ borderTopWidth: 1, borderTopColor: "rgba(255,215,0,0.1)" }}
               >
-                <MoEIndicator />
+                <MoeIndicator />
                 <View className="flex-row items-center gap-2">
                   {enhancerEnabled && (
                     <Pressable
@@ -319,45 +320,5 @@ export const HomeScreenContent = ({
       <SettingsDrawer visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
     </SafeAreaView>
   </NeonBackground>
-  );
-};
-
-const MoEIndicator = () => {
-  const model = useSettingsStore((s) => s.model);
-  const plannerModel = useSettingsStore((s) => s.plannerModel);
-  const editorModel = useSettingsStore((s) => s.editorModel);
-  const shortName = (m: string) => m.split("/").pop()?.slice(0, 14) || "Auto";
-  const generationLabel = shortName(model);
-  const plannerLabel = shortName(plannerModel || model);
-  const fixLabel = shortName(editorModel || model);
-  const showFixChip = Boolean(editorModel.trim()) && fixLabel !== generationLabel;
-
-  return (
-    <View className="flex-row items-center gap-2 flex-wrap">
-      <View className="flex-row items-center gap-1">
-        <Bot size={10} color="#7C4DFF" strokeWidth={1.5} />
-        <Text style={{ fontSize: 9, color: "#B388FF", fontWeight: "600" }}>
-          {plannerLabel}
-        </Text>
-      </View>
-      <View style={{ width: 1, height: 10, backgroundColor: "rgba(255,215,0,0.2)" }} />
-      <View className="flex-row items-center gap-1">
-        <Code2 size={10} color="#00E5FF" strokeWidth={1.5} />
-        <Text style={{ fontSize: 9, color: "#80F0FF", fontWeight: "600" }}>
-          {generationLabel}
-        </Text>
-      </View>
-      {showFixChip && (
-        <>
-          <View style={{ width: 1, height: 10, backgroundColor: "rgba(255,215,0,0.2)" }} />
-          <View className="flex-row items-center gap-1">
-            <Text style={{ fontSize: 9, color: "#FFD700", fontWeight: "700" }}>Fix</Text>
-            <Text style={{ fontSize: 9, color: "#FFE566", fontWeight: "600" }}>
-              {fixLabel}
-            </Text>
-          </View>
-        </>
-      )}
-    </View>
   );
 };

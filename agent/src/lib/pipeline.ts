@@ -519,6 +519,7 @@ const _createProjectInner = async (
 
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
+    emitOperation({ type: "status", status: "analyzing" });
     emitOperation({
       type: "build_event",
       eventType: "moe_swap",

@@ -6,6 +6,7 @@ import {
   buildCreationStartState,
   buildPersistedProjectChats,
   buildProjectSwitchState,
+  createEmptyChat,
 } from "./project-store.helpers";
 import type { ProjectState } from "./project-store.types";
 
@@ -87,6 +88,10 @@ const createState = (): ProjectState => ({
   setPendingProjectName: () => undefined,
   setPendingCreationRequestId: () => undefined,
   appendStreamingContent: () => undefined,
+  appendPlanStreamChunk: () => undefined,
+  finalizePlanStream: () => undefined,
+  appendReasoningMessage: () => undefined,
+  syncProjectWorkspace: () => undefined,
   clearStreamingContent: () => undefined,
   startGenerationFile: () => undefined,
   appendGenerationCode: () => undefined,
@@ -199,5 +204,31 @@ describe("buildProjectSwitchState", () => {
     expect(nextState.projectChats?.alpha?.fileContents).toEqual({
       "app.tsx": "alpha",
     });
+  });
+
+  it("restores cached generation progress when returning to a project", () => {
+    const state = createState();
+    state.generationFiles = [{ path: "app/index.tsx", code: "", status: "streaming" }];
+    state.generationProgress = 0.5;
+    state.currentGeneratingFile = "app/index.tsx";
+    state.projectChats = {
+      ...state.projectChats,
+      beta: {
+        ...(state.projectChats.beta ?? createEmptyChat()),
+        generationFiles: [{ path: "app/login.tsx", code: "x", status: "done" }],
+        generationProgress: 1,
+        currentGeneratingFile: null,
+      },
+    };
+
+    const nextState = buildProjectSwitchState(state, "beta");
+
+    expect(nextState.generationFiles).toEqual([
+      { path: "app/login.tsx", code: "x", status: "done" },
+    ]);
+    expect(nextState.generationProgress).toBe(1);
+    expect(nextState.projectChats?.alpha?.generationFiles).toEqual([
+      { path: "app/index.tsx", code: "", status: "streaming" },
+    ]);
   });
 });

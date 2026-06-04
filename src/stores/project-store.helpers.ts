@@ -1,5 +1,6 @@
 // Keeps project and preview store transitions pure so lifecycle changes remain testable.
 import { CREATING_PROJECT_SLUG, isCreatingRoute } from "@/shared/lib/creation-flow";
+import { readProjectWorkspaceCache } from "./project-cache";
 import type {
   ProjectChat,
   ProjectState,
@@ -105,6 +106,10 @@ export const persistCurrentProjectSnapshot = (
     streamingContent: state.streamingContent,
     previewUrl: state.previewUrl,
     previewPort: state.previewPort,
+    plan: state.plan,
+    generationFiles: state.generationFiles,
+    generationProgress: state.generationProgress,
+    currentGeneratingFile: state.currentGeneratingFile,
   });
 };
 
@@ -181,6 +186,7 @@ export const buildProjectSwitchState = (
   const nextStatus = creating
     ? state.status
     : state.projectList.find((project) => project.name === projectName)?.status ?? "ready";
+  const workspace = readProjectWorkspaceCache(projectChats, projectName);
 
   return {
     projectName,
@@ -194,8 +200,11 @@ export const buildProjectSwitchState = (
     fileContents: nextChat.fileContents,
     fileDrafts: {},
     versions: nextChat.versions,
-    streamingContent: nextChat.streamingContent,
-    generationFiles: [],
+    plan: workspace.plan,
+    streamingContent: workspace.streamingContent,
+    generationFiles: workspace.generationFiles,
+    generationProgress: workspace.generationProgress,
+    currentGeneratingFile: workspace.currentGeneratingFile,
     previewUrl: null,
     previewPort: null,
     previewBuildId: null,
@@ -252,7 +261,12 @@ export const buildCreationStartState = (
 const stripHeavyMessageFields = (
   messages: ProjectChat["messages"]
 ): ProjectChat["messages"] =>
-  messages.map(({ diffBefore: _b, diffAfter: _a, diffFilepath: _f, ...rest }) => rest);
+  messages.map(({ diffBefore: _b, diffAfter: _a, diffFilepath: _f, thinking, ...rest }) => ({
+    ...rest,
+    ...(thinking
+      ? { thinking: thinking.length > 12_000 ? `${thinking.slice(-12_000)}` : thinking }
+      : {}),
+  }));
 
 export const buildPersistedProjectChats = (
   projectChats: Record<string, ProjectChat>
@@ -265,13 +279,17 @@ export const buildPersistedProjectChats = (
       .map(([name, chat]) => [
       name,
       {
-        messages: stripHeavyMessageFields(chat.messages.slice(-50)),
+        messages: stripHeavyMessageFields(chat.messages.slice(-80)),
         versions: chat.versions,
         fileTree: chat.fileTree,
         openFiles: chat.openFiles,
         activeFile: chat.activeFile,
         fileContents: {},
-        streamingContent: "",
+        streamingContent: chat.streamingContent ?? "",
+        plan: chat.plan ?? null,
+        generationFiles: (chat.generationFiles ?? []).slice(-40),
+        generationProgress: chat.generationProgress ?? 0,
+        currentGeneratingFile: chat.currentGeneratingFile ?? null,
         previewUrl: null,
         previewPort: null,
       },

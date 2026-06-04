@@ -7,6 +7,7 @@ import {
 import type { ChatMessage as Msg } from "../schemas/message.schema";
 import MarkdownRenderer from "./markdown-renderer";
 import DiffView from "./diff-view";
+import ProcessMessage from "./process-message";
 
 interface ChatMessageProps {
   message: Msg;
@@ -37,6 +38,10 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
         <Text className="text-ink-light text-xs">{message.content}</Text>
       </View>
     );
+  }
+
+  if (message.processKind) {
+    return <ProcessMessage message={message} />;
   }
 
   const isUser = message.role === "user";

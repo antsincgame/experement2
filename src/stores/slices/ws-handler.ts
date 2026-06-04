@@ -7,6 +7,13 @@ import {
   isPendingCreation,
 } from "@/shared/lib/creation-flow";
 import {
+  getMessageProjectName,
+  getMessageRequestId,
+  matchesActiveProject,
+  resolveChatTargetProject,
+  resolveEventProject,
+} from "./ws-scope.js";
+import {
   createEmptyChat,
   migrateCreatingChatToProject,
 } from "@/stores/project-store.helpers";
@@ -16,8 +23,11 @@ import {
   createDiffMessage,
   createSystemMessage,
   createErrorMessage,
+  createProcessMessage,
   type ChatMessage,
 } from "@/features/chat/schemas/message.schema";
+import { formatBuildEventLine } from "@/shared/lib/format-build-event";
+import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
 import type {
@@ -29,83 +39,6 @@ import type {
 
 type StoreGet = ProjectStoreGet;
 type StoreSet = ProjectStoreSet;
-
-const GLOBAL_MESSAGE_TYPES = new Set([
-  "connected",
-  "lm_studio_status",
-  "llm_server_status",
-]);
-
-const UNSCOPED_FALLBACK_TYPES = new Set([
-  "generation_aborted",
-]);
-
-const getMessageProjectName = (msg: IncomingWsMessage): string | null =>
-  "projectName" in msg && typeof msg.projectName === "string"
-    ? msg.projectName
-    : null;
-
-const getMessageRequestId = (msg: IncomingWsMessage): string | null =>
-  "requestId" in msg && typeof msg.requestId === "string"
-    ? msg.requestId
-    : null;
-
-const matchesActiveProject = (
-  store: StoreGet,
-  msg: IncomingWsMessage
-): boolean => {
-  if (GLOBAL_MESSAGE_TYPES.has(msg.type)) {
-    return true;
-  }
-
-  const messageProjectName = getMessageProjectName(msg);
-  const state = store();
-  const currentProjectName = state.projectName;
-
-  if (isCreationSession(state)) {
-    // During creation the active slug is the "__creating__" placeholder while
-    // events already carry the real (planner-resolved) name, so name matching
-    // can't be used yet. Scope by the creation's requestId instead: only events
-    // from THIS create_project belong here — a previous/background run's late
-    // events carry a different requestId and must be dropped.
-    const creationRequestId = state.pendingCreationRequestId;
-    if (!creationRequestId) {
-      return true; // backwards-compatible: no requestId tracked → legacy behavior
-    }
-    const messageRequestId = getMessageRequestId(msg);
-    if (messageRequestId) {
-      return messageRequestId === creationRequestId;
-    }
-    // No requestId on the event: accept only early unscoped/placeholder events.
-    return !messageProjectName || isCreatingRoute(messageProjectName);
-  }
-
-  if (!currentProjectName) {
-    return true;
-  }
-
-  if (!messageProjectName) {
-    return UNSCOPED_FALLBACK_TYPES.has(msg.type);
-  }
-
-  return messageProjectName === currentProjectName;
-};
-
-/** Project key for chat cache: explicit WS scope, or creation session slug. */
-export const resolveChatTargetProject = (
-  get: StoreGet,
-  msg: IncomingWsMessage
-): string | null => {
-  const explicit = getMessageProjectName(msg);
-  if (explicit) {
-    return explicit;
-  }
-  const state = get();
-  if (isCreationSession(state) && state.projectName) {
-    return state.projectName;
-  }
-  return null;
-};
 
 const applyErrorState = (
   store: ReturnType<StoreGet>,
@@ -172,6 +105,7 @@ export const createWsHandler = (
 
   const isActive = matchesActiveProject(get, msg);
   const chatProject = resolveChatTargetProject(get, msg);
+  const eventProject = resolveEventProject(get, msg);
   // Route a chat message to the active conversation, or — when the event belongs
   // to a project the user has switched away from — silently into that project's
   // cache so its generation/iteration history is not lost.
@@ -199,7 +133,14 @@ export const createWsHandler = (
         }
         break;
       }
+      const previousStatus = get().status;
       store.setStatus(msg.status);
+      if (previousStatus !== msg.status) {
+        const phaseLabel = GENERATION_STATUS_LABELS[msg.status];
+        if (phaseLabel) {
+          emitChat(createProcessMessage("phase", phaseLabel));
+        }
+      }
       if (msg.status === "planning") {
         store.resetGenerationFiles();
       }
@@ -220,10 +161,17 @@ export const createWsHandler = (
     }
 
     case "plan_chunk": {
-      if (!matchesActiveProject(get, msg)) break;
+      const target = eventProject;
+      if (!target) {
+        break;
+      }
+      if (!isActive) {
+        store.appendPlanStreamChunk(msg.chunk, target);
+        break;
+      }
       const planStatus = get().status;
       if (planStatus === "planning" || planStatus === "scaffolding") {
-        store.appendStreamingContent(msg.chunk);
+        store.appendPlanStreamChunk(msg.chunk);
       }
       break;
     }
@@ -287,6 +235,7 @@ export const createWsHandler = (
           messages: nextChat.messages,
           streamingContent: nextChat.streamingContent,
         });
+        store.syncProjectWorkspace(planName, { plan });
         store.addProject({
           name: planName,
           displayName: displayName ?? planName,
@@ -296,10 +245,18 @@ export const createWsHandler = (
         });
       } else {
         set({ plan: msg.plan });
+        if (eventProject) {
+          store.syncProjectWorkspace(eventProject, { plan: msg.plan });
+        }
       }
 
+      store.finalizePlanStream();
       store.clearStreamingContent();
-      emitChat(createSystemMessage("Plan created [ok]", false));
+      const plannedFileCount = Array.isArray(plan.files) ? plan.files.length : "?";
+      emitChat(createProcessMessage(
+        "phase",
+        `Plan locked — **${displayName ?? planName ?? "project"}** (${plannedFileCount} files). Scaffolding…`,
+      ));
       log({ level: "info", source: "pipeline", message: "Plan complete" });
       break;
     }
@@ -351,34 +308,61 @@ export const createWsHandler = (
       }
 
       set({ projectName, pendingProjectName: null, pendingCreationRequestId: null });
-      store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
+      emitChat(createProcessMessage("phase", `Scaffold ready — \`${projectName}\``));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
       break;
     }
 
-    case "file_generating":
-      if (!matchesActiveProject(get, msg)) break;
-      set({
-        generationProgress: msg.progress,
-        currentGeneratingFile: msg.filepath,
-      });
-      store.startGenerationFile(msg.filepath);
+    case "file_generating": {
+      const target = eventProject;
+      if (!target) {
+        break;
+      }
+      if (isActive) {
+        set({
+          generationProgress: msg.progress,
+          currentGeneratingFile: msg.filepath,
+        });
+        store.startGenerationFile(msg.filepath);
+      } else {
+        store.syncProjectWorkspace(target, {
+          generationProgress: msg.progress,
+          currentGeneratingFile: msg.filepath,
+        });
+        store.startGenerationFile(msg.filepath, target);
+      }
+      emitChat(createProcessMessage(
+        "file",
+        `Writing \`${msg.filepath}\` (${Math.round(msg.progress * 100)}%)`,
+      ));
       break;
+    }
 
     case "code_chunk": {
-      if (!matchesActiveProject(get, msg)) break;
-      const codeStatus = get().status;
+      const target = eventProject;
+      if (!target) {
+        break;
+      }
+      const codeStatus = isActive
+        ? get().status
+        : get().projectList.find((p) => p.name === target)?.status ?? "idle";
       if (codeStatus === "generating" || codeStatus === "analyzing") {
-        store.appendStreamingContent(msg.chunk);
-        store.appendGenerationCode(msg.chunk);
+        if (isActive) {
+          store.appendStreamingContent(msg.chunk);
+          store.appendGenerationCode(msg.chunk);
+        } else {
+          store.appendGenerationCode(msg.chunk, target);
+        }
       }
       break;
     }
 
     case "file_complete":
-      if (isActive) store.completeGenerationFile(msg.filepath);
-      emitChat(createSystemMessage(`File created: ${msg.filepath}`, true));
+      if (eventProject) {
+        store.completeGenerationFile(msg.filepath, eventProject);
+      }
+      emitChat(createProcessMessage("file", `✓ \`${msg.filepath}\``));
       log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
       break;
 
@@ -391,13 +375,17 @@ export const createWsHandler = (
       break;
 
     case "build_event": {
-      if (!matchesActiveProject(get, msg)) {
-        if (get().projectName && !getMessageProjectName(msg)) {
-          log({ level: "warn", source: "ws", message: `Ignored unscoped build event: ${msg.eventType}` });
-        }
+      if (!eventProject && get().projectName && !getMessageProjectName(msg)) {
+        log({ level: "warn", source: "ws", message: `Ignored unscoped build event: ${msg.eventType}` });
+        break;
+      }
+      if (!isActive && !eventProject) {
         break;
       }
       const eventType = msg.eventType;
+      const line = formatBuildEventLine(eventType, msg.message, msg.error);
+      const processKind = eventType === "moe_swap" ? "moe" : "build";
+      emitChat(createProcessMessage(processKind, line));
       if (eventType === "build_error") {
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
       } else if (eventType === "build_success") {
@@ -457,15 +445,23 @@ export const createWsHandler = (
       break;
     }
 
-    case "thinking":
-      emitChat(createReasoningMessage(msg.content));
+    case "thinking": {
+      const target = eventProject;
+      if (isActive) {
+        store.appendReasoningMessage(msg.content);
+      } else if (target) {
+        store.appendReasoningMessage(msg.content, target);
+      }
       break;
+    }
 
     case "analysis_complete": {
       const thinking = msg.thinking;
       if (thinking) emitChat(createReasoningMessage(thinking));
       const { files } = msg;
-      if (files?.length) emitChat(createSystemMessage(`Analyzing: ${files.join(", ")}`, true));
+      if (files?.length) {
+        emitChat(createProcessMessage("phase", `Iteration scope: ${files.join(", ")}`));
+      }
       break;
     }
 
@@ -554,12 +550,15 @@ export const createWsHandler = (
       break;
 
     case "autofix_start":
-      emitChat(createSystemMessage(`Autofix: ${msg.file ?? "unknown"} - ${msg.error.slice(0, 100)}`, false));
+      emitChat(createProcessMessage(
+        "fix",
+        `Autofix \`${msg.file ?? "project"}\`: ${msg.error.slice(0, 200)}`,
+      ));
       log({ level: "warn", source: "autofix", message: `Starting autofix: ${msg.file ?? "unknown"}`, details: msg.error.slice(0, 300) });
       break;
 
     case "autofix_success":
-      emitChat(createAssistantMessage(`Error fixed (attempt ${msg.attempts}) [ok]`));
+      emitChat(createProcessMessage("fix", `✓ Fixed after ${msg.attempts} attempt(s)`));
       log({ level: "info", source: "autofix", message: `Fixed on attempt ${msg.attempts}` });
       break;
 
@@ -643,12 +642,15 @@ export const createWsHandler = (
     }
 
     case "autofix_attempt":
-      emitChat(createSystemMessage(`Autofix: attempt ${msg.attempt}/${msg.maxAttempts}`, true));
+      emitChat(createProcessMessage(
+        "fix",
+        `Autofix attempt ${msg.attempt}/${msg.maxAttempts}`,
+      ));
       log({ level: "warn", source: "autofix", message: `Attempt ${msg.attempt}/${msg.maxAttempts}` });
       break;
 
     case "autofix_block":
-      emitChat(createSystemMessage(`Fix: ${msg.filepath}`, true));
+      emitChat(createProcessMessage("fix", `Patch applied: \`${msg.filepath}\``));
       log({ level: "info", source: "autofix", message: `Fix applied: ${msg.filepath}` });
       break;
 

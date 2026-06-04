@@ -2,6 +2,9 @@ export type MessageRole = "user" | "assistant" | "system";
 
 export type MessageStatus = "pending" | "streaming" | "complete" | "error";
 
+/** Structured pipeline narration shown in chat (plan stream, MoE, fixes, Metro). */
+export type ProcessKind = "plan" | "phase" | "moe" | "file" | "fix" | "build";
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -16,7 +19,10 @@ export interface ChatMessage {
   diffFilepath?: string;
   diffBefore?: string;
   diffAfter?: string;
+  processKind?: ProcessKind;
 }
+
+const MAX_PLAN_STREAM_CHARS = 12_000;
 
 export const createUserMessage = (content: string): ChatMessage => ({
   id: crypto.randomUUID(),
@@ -90,4 +96,36 @@ export const createErrorMessage = (
   isError: true,
   errorDetails,
   errorFile,
+});
+
+export const createPlanStreamMessage = (initialChunk: string): ChatMessage => ({
+  id: crypto.randomUUID(),
+  role: "assistant",
+  content: initialChunk.slice(-MAX_PLAN_STREAM_CHARS),
+  timestamp: Date.now(),
+  status: "streaming",
+  processKind: "plan",
+});
+
+export const appendPlanStreamContent = (
+  message: ChatMessage,
+  chunk: string,
+): ChatMessage => ({
+  ...message,
+  content: (message.content + chunk).slice(-MAX_PLAN_STREAM_CHARS),
+  status: "streaming",
+});
+
+export const createProcessMessage = (
+  kind: ProcessKind,
+  content: string,
+  isHidden = false,
+): ChatMessage => ({
+  id: crypto.randomUUID(),
+  role: "assistant",
+  content,
+  timestamp: Date.now(),
+  status: "complete",
+  processKind: kind,
+  isHidden,
 });

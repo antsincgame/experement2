@@ -8,7 +8,8 @@ import LotusToast from "@/shared/components/effects/lotus-toast";
 import NeonBackground from "@/shared/components/effects/neon-background";
 import WorkspaceLayout from "@/features/workspace/components/workspace-layout";
 import { isCreatingRoute } from "@/shared/lib/creation-flow";
-import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
+import { GENERATION_STATUS_LABELS, isGenerationActive } from "@/shared/lib/generation-status";
+import { MoeIndicator } from "@/features/chat/components/moe-indicator";
 import type { ProjectStatus } from "@/shared/schemas/ws-messages";
 import { mixedStyle } from "@/shared/lib/web-styles";
 import type { FileNode, ProjectEntry } from "@/stores/project-store";
@@ -121,6 +122,7 @@ export const ProjectScreenContent = ({
           )}
         </Pressable>
         <View className="flex-row items-center gap-2">
+          {isGenerationActive(status) && <MoeIndicator />}
           {projectName && (
             <Pressable
               onPress={handleExport}

@@ -1,35 +1,96 @@
 // Extracts chat and version mutations so project-store no longer owns every domain action inline.
-import type { ChatMessage } from "@/features/chat/schemas/message.schema";
+import {
+  appendPlanStreamContent,
+  createPlanStreamMessage,
+  createReasoningMessage,
+  type ChatMessage,
+} from "@/features/chat/schemas/message.schema";
+import {
+  applyProjectWorkspaceCache,
+  readProjectWorkspaceCache,
+  type ProjectWorkspaceCache,
+} from "../project-cache";
 import type { GenerationFile, ProjectStoreSet, Version } from "../project-store.types";
-import { saveProjectChatPatch } from "../project-store.helpers";
+import { createEmptyChat, saveProjectChatPatch } from "../project-store.helpers";
 
-// Per-file code preview is transient; cap it so a runaway stream cannot exhaust memory.
 const MAX_GENERATION_FILE_CHARS = 24_000;
+const MAX_MESSAGES = 200;
+const MAX_PERSISTED_THINKING_CHARS = 16_000;
+
+const trimMessages = (messages: ChatMessage[]): ChatMessage[] =>
+  messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
+
+const upsertPlanStream = (messages: ChatMessage[], chunk: string): ChatMessage[] => {
+  const next = [...messages];
+  let planIndex = -1;
+  for (let index = next.length - 1; index >= 0; index -= 1) {
+    const entry = next[index];
+    if (entry.processKind === "plan" && entry.status === "streaming") {
+      planIndex = index;
+      break;
+    }
+  }
+  if (planIndex >= 0) {
+    next[planIndex] = appendPlanStreamContent(next[planIndex], chunk);
+  } else {
+    next.push(createPlanStreamMessage(chunk));
+  }
+  return trimMessages(next);
+};
+
+const upsertReasoning = (messages: ChatMessage[], thinking: string): ChatMessage[] => {
+  const next = [...messages];
+  const last = next[next.length - 1];
+  const header = thinking.split("\n")[0] ?? "";
+  if (
+    last?.role === "assistant"
+    && last.thinking
+    && last.content.trim() === ""
+    && header.length > 0
+    && last.thinking.startsWith(header)
+  ) {
+    next[next.length - 1] = {
+      ...last,
+      thinking: thinking.slice(-MAX_PERSISTED_THINKING_CHARS),
+    };
+    return trimMessages(next);
+  }
+  return trimMessages([
+    ...next,
+    {
+      ...createReasoningMessage(thinking.slice(-MAX_PERSISTED_THINKING_CHARS)),
+    },
+  ]);
+};
+
+const updateGenerationFiles = (
+  files: GenerationFile[],
+  path: string,
+  updater: (file: GenerationFile) => GenerationFile,
+): GenerationFile[] => {
+  const existing = files.find((file) => file.path === path);
+  if (existing) {
+    return files.map((file) => (file.path === path ? updater(file) : file));
+  }
+  return [...files, { path, code: "", status: "streaming" as const }];
+};
 
 export const createProjectChatSlice = (set: ProjectStoreSet) => ({
   addMessage: (message: ChatMessage) =>
     set((state) => {
-      const nextMessages = [...state.messages, message];
-      const messages = nextMessages.length > 200
-        ? nextMessages.slice(-200)
-        : nextMessages;
-
+      const nextMessages = trimMessages([...state.messages, message]);
       return {
-        messages,
+        messages: nextMessages,
         projectChats: saveProjectChatPatch(state.projectChats, state.projectName, {
-          messages,
+          messages: nextMessages,
         }),
       };
     }),
 
-  // Mirror a chat event into a project the user is NOT currently viewing, so
-  // generation/iteration progress is not lost when switching projects mid-run.
-  // Never mutates the active `messages` array unless the target IS active.
   appendBackgroundMessage: (projectName: string, message: ChatMessage) =>
     set((state) => {
       if (!projectName || projectName === state.projectName) {
-        const nextActive = [...state.messages, message];
-        const messages = nextActive.length > 200 ? nextActive.slice(-200) : nextActive;
+        const messages = trimMessages([...state.messages, message]);
         return {
           messages,
           projectChats: saveProjectChatPatch(state.projectChats, state.projectName, {
@@ -38,14 +99,34 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
         };
       }
       const existing = state.projectChats[projectName]?.messages ?? [];
-      const next = [...existing, message];
-      const messages = next.length > 200 ? next.slice(-200) : next;
+      const messages = trimMessages([...existing, message]);
       return {
-        projectChats: saveProjectChatPatch(state.projectChats, projectName, {
-          messages,
-        }),
+        projectChats: saveProjectChatPatch(state.projectChats, projectName, { messages }),
       };
     }),
+
+  appendReasoningMessage: (thinking: string, targetProject?: string | null) =>
+    set((state) => {
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
+      }
+      if (target === state.projectName) {
+        const messages = upsertReasoning(state.messages, thinking);
+        return {
+          messages,
+          projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
+        };
+      }
+      const chat = state.projectChats[target] ?? createEmptyChat();
+      const messages = upsertReasoning(chat.messages, thinking);
+      return {
+        projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
+      };
+    }),
+
+  syncProjectWorkspace: (projectName: string, patch: Partial<ProjectWorkspaceCache>) =>
+    set((state) => applyProjectWorkspaceCache(state, projectName, patch)),
 
   updateLastAssistantMessage: (content: string) =>
     set((state) => {
@@ -54,15 +135,9 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
         if (messages[index].role !== "assistant") {
           continue;
         }
-
-        messages[index] = {
-          ...messages[index],
-          content,
-          status: "streaming",
-        };
+        messages[index] = { ...messages[index], content, status: "streaming" };
         break;
       }
-
       return {
         messages,
         projectChats: saveProjectChatPatch(state.projectChats, state.projectName, {
@@ -88,10 +163,74 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
   appendStreamingContent: (chunk: string) =>
     set((state) => {
       const nextStreamingContent = state.streamingContent + chunk;
+      const streamingContent = nextStreamingContent.length > 4_000
+        ? nextStreamingContent.slice(-4_000)
+        : nextStreamingContent;
+      return { streamingContent };
+    }),
+
+  appendPlanStreamChunk: (chunk: string, targetProject?: string | null) =>
+    set((state) => {
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
+      }
+
+      const nextStreaming = (readProjectWorkspaceCache(state.projectChats, target).streamingContent + chunk)
+        .slice(-4_000);
+
+      if (target === state.projectName) {
+        const messages = upsertPlanStream(state.messages, chunk);
+        return {
+          messages,
+          streamingContent: nextStreaming,
+          projectChats: saveProjectChatPatch(state.projectChats, target, {
+            messages,
+            streamingContent: nextStreaming,
+          }),
+        };
+      }
+
+      const chat = state.projectChats[target] ?? createEmptyChat();
+      const messages = upsertPlanStream(chat.messages, chunk);
+      const projectChats = saveProjectChatPatch(state.projectChats, target, {
+        messages,
+        streamingContent: nextStreaming,
+      });
+      return { projectChats };
+    }),
+
+  finalizePlanStream: (targetProject?: string | null) =>
+    set((state) => {
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
+      }
+
+      const finalize = (messages: ChatMessage[]): ChatMessage[] => {
+        const next = [...messages];
+        for (let index = next.length - 1; index >= 0; index -= 1) {
+          const entry = next[index];
+          if (entry.processKind === "plan" && entry.status === "streaming") {
+            next[index] = { ...entry, status: "complete" };
+            break;
+          }
+        }
+        return next;
+      };
+
+      if (target === state.projectName) {
+        const messages = finalize(state.messages);
+        return {
+          messages,
+          projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
+        };
+      }
+
+      const chat = state.projectChats[target] ?? createEmptyChat();
+      const messages = finalize(chat.messages);
       return {
-        streamingContent: nextStreamingContent.length > 4_000
-          ? nextStreamingContent.slice(-4_000)
-          : nextStreamingContent,
+        projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
       };
     }),
 
@@ -103,40 +242,63 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
       }),
     })),
 
-  startGenerationFile: (path: string) =>
+  startGenerationFile: (path: string, targetProject?: string | null) =>
     set((state) => {
-      const existing = state.generationFiles.find((file) => file.path === path);
-      if (existing) {
-        return {
-          generationFiles: state.generationFiles.map((file) =>
-            file.path === path ? { ...file, status: "streaming" as const } : file
-          ),
-        };
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
       }
-      const entry: GenerationFile = { path, code: "", status: "streaming" };
-      return { generationFiles: [...state.generationFiles, entry] };
+      const cache = readProjectWorkspaceCache(state.projectChats, target);
+      const generationFiles = updateGenerationFiles(cache.generationFiles, path, (file) => ({
+        ...file,
+        status: "streaming",
+      }));
+      return applyProjectWorkspaceCache(state, target, { generationFiles });
     }),
 
-  appendGenerationCode: (chunk: string) =>
+  appendGenerationCode: (chunk: string, targetProject?: string | null) =>
     set((state) => {
-      const files = state.generationFiles;
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
+      }
+      const cache = readProjectWorkspaceCache(state.projectChats, target);
+      const files = cache.generationFiles;
       const lastIndex = files.length - 1;
       if (lastIndex < 0) {
         return {};
       }
-      const target = files[lastIndex];
-      const merged = (target.code + chunk).slice(-MAX_GENERATION_FILE_CHARS);
+      const file = files[lastIndex];
       const generationFiles = [...files];
-      generationFiles[lastIndex] = { ...target, code: merged };
-      return { generationFiles };
+      generationFiles[lastIndex] = {
+        ...file,
+        code: (file.code + chunk).slice(-MAX_GENERATION_FILE_CHARS),
+      };
+      return applyProjectWorkspaceCache(state, target, { generationFiles });
     }),
 
-  completeGenerationFile: (path: string) =>
-    set((state) => ({
-      generationFiles: state.generationFiles.map((file) =>
+  completeGenerationFile: (path: string, targetProject?: string | null) =>
+    set((state) => {
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
+      }
+      const cache = readProjectWorkspaceCache(state.projectChats, target);
+      const generationFiles = cache.generationFiles.map((file) =>
         file.path === path ? { ...file, status: "done" as const } : file
-      ),
-    })),
+      );
+      return applyProjectWorkspaceCache(state, target, { generationFiles });
+    }),
 
-  resetGenerationFiles: () => set({ generationFiles: [] }),
+  resetGenerationFiles: () =>
+    set((state) => {
+      if (!state.projectName) {
+        return { generationFiles: [] };
+      }
+      return applyProjectWorkspaceCache(state, state.projectName, {
+        generationFiles: [],
+        generationProgress: 0,
+        currentGeneratingFile: null,
+      });
+    }),
 });

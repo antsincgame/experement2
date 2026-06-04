@@ -6,6 +6,7 @@ import type {
   PreviewStatus as PreviewRuntimeStatus,
   ProjectStatus,
 } from "@/shared/schemas/ws-messages";
+import type { ProjectWorkspaceCache } from "./project-cache";
 
 export type AppStatus = ProjectStatus;
 export type PreviewStatus = PreviewRuntimeStatus;
@@ -50,6 +51,11 @@ export interface ProjectChat {
   streamingContent: string;
   previewUrl: string | null;
   previewPort: number | null;
+  /** Cached while user views another project — restored on switchProject. */
+  plan?: Record<string, unknown> | null;
+  generationFiles?: GenerationFile[];
+  generationProgress?: number;
+  currentGeneratingFile?: string | null;
 }
 
 export interface ProjectStateData {
@@ -115,10 +121,17 @@ export interface ProjectStateActions {
   setPendingProjectName: (name: string | null) => void;
   setPendingCreationRequestId: (requestId: string | null) => void;
   appendStreamingContent: (chunk: string) => void;
+  appendPlanStreamChunk: (chunk: string, targetProject?: string | null) => void;
+  finalizePlanStream: (targetProject?: string | null) => void;
+  appendReasoningMessage: (thinking: string, targetProject?: string | null) => void;
+  syncProjectWorkspace: (
+    projectName: string,
+    patch: Partial<ProjectWorkspaceCache>,
+  ) => void;
   clearStreamingContent: () => void;
-  startGenerationFile: (path: string) => void;
-  appendGenerationCode: (chunk: string) => void;
-  completeGenerationFile: (path: string) => void;
+  startGenerationFile: (path: string, targetProject?: string | null) => void;
+  appendGenerationCode: (chunk: string, targetProject?: string | null) => void;
+  completeGenerationFile: (path: string, targetProject?: string | null) => void;
   resetGenerationFiles: () => void;
   toggleFileTree: () => void;
   toggleTerminal: () => void;

@@ -446,6 +446,7 @@ Generate the complete code for: ${fileSpec.path}`;
     ];
 
     let responseBuffer = "";
+    let lastReasoningLen = 0;
 
     const generator = await complete(messages, {
       temperature: temperature ?? 0.4,
@@ -462,6 +463,13 @@ Generate the complete code for: ${fileSpec.path}`;
     for await (const chunk of generator) {
       responseBuffer += chunk;
       chunkBuffer += chunk;
+      if (onThinking) {
+        const reasoning = extractReasoning(responseBuffer);
+        if (reasoning.length > lastReasoningLen) {
+          onThinking(fileSpec.path, reasoning);
+          lastReasoningLen = reasoning.length;
+        }
+      }
       if (Date.now() - lastSendTime > 100) {
         onChunk?.(chunkBuffer);
         chunkBuffer = "";
@@ -469,15 +477,6 @@ Generate the complete code for: ${fileSpec.path}`;
       }
     }
     if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
-
-    // Surface the model's reasoning for this file (if it produced any) so the
-    // chat can show the thought process, then it is stripped from the saved code.
-    if (onThinking && /<(?:think|thinking|redacted_thinking)>/i.test(responseBuffer)) {
-      const reasoning = extractReasoning(responseBuffer);
-      if (reasoning) {
-        onThinking(fileSpec.path, reasoning);
-      }
-    }
 
     const extracted = extractCodeFromResponse(responseBuffer);
     if (extracted) {
