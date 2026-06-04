@@ -218,6 +218,13 @@ export const AutofixBlockMessageSchema = z.object({
   buildId: BuildIdSchema.optional(),
 }).merge(ProjectScopedMessageSchema);
 
+export const PolishProgressMessageSchema = z.object({
+  type: z.literal("polish_progress"),
+  pass: z.number(),
+  maxPasses: z.number(),
+  message: z.string(),
+}).merge(OperationScopedMessageSchema);
+
 export const LlmServerStatusMessageSchema = z.object({
   type: z.enum(["lm_studio_status", "llm_server_status"]),
   status: z.enum(["connected", "disconnected", "checking"]),
@@ -252,6 +259,7 @@ export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
   IterationResultMessageSchema,
   AutofixAttemptMessageSchema,
   AutofixBlockMessageSchema,
+  PolishProgressMessageSchema,
   LlmServerStatusMessageSchema,
 ]);
 
@@ -273,6 +281,8 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     editorModel: z.string().optional(),
     embeddingModel: z.string().optional(),
     semanticRagEnabled: z.boolean().optional(),
+    autoPolishEnabled: z.boolean().optional(),
+    autoPolishMaxPasses: z.number().optional(),
     temperature: z.number().optional(),
     maxTokens: z.number().optional(),
     topP: z.number().optional(),

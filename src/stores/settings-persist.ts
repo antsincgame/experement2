@@ -23,6 +23,7 @@ export interface PersistedSettings {
   enhancerEnabled: boolean;
   embeddingModel: string;
   semanticRagEnabled: boolean;
+  autoPolishEnabled: boolean;
 }
 
 export const defaultPersistedSettings = (): PersistedSettings => ({
@@ -39,6 +40,7 @@ export const defaultPersistedSettings = (): PersistedSettings => ({
   enhancerEnabled: true,
   embeddingModel: "",
   semanticRagEnabled: true,
+  autoPolishEnabled: false,
 });
 
 export const pickPersistedSettings = (state: {
@@ -55,6 +57,7 @@ export const pickPersistedSettings = (state: {
   enhancerEnabled: boolean;
   embeddingModel: string;
   semanticRagEnabled: boolean;
+  autoPolishEnabled: boolean;
 }): PersistedSettings => ({
   lmStudioUrl: state.lmStudioUrl,
   model: state.model,
@@ -69,6 +72,7 @@ export const pickPersistedSettings = (state: {
   enhancerEnabled: state.enhancerEnabled,
   embeddingModel: state.embeddingModel,
   semanticRagEnabled: state.semanticRagEnabled,
+  autoPolishEnabled: state.autoPolishEnabled,
 });
 
 const asNumber = (value: unknown, fallback: number): number =>
@@ -110,6 +114,7 @@ export const migratePersistedSettings = (
     enhancerEnabled: asBoolean(raw.enhancerEnabled, defaults.enhancerEnabled),
     embeddingModel: asString(raw.embeddingModel, defaults.embeddingModel),
     semanticRagEnabled: asBoolean(raw.semanticRagEnabled, defaults.semanticRagEnabled),
+    autoPolishEnabled: asBoolean(raw.autoPolishEnabled, defaults.autoPolishEnabled),
   };
 };
 
@@ -128,6 +133,7 @@ export const flushSettingsToStorage = (state: {
   enhancerEnabled: boolean;
   embeddingModel: string;
   semanticRagEnabled: boolean;
+  autoPolishEnabled: boolean;
 }): void => {
   const payload = JSON.stringify({
     state: pickPersistedSettings(state),

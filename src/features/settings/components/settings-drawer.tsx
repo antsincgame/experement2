@@ -398,6 +398,32 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
             />
           </View>
 
+          {/* Auto-polish design (experimental, opt-in, OFF by default) */}
+          <View
+            className="rounded-xl px-4 py-3"
+            style={{ backgroundColor: "rgba(124, 77, 255, 0.06)", borderWidth: 1, borderColor: "rgba(124, 77, 255, 0.15)" }}
+          >
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-white text-xs font-semibold">Auto-polish design (experimental)</Text>
+              <Pressable
+                onPress={() => patchDraft({ autoPolishEnabled: !draft.autoPolishEnabled })}
+                className="px-2 py-0.5 rounded"
+                style={{
+                  backgroundColor: draft.autoPolishEnabled ? "rgba(0,229,255,0.15)" : "rgba(0,0,0,0.04)",
+                }}
+              >
+                <Text style={{ fontSize: 10, color: draft.autoPolishEnabled ? "#00E5FF" : "#8888AA" }}>
+                  {draft.autoPolishEnabled ? "ON" : "OFF"}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={{ fontSize: 10, color: "#8888AA", lineHeight: 15 }}>
+              Опционально (по умолчанию ВЫКЛ). После первой успешной сборки агент сделает
+              несколько проходов, улучшая дизайн экранов. Изменение принимается только если
+              проект всё ещё проходит typecheck.
+            </Text>
+          </View>
+
           {/* Error Logs */}
           <ErrorLogPanel />
         </ScrollView>
