@@ -1,10 +1,13 @@
-// Runtime shim: explicit re-exports (Node ESM named re-export from export * chain is unreliable under tsx).
+// Runtime shim: call-time access (eager snapshot of cross-pkg const exports is undefined under tsx).
 import * as shared from "../../../src/shared/lib/plan-brief.js";
 
 export type { PlanBriefInput, PlanFileEntry } from "../../../src/shared/lib/plan-brief.js";
 
-export const formatPlanBriefForModels = shared.formatPlanBriefForModels;
-export const formatPlanBriefForChat = shared.formatPlanBriefForChat;
-export const formatPlanBrief = shared.formatPlanBrief;
-export const summarizePlanForChat = shared.summarizePlanForChat;
-export const PLAN_DRAFTING_PLACEHOLDER = shared.PLAN_DRAFTING_PLACEHOLDER;
+export const formatPlanBriefForModels = (p: shared.PlanBriefInput): string =>
+  shared.formatPlanBriefForModels(p);
+export const formatPlanBriefForChat = (p: shared.PlanBriefInput): string =>
+  shared.formatPlanBriefForChat(p);
+export const formatPlanBrief = (p: shared.PlanBriefInput): string => shared.formatPlanBrief(p);
+export const summarizePlanForChat = (p: shared.PlanBriefInput): string =>
+  shared.summarizePlanForChat(p);
+export { PLAN_DRAFTING_PLACEHOLDER } from "../../../src/shared/lib/plan-brief.js";
