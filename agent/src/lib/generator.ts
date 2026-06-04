@@ -9,6 +9,7 @@ import type { ContractViolation } from "./project-validator.js";
 import { formatDiagnosticsForPrompt, type TypeDiagnostic } from "./typecheck.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import { getGenerationContext } from "./rag-retrieve.js";
+import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 import { broadcast } from "./event-bus.js";
 import {
   BOILERPLATE_TEMPLATES,
@@ -740,6 +741,11 @@ export const regenerateFileWithTypeErrors = async (
   const errorBlock = formatDiagnosticsForPrompt(diagnostics);
   const hasContracts = Object.keys(contracts).length > 0;
 
+  // Pull a concrete exemplar from past successful fixes for a similar type error.
+  // Advisory only: no match → empty string → prompt is byte-identical to before.
+  const pastFix = buildPastFixBlock(findSimilarFixes(errorBlock, { file: filePath }));
+  const pastFixBlock = pastFix ? `\n${pastFix}\n` : "";
+
   const messages = [
     {
       role: "system" as const,
@@ -753,7 +759,7 @@ Import every custom type you use: import type { X } from "@/types/index".`,
     {
       role: "user" as const,
       content: `File: ${filePath}
-
+${pastFixBlock}
 ## Project Skeleton
 ${skeleton.summary}
 ${hasContracts ? `\n## Dependency Export Contracts (JSON)\n\`\`\`json\n${JSON.stringify(contracts, null, 2)}\n\`\`\`\n` : ""}
