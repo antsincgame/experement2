@@ -10,7 +10,7 @@ import {
   matchesActiveProject,
   resolveChatTargetProject,
   resolveEventProject,
-} from "./ws-scope.js";
+} from "./ws-scope";
 import {
   createEmptyChat,
   migrateCreatingChatToProject,
