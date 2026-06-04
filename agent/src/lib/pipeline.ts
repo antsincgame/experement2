@@ -23,7 +23,7 @@ import { autoFix } from "./auto-fixer.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { validateGeneratedProject, validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
-import { waitForMetroReady } from "./metro-ready.js";
+import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
 import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug, summarizePlanForChat } from "./pipeline-helpers.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
@@ -609,6 +609,13 @@ const _createProjectInner = async (
       buildError = event.error;
     }
   }, true); // clearCache for initial build
+
+  // Expo web compiles lazily — no page request, no bundle, no "Bundled" log, so
+  // the wait below would always time out. Fire the first request to kick off
+  // compilation concurrently with the outcome wait.
+  void triggerMetroBuild(expoPort).catch(() => {
+    // Best-effort: the build-outcome wait still observes the real result.
+  });
 
   // Wait for first build result (success or error)
   await waitForBuildOutcome(

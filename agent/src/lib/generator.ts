@@ -12,6 +12,7 @@ import { getGenerationContext } from "./rag-retrieve.js";
 import { broadcast } from "./event-bus.js";
 import {
   BOILERPLATE_TEMPLATES,
+  getIndexRedirect,
   getRootLayout,
   getTabsLayout,
 } from "../prompts/templates.js";
@@ -328,6 +329,18 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
   if (navType === "tabs") {
     writeFile(projectName, "app/(tabs)/_layout.tsx", getTabsLayout(plan.navigation));
     generatedFiles.push("app/(tabs)/_layout.tsx");
+  }
+
+  // Guarantee a "/" route. Expo web 404s the index when no root route exists
+  // (e.g. a plan with only /login, /transport, /tracking), which the preview
+  // health check reads as a dead Metro and which leaves the iframe blank. If the
+  // plan ships no index route, redirect "/" to the first screen deterministically.
+  const planHasIndexRoute = plan.files.some(
+    (file) => file.path === "app/index.tsx" || file.path === "app/(tabs)/index.tsx"
+  );
+  if (!planHasIndexRoute) {
+    writeFile(projectName, "app/index.tsx", getIndexRedirect(plan.navigation));
+    generatedFiles.push("app/index.tsx");
   }
 
   // Sort files: types → stores → hooks → components → screens

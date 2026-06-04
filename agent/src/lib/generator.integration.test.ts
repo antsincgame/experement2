@@ -86,6 +86,49 @@ describe("generateFiles (integration, injected fake model)", () => {
     expect(requested).toEqual(["src/types/index.ts", "app/index.tsx"]);
   });
 
+  it("writes an index redirect when the plan ships no root route", async () => {
+    const planWithoutIndex = AppPlanSchema.parse({
+      name: "ride",
+      displayName: "Ride",
+      description: "A ride app",
+      navigation: {
+        type: "stack",
+        screens: [{ path: "app/login.tsx", name: "Login", icon: "log-in" }],
+      },
+      files: [
+        { path: "app/login.tsx", type: "screen", description: "login screen", dependencies: [] },
+      ],
+    });
+
+    const files = await generateFiles({
+      projectName,
+      projectPath: getProjectPath(projectName),
+      plan: planWithoutIndex,
+      complete: fakeComplete,
+      semanticRagEnabled: false,
+    });
+
+    expect(files).toContain("app/index.tsx");
+    const index = readFile(projectName, "app/index.tsx") ?? "";
+    expect(index).toContain('import { Redirect } from "expo-router"');
+    expect(index).toContain('href="/login"');
+  });
+
+  it("does NOT overwrite a plan that already provides app/index.tsx", async () => {
+    const files = await generateFiles({
+      projectName,
+      projectPath: getProjectPath(projectName),
+      plan: buildPlan(),
+      complete: fakeComplete,
+      semanticRagEnabled: false,
+    });
+
+    expect(files.filter((file) => file === "app/index.tsx")).toHaveLength(1);
+    const index = readFile(projectName, "app/index.tsx") ?? "";
+    // The model-generated screen, not the redirect stub.
+    expect(index).not.toContain('<Redirect href=');
+  });
+
   it("runs the real sanitizer on generated code (alias collapse + hook import fix)", async () => {
     await generateFiles({
       projectName,

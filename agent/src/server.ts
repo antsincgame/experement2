@@ -17,7 +17,7 @@ import { formatZodError } from "./lib/request-validation.js";
 import { assertLlmUrl } from "./lib/llm-url.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { isErrorReported } from "./lib/reported-error.js";
-import { waitForMetroReady } from "./lib/metro-ready.js";
+import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
 import { projectRouter } from "./routes/project.js";
 import { llmRouter } from "./routes/llm.js";
 import { processRouter } from "./routes/process.js";
@@ -569,6 +569,10 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
               }
             }
           });
+
+          // Expo web bundles lazily; fire the first request so compilation starts
+          // instead of waiting for a request that never comes.
+          void triggerMetroBuild(port).catch(() => {});
 
           // Wait for Metro to actually accept requests before announcing preview.
           // First Expo + Tamagui bundle can take well over 30s on a cold start.

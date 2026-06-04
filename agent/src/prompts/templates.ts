@@ -11,6 +11,35 @@ const getScreenRouteName = (routePath: string): string => {
 const getScreenTitle = (screenName: string): string =>
   screenName.trim().length > 0 ? screenName.trim() : "Screen";
 
+/** Turns a screen file path into the URL expo-router serves it at. */
+const getRouteHref = (routePath: string): string => {
+  const normalized = routePath
+    .replace(/^app\//, "")
+    .replace(/\.(tsx|ts|jsx|js)$/, "")
+    // Route groups like "(tabs)/" are transparent in the URL.
+    .replace(/\([^/]+\)\//g, "")
+    .replace(/(?:^|\/)index$/, "");
+  return normalized.length > 0 ? `/${normalized}` : "/";
+};
+
+/**
+ * Index route that redirects to the first screen. Generated only when a plan has
+ * no root route of its own (no app/index.tsx and no app/(tabs)/index.tsx): expo
+ * web then 404s on "/", which the agent's health check reads as a dead Metro and
+ * which leaves the preview iframe blank. A deterministic redirect guarantees that
+ * "/" always resolves to a real screen.
+ */
+export const getIndexRedirect = (navigation: AppPlan["navigation"]): string => {
+  const firstScreen = navigation?.screens?.[0]?.path ?? "";
+  const href = getRouteHref(firstScreen);
+  return `import { Redirect } from "expo-router";
+
+export default function Index() {
+  return <Redirect href="${href}" />;
+}
+`;
+};
+
 export const getRootLayout = (
   _navigation: AppPlan["navigation"]
 ): string => {
