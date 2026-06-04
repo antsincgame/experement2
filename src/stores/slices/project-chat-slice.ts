@@ -1,11 +1,11 @@
 // Extracts chat and version mutations so project-store no longer owns every domain action inline.
 import {
-  appendPlanStreamContent,
-  createPlanStreamMessage,
   createProcessMessage,
   createReasoningMessage,
   type ChatMessage,
 } from "@/features/chat/schemas/message.schema";
+import { formatPlanBrief, PLAN_DRAFTING_PLACEHOLDER } from "@/shared/lib/plan-brief";
+import type { PlanBriefInput } from "@/shared/lib/plan-brief";
 import {
   applyProjectWorkspaceCache,
   readProjectWorkspaceCache,
@@ -21,20 +21,46 @@ const MAX_PERSISTED_THINKING_CHARS = 16_000;
 const trimMessages = (messages: ChatMessage[]): ChatMessage[] =>
   messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
 
-const upsertPlanStream = (messages: ChatMessage[], chunk: string): ChatMessage[] => {
+const upsertPlanDrafting = (messages: ChatMessage[]): ChatMessage[] => {
+  const hasPlan = messages.some((m) => m.processKind === "plan");
+  if (hasPlan) {
+    return messages;
+  }
+  return trimMessages([
+    ...messages,
+    {
+      ...createProcessMessage("plan", PLAN_DRAFTING_PLACEHOLDER),
+      status: "streaming",
+    },
+  ]);
+};
+
+const applyPlanBrief = (
+  messages: ChatMessage[],
+  plan: Record<string, unknown>,
+  planBrief?: string,
+): ChatMessage[] => {
+  const brief =
+    planBrief?.trim() ||
+    formatPlanBrief(plan as PlanBriefInput);
   const next = [...messages];
   let planIndex = -1;
   for (let index = next.length - 1; index >= 0; index -= 1) {
-    const entry = next[index];
-    if (entry.processKind === "plan" && entry.status === "streaming") {
+    if (next[index].processKind === "plan") {
       planIndex = index;
       break;
     }
   }
+  const entry = {
+    ...(planIndex >= 0 ? next[planIndex] : createProcessMessage("plan", brief)),
+    content: brief,
+    status: "complete" as const,
+    processKind: "plan" as const,
+  };
   if (planIndex >= 0) {
-    next[planIndex] = appendPlanStreamContent(next[planIndex], chunk);
+    next[planIndex] = entry;
   } else {
-    next.push(createPlanStreamMessage(chunk));
+    next.push(entry);
   }
   return trimMessages(next);
 };
@@ -205,58 +231,15 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
       return { streamingContent };
     }),
 
-  appendPlanStreamChunk: (chunk: string, targetProject?: string | null) =>
+  ensurePlanDraftingMessage: (targetProject?: string | null) =>
     set((state) => {
       const target = targetProject ?? state.projectName;
       if (!target) {
         return {};
       }
 
-      const nextStreaming = (readProjectWorkspaceCache(state.projectChats, target).streamingContent + chunk)
-        .slice(-4_000);
-
       if (target === state.projectName) {
-        const messages = upsertPlanStream(state.messages, chunk);
-        return {
-          messages,
-          streamingContent: nextStreaming,
-          projectChats: saveProjectChatPatch(state.projectChats, target, {
-            messages,
-            streamingContent: nextStreaming,
-          }),
-        };
-      }
-
-      const chat = state.projectChats[target] ?? createEmptyChat();
-      const messages = upsertPlanStream(chat.messages, chunk);
-      const projectChats = saveProjectChatPatch(state.projectChats, target, {
-        messages,
-        streamingContent: nextStreaming,
-      });
-      return { projectChats };
-    }),
-
-  finalizePlanStream: (targetProject?: string | null) =>
-    set((state) => {
-      const target = targetProject ?? state.projectName;
-      if (!target) {
-        return {};
-      }
-
-      const finalize = (messages: ChatMessage[]): ChatMessage[] => {
-        const next = [...messages];
-        for (let index = next.length - 1; index >= 0; index -= 1) {
-          const entry = next[index];
-          if (entry.processKind === "plan" && entry.status === "streaming") {
-            next[index] = { ...entry, status: "complete" };
-            break;
-          }
-        }
-        return next;
-      };
-
-      if (target === state.projectName) {
-        const messages = finalize(state.messages);
+        const messages = upsertPlanDrafting(state.messages);
         return {
           messages,
           projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
@@ -264,7 +247,33 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
       }
 
       const chat = state.projectChats[target] ?? createEmptyChat();
-      const messages = finalize(chat.messages);
+      const messages = upsertPlanDrafting(chat.messages);
+      return {
+        projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
+      };
+    }),
+
+  applyPlanBriefToChat: (
+    plan: Record<string, unknown>,
+    planBrief?: string,
+    targetProject?: string | null,
+  ) =>
+    set((state) => {
+      const target = targetProject ?? state.projectName;
+      if (!target) {
+        return {};
+      }
+
+      if (target === state.projectName) {
+        const messages = applyPlanBrief(state.messages, plan, planBrief);
+        return {
+          messages,
+          projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
+        };
+      }
+
+      const chat = state.projectChats[target] ?? createEmptyChat();
+      const messages = applyPlanBrief(chat.messages, plan, planBrief);
       return {
         projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
       };

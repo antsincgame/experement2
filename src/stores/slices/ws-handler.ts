@@ -176,6 +176,7 @@ export const createWsHandler = (
       }
       if (msg.status === "planning") {
         store.resetGenerationFiles();
+        store.ensurePlanDraftingMessage();
       }
       if (msg.previewStatus) {
         applyPreviewStatus(store, msg.previewStatus, {
@@ -199,12 +200,12 @@ export const createWsHandler = (
         break;
       }
       if (!isActive) {
-        store.appendPlanStreamChunk(msg.chunk, target);
+        store.ensurePlanDraftingMessage(target);
         break;
       }
       const planStatus = get().status;
       if (planStatus === "planning" || planStatus === "scaffolding") {
-        store.appendPlanStreamChunk(msg.chunk);
+        store.ensurePlanDraftingMessage();
       }
       break;
     }
@@ -229,9 +230,10 @@ export const createWsHandler = (
           });
         }
         set({ projectChats });
-        store.appendBackgroundMessage(
-          cacheName,
-          createSystemMessage("Plan created [ok]", false)
+        store.applyPlanBriefToChat(
+          plan,
+          typeof msg.planBrief === "string" ? msg.planBrief : undefined,
+          planName ?? cacheName,
         );
         if (planName) {
           const existing = store.projectList.find((p) => p.name === planName);
@@ -283,7 +285,11 @@ export const createWsHandler = (
         }
       }
 
-      store.finalizePlanStream();
+      store.applyPlanBriefToChat(
+        plan,
+        typeof msg.planBrief === "string" ? msg.planBrief : undefined,
+        cacheName ?? planName ?? undefined,
+      );
       store.clearStreamingContent();
       const plannedFileCount = Array.isArray(plan.files) ? plan.files.length : 0;
       emitChat(createProcessMessage(

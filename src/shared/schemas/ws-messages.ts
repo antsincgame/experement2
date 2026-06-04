@@ -69,6 +69,8 @@ export const PlanChunkMessageSchema = z.object({
 export const PlanCompleteMessageSchema = z.object({
   type: z.literal("plan_complete"),
   plan: z.record(z.string(), z.unknown()),
+  planBrief: z.string().optional(),
+  blueprintPath: z.string().optional(),
 }).merge(OperationScopedMessageSchema);
 
 export const ScaffoldCompleteMessageSchema = z.object({

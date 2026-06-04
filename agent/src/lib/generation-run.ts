@@ -5,8 +5,8 @@ import {
   resolveFixModel,
   resolveGenerationModel,
 } from "./model-roles.js";
-import { summarizePlanForChat } from "./pipeline-helpers.js";
-import { createPipelineEmitter, type PipelineEmitter } from "./pipeline-emitter.js";
+import { formatPlanBriefForChat } from "./plan-brief.js";
+import { createPipelineEmitter } from "./pipeline-emitter.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { runCodegenAndShip, type CodegenShipResult } from "./pipeline-codegen-phase.js";
 import { getProjectResumeStatus } from "./generation-state.js";
@@ -86,7 +86,13 @@ export const executeCodegenRun = async (
 
   if (mode === "resume") {
     const resume = getProjectResumeStatus(projectName);
-    emitter.emit({ type: "plan_complete", plan: { ...plan, name: projectName } });
+    emitter.emit({
+      type: "plan_complete",
+      plan: { ...plan, name: projectName },
+      planBrief: formatPlanBriefForChat(plan),
+      blueprintPath: ".appfactory/blueprint.json",
+      briefPath: ".appfactory/blueprint-brief.md",
+    });
     emitter.emit({
       type: "thinking",
       content: resumeThinking(
@@ -135,6 +141,3 @@ export const executeCodegenRun = async (
   });
 };
 
-export const emitPlanBrief = (emitter: PipelineEmitter, plan: AppPlan): void => {
-  emitter.emit({ type: "thinking", content: summarizePlanForChat(plan) });
-};

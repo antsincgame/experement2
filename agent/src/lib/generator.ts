@@ -5,6 +5,7 @@ import { writeFile, readFile } from "../services/file-manager.js";
 import path from "path";
 import { buildProjectSkeleton, extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
+import { formatPlanBriefForModels } from "./plan-brief.js";
 import type { ContractViolation } from "./project-validator.js";
 import { formatDiagnosticsForPrompt, type TypeDiagnostic } from "./typecheck.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
@@ -62,25 +63,22 @@ export const buildPlanContext = (
   plan: AppPlan,
   fileSpec: AppPlan["files"][number]
 ): string => {
-  const themeStyle = plan.theme?.style ?? "premium";
-  const navType = plan.navigation?.type ?? "stack";
-  const manifest = plan.files.map((f) => `- ${f.path} (${f.type})`).join("\n");
   const depSpecs = fileSpec.dependencies
     .map((dep) => plan.files.find((f) => f.path === dep))
     .filter((f): f is AppPlan["files"][number] => Boolean(f))
     .map((f) => `- ${f.path} (${f.type}): ${f.description}`);
 
   const sections = [
-    "## App",
-    `Name: ${plan.displayName} (${plan.name})`,
-    `Description: ${plan.description}`,
-    `Theme: ${themeStyle}; Navigation: ${navType}`,
+    "## Product blueprint (primary — read before coding)",
+    formatPlanBriefForModels(plan),
     "",
-    "## File Manifest (every file in this app)",
-    manifest,
+    "## Your assignment",
+    `Path: ${fileSpec.path}`,
+    `Type: ${fileSpec.type}`,
+    `Spec: ${fileSpec.description}`,
   ];
   if (depSpecs.length > 0) {
-    sections.push("", "## This file's dependencies (intent)", depSpecs.join("\n"));
+    sections.push("", "## Direct dependencies (must match imports)", depSpecs.join("\n"));
   }
   return sections.join("\n");
 };

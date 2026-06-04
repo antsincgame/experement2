@@ -124,8 +124,12 @@ export interface ProjectStateActions {
   setPendingProjectName: (name: string | null) => void;
   setPendingCreationRequestId: (requestId: string | null) => void;
   appendStreamingContent: (chunk: string) => void;
-  appendPlanStreamChunk: (chunk: string, targetProject?: string | null) => void;
-  finalizePlanStream: (targetProject?: string | null) => void;
+  ensurePlanDraftingMessage: (targetProject?: string | null) => void;
+  applyPlanBriefToChat: (
+    plan: Record<string, unknown>,
+    planBrief?: string,
+    targetProject?: string | null,
+  ) => void;
   appendReasoningMessage: (thinking: string, targetProject?: string | null) => void;
   completeFileMessage: (filepath: string, targetProject?: string | null) => void;
   syncProjectWorkspace: (

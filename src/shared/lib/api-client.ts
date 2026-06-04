@@ -278,6 +278,18 @@ class ApiClient {
     );
   }
 
+  getProjectBlueprint<T = Record<string, unknown>>(projectName: string): Promise<T> {
+    return this.getData<T>(
+      `/api/projects/${encodeURIComponent(projectName)}/blueprint`,
+    );
+  }
+
+  getProjectBlueprintBrief(projectName: string): Promise<{ format: string; content: string }> {
+    return this.getData<{ format: string; content: string }>(
+      `/api/projects/${encodeURIComponent(projectName)}/blueprint/brief`,
+    );
+  }
+
   listProjectFiles(projectName: string): Promise<string[]> {
     return this.getData<string[]>(
       `/api/projects/${encodeURIComponent(projectName)}/all-files`

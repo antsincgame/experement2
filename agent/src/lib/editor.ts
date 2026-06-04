@@ -7,6 +7,7 @@ import {
   getProjectPath,
 } from "../services/file-manager.js";
 import { buildProjectSkeleton } from "./context-builder.js";
+import { loadPlanBrief } from "./plan-artifact.js";
 import { parseStream } from "./stream-parser.js";
 import { EditActionSchema, type EditAction } from "../schemas/edit-action.schema.js";
 import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
@@ -85,6 +86,7 @@ export const editProject = async (
 
   const projectPath = getProjectPath(projectName);
   const skeleton = buildProjectSkeleton(projectPath);
+  const planBrief = loadPlanBrief(projectName);
   const recentChat = chatHistory.slice(-5);
 
   // ── STEP 1: Analyze ──────────────────────────────────
@@ -93,7 +95,7 @@ export const editProject = async (
     ...recentChat.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     {
       role: "user" as const,
-      content: `/no_think\nProject skeleton:\n${skeleton.summary}\n\nUser request: ${userRequest}`,
+      content: `/no_think\n${planBrief ? `Product blueprint:\n${planBrief}\n\n` : ""}Project skeleton:\n${skeleton.summary}\n\nUser request: ${userRequest}`,
     },
   ];
 

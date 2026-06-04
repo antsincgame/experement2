@@ -18,9 +18,10 @@ import {
   resolvePlannerModel,
 } from "./model-roles.js";
 import { autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
+import { formatPlanBriefForChat } from "./plan-brief.js";
 import { saveGenerationState, advanceGenerationCheckpoint } from "./generation-state.js";
 import { createPipelineEmitter } from "./pipeline-emitter.js";
-import { emitPlanBrief, executeCodegenRun } from "./generation-run.js";
+import { executeCodegenRun } from "./generation-run.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { createDefaultContext } from "./pipeline-types.js";
 import { runProjectQualityGates } from "./pipeline-gates.js";
@@ -160,7 +161,7 @@ const _createProjectInner = async (
     maxTokens,
     topP,
     complete,
-    onChunk: (chunk) => emitPreSlug({ type: "plan_chunk", chunk }),
+    // Raw plan JSON is not streamed to chat — only saved to .appfactory/blueprint.json.
   });
 
   autoHealPlanDependencies(plan);
@@ -175,8 +176,13 @@ const _createProjectInner = async (
   saveGenerationState(projectSlug, finalizedPlan, "planned");
 
   const emitter = createPipelineEmitter(projectSlug, ctx.broadcast, requestId);
-  emitter.emit({ type: "plan_complete", plan: finalizedPlan });
-  emitPlanBrief(emitter, plan);
+  emitter.emit({
+    type: "plan_complete",
+    plan: finalizedPlan,
+    planBrief: formatPlanBriefForChat(plan),
+    blueprintPath: ".appfactory/blueprint.json",
+    briefPath: ".appfactory/blueprint-brief.md",
+  });
 
   emitter.emit({ type: "status", status: "scaffolding" });
 

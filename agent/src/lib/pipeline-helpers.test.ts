@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
+import { summarizePlanForChat } from "./plan-brief.js";
 import {
   summarizeOutput,
   dedupeProjectSlug,
   autoHealPlanDependencies,
-  summarizePlanForChat,
 } from "./pipeline-helpers.js";
 
 type PlanFile = AppPlan["files"][number];
@@ -37,7 +37,7 @@ describe("summarizePlanForChat", () => {
     expect(summary).toContain("**2** screen");
     expect(summary).toContain("**NoteCard.tsx**");
     expect(summary).toContain("noteStore.ts");
-    expect(summary).toContain("**zustand**");
+    expect(summary).toContain("`zustand`");
     expect(summary).toContain("**5 files**");
   });
 
@@ -62,8 +62,7 @@ describe("summarizePlanForChat", () => {
     expect(summary).toContain("tabs");
     expect(summary).toContain("**index.tsx**");
     expect(summary).toContain("List of notes with search");
-    expect(summary).toContain("What happens next");
-    expect(summary).toContain("scaffold");
+    expect(summary).toContain("blueprint-brief.md");
   });
 });
 

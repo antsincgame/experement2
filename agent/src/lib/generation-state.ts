@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { getProjectPath, readFile as readProjectFile } from "../services/file-manager.js";
+import { savePlanBlueprint } from "./plan-artifact.js";
 
 const STATE_DIR = ".appfactory";
 const STATE_FILE = "generation-state.json";
@@ -77,6 +78,7 @@ export const saveGenerationState = (
   plan: AppPlan,
   checkpoint: GenerationCheckpoint,
 ): void => {
+  savePlanBlueprint(projectName, plan);
   persistState(projectName, {
     version: 1,
     plan,

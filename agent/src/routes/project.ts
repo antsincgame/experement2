@@ -13,6 +13,7 @@ import {
   ProjectParamsSchema,
 } from "../schemas/runtime-input.schema.js";
 import { getProjectResumeStatus } from "../lib/generation-state.js";
+import { loadPlanBlueprint, loadPlanBrief } from "../lib/plan-artifact.js";
 import {
   getFileTree,
   readFile,
@@ -163,6 +164,52 @@ projectRouter.get("/:name/file", (req, res) => {
       code: "INVALID_INPUT",
     });
   }
+});
+
+projectRouter.get("/:name/blueprint", (req, res) => {
+  const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+  if (!params) {
+    return;
+  }
+
+  if (!projectExists(params.name)) {
+    res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
+    return;
+  }
+
+  const blueprint = loadPlanBlueprint(params.name);
+  if (!blueprint) {
+    res.status(404).json({
+      error: "No blueprint saved for this project",
+      code: "BLUEPRINT_NOT_FOUND",
+    });
+    return;
+  }
+
+  res.json({ data: blueprint });
+});
+
+projectRouter.get("/:name/blueprint/brief", (req, res) => {
+  const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+  if (!params) {
+    return;
+  }
+
+  if (!projectExists(params.name)) {
+    res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
+    return;
+  }
+
+  const brief = loadPlanBrief(params.name);
+  if (!brief) {
+    res.status(404).json({
+      error: "No blueprint brief for this project",
+      code: "BRIEF_NOT_FOUND",
+    });
+    return;
+  }
+
+  res.json({ data: { format: "markdown", content: brief } });
 });
 
 projectRouter.get("/:name/status", (req, res) => {

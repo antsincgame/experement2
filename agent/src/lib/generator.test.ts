@@ -30,24 +30,24 @@ describe("buildPlanContext", () => {
     ],
   } as unknown as AppPlan;
 
-  it("includes the app header and a full file manifest", () => {
+  it("leads with the product blueprint narrative", () => {
     const ctx = buildPlanContext(plan, plan.files[0]);
-    expect(ctx).toContain("Name: Notes (notes)");
-    expect(ctx).toContain("Theme: premium; Navigation: tabs");
-    expect(ctx).toContain("- app/(tabs)/index.tsx (screen)");
-    expect(ctx).toContain("- src/types/index.ts (type)");
+    expect(ctx).toContain("Product blueprint");
+    expect(ctx).toContain("# Notes");
+    expect(ctx).toContain("List screen");
+    expect(ctx).toContain("blueprint.json");
   });
 
-  it("lists only the target file's direct dependency intent, not all descriptions", () => {
+  it("highlights the current file and direct dependency specs", () => {
     const ctx = buildPlanContext(plan, plan.files[0]);
+    expect(ctx).toContain("Your assignment");
+    expect(ctx).toContain("Path: app/(tabs)/index.tsx");
     expect(ctx).toContain("- src/stores/noteStore.ts (store): Zustand store with CRUD");
-    // The unrelated types file's description is NOT inlined as a dependency intent.
-    expect(ctx).not.toContain("(type): Domain types");
   });
 
   it("omits the dependency section when the file has no dependencies", () => {
     const ctx = buildPlanContext(plan, plan.files[2]);
-    expect(ctx).not.toContain("This file's dependencies");
+    expect(ctx).not.toContain("Direct dependencies");
   });
 });
 

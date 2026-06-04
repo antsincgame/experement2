@@ -176,35 +176,36 @@ const createHarness = () => {
     setPendingProjectName: (pendingProjectName) => setState({ pendingProjectName }),
     setPendingCreationRequestId: (pendingCreationRequestId) => setState({ pendingCreationRequestId }),
     appendStreamingContent: (chunk) => setState((current) => ({ streamingContent: current.streamingContent + chunk })),
-    appendPlanStreamChunk: (chunk) => setState((current) => {
-      const messages = [...current.messages];
-      const planIndex = messages.findIndex(
-        (m) => m.processKind === "plan" && m.status === "streaming",
-      );
-      if (planIndex >= 0) {
-        messages[planIndex] = {
-          ...messages[planIndex],
-          content: messages[planIndex].content + chunk,
-        };
-      } else {
-        messages.push({
-          id: "plan",
-          role: "assistant",
-          content: chunk,
-          processKind: "plan",
-          status: "streaming",
-          timestamp: 1,
-        });
+    ensurePlanDraftingMessage: () => setState((current) => {
+      if (current.messages.some((m) => m.processKind === "plan")) {
+        return {};
       }
       return {
-        messages,
-        streamingContent: current.streamingContent + chunk,
+        messages: [
+          ...current.messages,
+          {
+            id: "plan-draft",
+            role: "assistant" as const,
+            content: "Drafting the blueprint…",
+            processKind: "plan" as const,
+            status: "streaming" as const,
+            timestamp: 1,
+          },
+        ],
       };
     }),
-    finalizePlanStream: () => setState((current) => ({
-      messages: current.messages.map((m) =>
-        m.processKind === "plan" ? { ...m, status: "complete" as const } : m
-      ),
+    applyPlanBriefToChat: (plan, planBrief) => setState((current) => ({
+      messages: [
+        ...current.messages.filter((m) => m.processKind !== "plan"),
+        {
+          id: "plan-brief",
+          role: "assistant" as const,
+          content: planBrief ?? String((plan as { displayName?: string }).displayName ?? "Plan"),
+          processKind: "plan" as const,
+          status: "complete" as const,
+          timestamp: 1,
+        },
+      ],
     })),
     clearStreamingContent: () => setState({ streamingContent: "" }),
     startGenerationFile: (path) => setState((current) => ({
@@ -348,7 +349,7 @@ describe("createWsHandler", () => {
     });
   });
 
-  it("streams plan chunks into chat during planning", () => {
+  it("shows a drafting placeholder during planning instead of raw JSON", () => {
     const harness = createHarness();
     harness.getState().setStatus("planning");
 
@@ -356,17 +357,12 @@ describe("createWsHandler", () => {
       type: "plan_chunk",
       requestId: REQUEST_ID,
       projectName: "alpha",
-      chunk: '{"name":',
-    });
-    harness.handle({
-      type: "plan_chunk",
-      requestId: REQUEST_ID,
-      projectName: "alpha",
-      chunk: '"app"}',
+      chunk: '{"name":"secret-app"}',
     });
 
     const planMessage = harness.getState().messages.find((m) => m.processKind === "plan");
-    expect(planMessage?.content).toBe('{"name":"app"}');
+    expect(planMessage?.content).toContain("Drafting the blueprint");
+    expect(planMessage?.content).not.toContain("secret-app");
     expect(planMessage?.status).toBe("streaming");
   });
 
