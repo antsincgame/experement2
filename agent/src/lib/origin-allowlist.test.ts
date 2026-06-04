@@ -13,6 +13,18 @@ describe("isOriginAllowed", () => {
     expect(isOriginAllowed("https://attacker.test", allowed)).toBe(false);
   });
 
+  it("allows any loopback http port in default dev mode", () => {
+    const original = process.env.AGENT_ALLOWED_ORIGINS;
+    delete process.env.AGENT_ALLOWED_ORIGINS;
+    expect(isOriginAllowed("http://localhost:8099", ["http://localhost:8081"])).toBe(true);
+    expect(isOriginAllowed("http://127.0.0.1:19006", ["http://localhost:8081"])).toBe(true);
+    if (original === undefined) {
+      delete process.env.AGENT_ALLOWED_ORIGINS;
+    } else {
+      process.env.AGENT_ALLOWED_ORIGINS = original;
+    }
+  });
+
   it("allows clients that send no Origin (native/CLI — not the cross-site threat)", () => {
     expect(isOriginAllowed(undefined, allowed)).toBe(true);
     expect(isOriginAllowed("", allowed)).toBe(true);
@@ -42,6 +54,7 @@ describe("getAllowedOrigins", () => {
       "http://localhost:8081",
       "http://localhost:8082",
       "http://127.0.0.1:8081",
+      "http://127.0.0.1:8082",
     ]);
   });
 });

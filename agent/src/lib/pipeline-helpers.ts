@@ -25,8 +25,6 @@ export const dedupeProjectSlug = (
   return slug;
 };
 
-export { formatPlanBriefForChat, summarizePlanForChat } from "./plan-brief.js";
-
 /**
  * Auto-heal the plan: for every src/ or app/ dependency referenced by a planned
  * file but missing from plan.files, append an inferred file entry. Mutates

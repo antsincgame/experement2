@@ -711,6 +711,17 @@ const shutdown = (): void => {
   setTimeout(() => process.exit(0), 1000).unref();
 };
 
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `[Agent] Port ${PORT} is already in use. Stop the other agent process or set AGENT_PORT.`
+    );
+  } else {
+    console.error("[Agent] Server error:", err.message);
+  }
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, async () => {
   console.log(`[Agent] Server: http://${HOST}:${PORT}`);
   console.log(`[Agent] WebSocket: ws://${HOST}:${PORT}`);

@@ -29,6 +29,7 @@ interface HomeScreenContentProps {
   handleCreate: (text: string) => void;
   handleEnhance: () => void;
   handleOpenProject: (name: string) => void;
+  agentHttpReachable: boolean | null;
   inputFocused: boolean;
   isConnected: boolean;
   isCreating: boolean;
@@ -50,6 +51,7 @@ export const HomeScreenContent = ({
   handleCreate,
   handleEnhance,
   handleOpenProject,
+  agentHttpReachable,
   inputFocused,
   isConnected,
   isCreating,
@@ -177,7 +179,11 @@ export const HomeScreenContent = ({
           {!isConnected && (
             <View className="w-full max-w-2xl px-6 mb-3">
               <Text style={{ fontSize: 12, color: "#FF3366", textAlign: "center" }}>
-                Agent offline — start the backend with npm run dev
+                {agentHttpReachable === true
+                  ? "Agent runs but WebSocket is blocked — refresh the page or run npm run dev from the repo root (Expo :8081, agent :3100)"
+                  : agentHttpReachable === false
+                    ? "Agent offline — from the repo root run: npm run dev"
+                    : "Connecting to agent…"}
               </Text>
             </View>
           )}

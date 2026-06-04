@@ -43,7 +43,33 @@ export const useHomeScreenController = () => {
   const [enhanceError, setEnhanceError] = useState<string | null>(null);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [diskProjects, setDiskProjects] = useState<ProjectListItem[]>([]);
+  const [agentHttpReachable, setAgentHttpReachable] = useState<boolean | null>(null);
   const enhanceErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isConnected) {
+      setAgentHttpReachable(true);
+      return;
+    }
+
+    let cancelled = false;
+    const probe = async (): Promise<void> => {
+      const ok = await apiClient.pingAgentHealth();
+      if (!cancelled) {
+        setAgentHttpReachable(ok);
+      }
+    };
+
+    void probe();
+    const interval = setInterval(() => {
+      void probe();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isConnected, agentUrl]);
 
   useEffect(() => {
     // A creation can fail with only the placeholder slug still active (the
@@ -203,6 +229,7 @@ export const useHomeScreenController = () => {
     handleEnhance,
     handleOpenProject,
     inputFocused,
+    agentHttpReachable,
     isConnected,
     isCreating,
     lmStudioStatus,

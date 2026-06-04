@@ -355,6 +355,19 @@ class ApiClient {
     }
   }
 
+  async pingAgentHealth(timeoutMs = 3000): Promise<boolean> {
+    try {
+      const url = this.buildUrl(this.getAgentUrl(), "/health");
+      const response = await fetch(url, {
+        method: "GET",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   async testAgentConnection(timeoutMs = 5000): Promise<void> {
     if (typeof WebSocket === "undefined") {
       throw new Error("WebSocket is not available in this environment");

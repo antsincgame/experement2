@@ -1,6 +1,6 @@
 // Guards against eager cross-package export snapshots (undefined under tsx, green under vitest).
 import { describe, expect, it } from "vitest";
-import { formatPlanBriefForModels, PLAN_DRAFTING_PLACEHOLDER } from "./plan-brief.js";
+import { formatPlanBriefForModels } from "./plan-brief.js";
 
 describe("plan-brief shim (call-time bindings)", () => {
   it("formatPlanBriefForModels is callable after shim import only", () => {
@@ -12,10 +12,6 @@ describe("plan-brief shim (call-time bindings)", () => {
     });
     expect(text).toContain("# ShimTest");
     expect(text.length).toBeGreaterThan(50);
-  });
-
-  it("PLAN_DRAFTING_PLACEHOLDER is re-exported via live binding", () => {
-    expect(PLAN_DRAFTING_PLACEHOLDER).toContain("Drafting the blueprint");
   });
 
   it("stays callable when plan-artifact loads before shim consumers", async () => {

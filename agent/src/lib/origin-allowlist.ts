@@ -9,7 +9,21 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:8081",
   "http://localhost:8082",
   "http://127.0.0.1:8081",
+  "http://127.0.0.1:8082",
 ];
+
+/** Expo web may land on any loopback port when 8081 is busy — allow in default dev mode. */
+export const isLoopbackHttpOrigin = (origin: string): boolean => {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    );
+  } catch {
+    return false;
+  }
+};
 
 /** Allowed origins from AGENT_ALLOWED_ORIGINS (csv), or the localhost defaults. */
 export const getAllowedOrigins = (): string[] =>
@@ -32,5 +46,12 @@ export const isOriginAllowed = (
   if (!origin) {
     return true;
   }
-  return allowed.includes(origin);
+  if (allowed.includes(origin)) {
+    return true;
+  }
+  // Default dev: any http loopback port (Expo :8083, etc.). Strict csv when AGENT_ALLOWED_ORIGINS is set.
+  if (!process.env.AGENT_ALLOWED_ORIGINS && isLoopbackHttpOrigin(origin)) {
+    return true;
+  }
+  return false;
 };

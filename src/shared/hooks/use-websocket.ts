@@ -295,10 +295,7 @@ const initializeRuntime = (): void => {
     ensureConnected();
   });
 
-  runtime.initialConnectTimer = setTimeout(() => {
-    getRuntime().initialConnectTimer = undefined;
-    ensureConnected();
-  }, 500);
+  ensureConnected();
 };
 
 export const disposeWebSocketRuntime = (): void => {
