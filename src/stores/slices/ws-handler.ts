@@ -2,6 +2,7 @@
 import {
   CREATING_PROJECT_SLUG,
   getPlannedProjectSlug,
+  isCreatingRoute,
   isCreationSession,
   isPendingCreation,
 } from "@/shared/lib/creation-flow";
@@ -44,6 +45,11 @@ const getMessageProjectName = (msg: IncomingWsMessage): string | null =>
     ? msg.projectName
     : null;
 
+const getMessageRequestId = (msg: IncomingWsMessage): string | null =>
+  "requestId" in msg && typeof msg.requestId === "string"
+    ? msg.requestId
+    : null;
+
 const matchesActiveProject = (
   store: StoreGet,
   msg: IncomingWsMessage
@@ -57,7 +63,21 @@ const matchesActiveProject = (
   const currentProjectName = state.projectName;
 
   if (isCreationSession(state)) {
-    return true;
+    // During creation the active slug is the "__creating__" placeholder while
+    // events already carry the real (planner-resolved) name, so name matching
+    // can't be used yet. Scope by the creation's requestId instead: only events
+    // from THIS create_project belong here — a previous/background run's late
+    // events carry a different requestId and must be dropped.
+    const creationRequestId = state.pendingCreationRequestId;
+    if (!creationRequestId) {
+      return true; // backwards-compatible: no requestId tracked → legacy behavior
+    }
+    const messageRequestId = getMessageRequestId(msg);
+    if (messageRequestId) {
+      return messageRequestId === creationRequestId;
+    }
+    // No requestId on the event: accept only early unscoped/placeholder events.
+    return !messageProjectName || isCreatingRoute(messageProjectName);
   }
 
   if (!currentProjectName) {
@@ -330,7 +350,7 @@ export const createWsHandler = (
         break;
       }
 
-      set({ projectName, pendingProjectName: null });
+      set({ projectName, pendingProjectName: null, pendingCreationRequestId: null });
       store.addMessage(createSystemMessage("Project scaffolded from cache [ok]", true));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
@@ -578,12 +598,25 @@ export const createWsHandler = (
       }
       const creationState = get();
       if (isPendingCreation(creationState.pendingProjectName)) {
-        const planned = getPlannedProjectSlug(creationState.plan);
-        if (planned && pName !== planned) {
+        // Drop a different run's project_created (different requestId).
+        const creationRequestId = creationState.pendingCreationRequestId;
+        const messageRequestId = getMessageRequestId(msg);
+        if (creationRequestId && messageRequestId && messageRequestId !== creationRequestId) {
           log({
             level: "warn",
             source: "pipeline",
-            message: `Ignoring project_created for ${pName} (planned: ${planned})`,
+            message: `Ignoring project_created for ${pName} (foreign requestId)`,
+          });
+          break;
+        }
+        // Our own project_created always arrives after plan_complete, so the plan
+        // must already name the project. If it doesn't yet, this isn't ours.
+        const planned = getPlannedProjectSlug(creationState.plan);
+        if (!planned || pName !== planned) {
+          log({
+            level: "warn",
+            source: "pipeline",
+            message: `Ignoring project_created for ${pName} (planned: ${planned ?? "none"})`,
           });
           break;
         }

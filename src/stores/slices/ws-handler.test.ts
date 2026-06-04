@@ -61,6 +61,7 @@ vi.mock("@/features/chat/schemas/message.schema", () => ({
 }));
 
 const REQUEST_ID = "7f34af80-790f-42d7-8ff5-5de444ce7127";
+const FOREIGN_REQUEST_ID = "9a9a9a9a-1111-4222-8333-444444444444";
 const BUILD_ID = "11111111-1111-4111-8111-111111111111";
 
 const createHarness = () => {
@@ -96,6 +97,7 @@ const createHarness = () => {
     isConnected: true,
     lmStudioStatus: "connected",
     pendingProjectName: null,
+    pendingCreationRequestId: null,
     streamingContent: "",
     fileTreeVisible: true,
     terminalVisible: true,
@@ -150,6 +152,7 @@ const createHarness = () => {
     setConnected: (isConnected) => setState({ isConnected }),
     setLmStudioStatus: (lmStudioStatus) => setState({ lmStudioStatus }),
     setPendingProjectName: (pendingProjectName) => setState({ pendingProjectName }),
+    setPendingCreationRequestId: (pendingCreationRequestId) => setState({ pendingCreationRequestId }),
     appendStreamingContent: (chunk) => setState((current) => ({ streamingContent: current.streamingContent + chunk })),
     clearStreamingContent: () => setState({ streamingContent: "" }),
     startGenerationFile: (path) => setState((current) => ({
@@ -335,5 +338,87 @@ describe("createWsHandler", () => {
     expect(harness.getState().previewStatus).toBe("error");
     expect(harness.getState().previewUrl).toBeNull();
     expect(harness.getState().previewPort).toBeNull();
+  });
+
+  // ── Creation-session scoping (H1) ──
+  const startCreationSession = (harness: ReturnType<typeof createHarness>) => {
+    harness.getState().setProjectName("__creating__");
+    harness.getState().setPendingProjectName("__creating__");
+    harness.getState().setPendingCreationRequestId(REQUEST_ID);
+    harness.getState().setStatus("planning");
+  };
+
+  it("ignores a stale event from a previous run during creation (foreign requestId)", () => {
+    const harness = createHarness();
+    startCreationSession(harness);
+
+    // A late event from an OLD run (different requestId) must not mutate status.
+    harness.handle({
+      type: "status",
+      requestId: FOREIGN_REQUEST_ID,
+      projectName: "old-project",
+      status: "generating",
+    });
+
+    expect(harness.getState().status).toBe("planning");
+  });
+
+  it("accepts events from THIS creation (matching requestId)", () => {
+    const harness = createHarness();
+    startCreationSession(harness);
+
+    harness.handle({
+      type: "status",
+      requestId: REQUEST_ID,
+      projectName: "my-app",
+      status: "generating",
+    });
+
+    expect(harness.getState().status).toBe("generating");
+  });
+
+  // ── project_created gate (H2) ──
+  it("ignores project_created from a foreign requestId while creating", () => {
+    const harness = createHarness();
+    startCreationSession(harness);
+    harness.getState().setPlan({ name: "my-app" });
+
+    harness.handle({
+      type: "project_created",
+      requestId: FOREIGN_REQUEST_ID,
+      projectName: "old-project",
+      port: 8081,
+    });
+
+    expect(harness.getState().projectName).toBe("__creating__");
+  });
+
+  it("ignores project_created that arrives before the plan is ready", () => {
+    const harness = createHarness();
+    startCreationSession(harness); // plan stays null
+
+    harness.handle({
+      type: "project_created",
+      requestId: REQUEST_ID,
+      projectName: "old-project",
+      port: 8081,
+    });
+
+    expect(harness.getState().projectName).toBe("__creating__");
+  });
+
+  it("accepts project_created for the planned project of this creation", () => {
+    const harness = createHarness();
+    startCreationSession(harness);
+    harness.getState().setPlan({ name: "my-app" });
+
+    harness.handle({
+      type: "project_created",
+      requestId: REQUEST_ID,
+      projectName: "my-app",
+      port: 8081,
+    });
+
+    expect(harness.getState().projectName).toBe("my-app");
   });
 });

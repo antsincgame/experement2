@@ -9,6 +9,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import {
   CREATING_PENDING_KEY,
   CREATING_PROJECT_SLUG,
+  isCreatingRoute,
 } from "@/shared/lib/creation-flow";
 import { isGenerationActive } from "@/shared/lib/generation-status";
 import { hydrateStoredProjects } from "./workspace-flow";
@@ -25,6 +26,7 @@ export const useHomeScreenController = () => {
   const addProject = useProjectStore((state) => state.addProject);
   const reset = useProjectStore((state) => state.reset);
   const setPendingProjectName = useProjectStore((state) => state.setPendingProjectName);
+  const setPendingCreationRequestId = useProjectStore((state) => state.setPendingCreationRequestId);
   const switchProject = useProjectStore((state) => state.switchProject);
   const setProjectName = useProjectStore((state) => state.setProjectName);
   const setPlan = useProjectStore((state) => state.setPlan);
@@ -50,12 +52,18 @@ export const useHomeScreenController = () => {
         .filter(m => m.isError).at(-1);
       setCreationError(lastError?.content.slice(0, 200) ?? "Project creation failed");
       setPendingProjectName(null);
+      setPendingCreationRequestId(null);
       setProjectName(null);
       setStatus("idle");
+      // Creation failed before a real project existed: leave the /project/__creating__
+      // placeholder route so the user lands back on a functional home screen.
+      if (isCreatingRoute(useProjectStore.getState().projectName) || projectName === CREATING_PROJECT_SLUG) {
+        router.replace("/");
+      }
     } else if (status !== "error") {
       setCreationError(null);
     }
-  }, [status, pendingProjectName, projectName, setPendingProjectName, setStatus]);
+  }, [status, pendingProjectName, projectName, router, setPendingCreationRequestId, setPendingProjectName, setProjectName, setStatus]);
 
   useEffect(() => {
     const loadProjects = async (): Promise<void> => {
@@ -148,7 +156,10 @@ export const useHomeScreenController = () => {
     setPendingProjectName(CREATING_PENDING_KEY);
     setStatus("planning");
     addMessage(createUserMessage(trimmed));
-    createProject(trimmed);
+    // Scope this creation's WS events by its requestId so a previous run's late
+    // events can't hijack the new session.
+    const requestId = createProject(trimmed);
+    setPendingCreationRequestId(requestId);
     router.replace(`/project/${encodeURIComponent(CREATING_PROJECT_SLUG)}`);
   }, [
     addMessage,
@@ -156,6 +167,7 @@ export const useHomeScreenController = () => {
     isCreating,
     router,
     setPendingProjectName,
+    setPendingCreationRequestId,
     setPlan,
     switchProject,
     setStatus,

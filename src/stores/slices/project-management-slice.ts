@@ -27,6 +27,9 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
 
   setPlan: (plan: Record<string, unknown> | null) => set({ plan }),
 
+  setPendingCreationRequestId: (pendingCreationRequestId: string | null) =>
+    set({ pendingCreationRequestId }),
+
   addProject: (entry: ProjectEntry) =>
     set((state) => ({
       projectList: [
@@ -73,6 +76,7 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
       isConnected: false,
       lmStudioStatus: "checking",
       pendingProjectName: null,
+      pendingCreationRequestId: null,
       streamingContent: "",
       fileTreeVisible: true,
       terminalVisible: true,

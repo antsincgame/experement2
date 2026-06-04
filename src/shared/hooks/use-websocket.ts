@@ -28,6 +28,10 @@ interface WsRuntime {
   socket?: WebSocket;
   messageQueue?: string[];
   settingsUnsubscribe?: () => void;
+  // Number of mounted useWebSocket consumers. The hook mounts in the app shell
+  // AND in home/project screens; tearing the socket down on every screen unmount
+  // caused reconnect churn. Dispose only when the last consumer unmounts.
+  mountCount?: number;
 }
 
 const createRequestId = (): string => crypto.randomUUID();
@@ -309,9 +313,17 @@ export const disposeWebSocketRuntime = (): void => {
 
 export const useWebSocket = () => {
   useEffect(() => {
+    const runtime = getRuntime();
+    runtime.mountCount = (runtime.mountCount ?? 0) + 1;
     initializeRuntime();
     return () => {
-      disposeWebSocketRuntime();
+      const current = getRuntime();
+      current.mountCount = Math.max(0, (current.mountCount ?? 1) - 1);
+      // Keep the single shared socket alive while any consumer (e.g. the app
+      // shell) is still mounted; only tear down when the last one unmounts.
+      if (current.mountCount === 0) {
+        disposeWebSocketRuntime();
+      }
     };
   }, []);
 
@@ -341,12 +353,14 @@ export const useWebSocket = () => {
     }
   }, []);
 
-  const createProject = useCallback((description: string) => {
+  const createProject = useCallback((description: string): string => {
     const { lmStudioUrl, model, plannerModel, editorModel, embeddingModel, semanticRagEnabled, temperature, maxTokens, topP } =
       useSettingsStore.getState();
+    // Return the requestId so the caller can scope WS events to THIS creation.
+    const requestId = createRequestId();
     send({
       type: "create_project",
-      requestId: createRequestId(),
+      requestId,
       description,
       lmStudioUrl,
       ...(model ? { model } : {}),
@@ -358,6 +372,7 @@ export const useWebSocket = () => {
       maxTokens,
       topP,
     });
+    return requestId;
   }, [send]);
 
   const iterate = useCallback((userRequest: string) => {

@@ -53,6 +53,7 @@ const initialState = {
   isConnected: false,
   lmStudioStatus: "checking" as const,
   pendingProjectName: null,
+  pendingCreationRequestId: null,
   streamingContent: "",
   fileTreeVisible: true,
   terminalVisible: true,

@@ -77,6 +77,9 @@ export interface ProjectStateData {
   isConnected: boolean;
   lmStudioStatus: "connected" | "disconnected" | "checking";
   pendingProjectName: string | null;
+  // requestId of the in-flight create_project, used to scope WS events to THIS
+  // creation so stale/background events from a previous run can't mutate it.
+  pendingCreationRequestId: string | null;
   streamingContent: string;
   fileTreeVisible: boolean;
   terminalVisible: boolean;
@@ -110,6 +113,7 @@ export interface ProjectStateActions {
   setConnected: (connected: boolean) => void;
   setLmStudioStatus: (status: "connected" | "disconnected" | "checking") => void;
   setPendingProjectName: (name: string | null) => void;
+  setPendingCreationRequestId: (requestId: string | null) => void;
   appendStreamingContent: (chunk: string) => void;
   clearStreamingContent: () => void;
   startGenerationFile: (path: string) => void;
