@@ -34,10 +34,9 @@ const firstSentence = (text: string, max = 110): string => {
 };
 
 /**
- * Build a warm, human-readable design brief of the plan for the chat "reasoning"
- * bubble, so the user reads it like a senior engineer describing the build —
- * not a raw file list. Per-screen intent comes from the model's own descriptions
- * (zero extra tokens). Keeps the labeled summary lines stable for downstream UI.
+ * Bolt.new-style design brief for the chat reasoning bubble — first-person,
+ * conversational, screen-by-screen story. Uses the model's own descriptions
+ * (no extra LLM call).
  */
 export const summarizePlanForChat = (plan: AppPlan): string => {
   const byType = (type: string): AppPlan["files"] =>
@@ -50,33 +49,63 @@ export const summarizePlanForChat = (plan: AppPlan): string => {
   const navType = plan.navigation?.type ?? "stack";
   const themeStyle = plan.theme?.style ?? "premium";
 
-  const lines: string[] = [`Planned **${plan.displayName}** — ${plan.description}`];
+  const lines: string[] = [
+    "**Here's the blueprint I'm locking in.**",
+    "",
+    `**${plan.displayName}** — ${firstSentence(plan.description, 160)}`,
+    "",
+    `I'm going for a **${themeStyle}** feel with **${navType}** navigation.`,
+  ];
 
-  // One-line "what we're building" sentence so the brief reads conversationally.
-  const pieces: string[] = [`a ${themeStyle} ${navType} app`];
-  if (screens.length > 0) pieces.push(`${screens.length} screen${screens.length > 1 ? "s" : ""}`);
-  if (components.length > 0) pieces.push(`${components.length} reusable component${components.length > 1 ? "s" : ""}`);
-  if (stores.length > 0) pieces.push(`${stores.length} Zustand store${stores.length > 1 ? "s" : ""}`);
-  lines.push("", `Building ${pieces.join(", ")}.`, "");
-
+  const scope: string[] = [];
   if (screens.length > 0) {
-    lines.push(`Screens (${screens.length}):`);
-    for (const screen of screens) {
-      lines.push(`• ${fileLabel(screen.path)} — ${firstSentence(screen.description)}`);
-    }
+    scope.push(`**${screens.length}** screen${screens.length > 1 ? "s" : ""}`);
   }
   if (components.length > 0) {
-    lines.push(`Components (${components.length}): ${components.map((f) => fileLabel(f.path)).join(", ")}`);
+    scope.push(
+      `**${components.length}** UI piece${components.length > 1 ? "s" : ""} you can reuse`,
+    );
   }
+  if (stores.length > 0) {
+    scope.push(`**${stores.length}** Zustand store${stores.length > 1 ? "s" : ""}`);
+  }
+  if (hooks.length > 0) {
+    scope.push(`**${hooks.length}** hook${hooks.length > 1 ? "s" : ""}`);
+  }
+  if (scope.length > 0) {
+    lines.push("", `On the board: ${scope.join(", ")}.`);
+  }
+
+  if (screens.length > 0) {
+    lines.push("", "**How you'll move through the app:**");
+    for (const screen of screens) {
+      lines.push(`• **${fileLabel(screen.path)}** — ${firstSentence(screen.description)}`);
+    }
+  }
+
+  if (components.length > 0) {
+    const names = components.map((f) => `**${fileLabel(f.path)}**`).join(", ");
+    lines.push("", `Shared UI: ${names}.`);
+  }
+
   if (stores.length > 0 || hooks.length > 0) {
-    const state = [...stores, ...hooks].map((f) => fileLabel(f.path)).join(", ");
-    lines.push(`State & logic: ${state}`);
+    const state = [...stores, ...hooks].map((f) => `\`${fileLabel(f.path)}\``).join(", ");
+    lines.push("", `State & logic live in ${state}.`);
   }
+
   if (plan.extraDependencies.length > 0) {
-    lines.push(`Libraries: ${plan.extraDependencies.join(", ")}`);
+    lines.push("", `Pulling in **${plan.extraDependencies.join("**, **")}** where it helps.`);
   }
-  lines.push(`Total: ${plan.files.length} files.`);
-  lines.push("", "Scaffolding the project, then writing each file with a live preview as it builds.");
+
+  lines.push(
+    "",
+    "**What happens next (you'll see it in the chat):**",
+    "1. I lock this blueprint and scaffold the Expo + Tamagui shell.",
+    "2. I write every file in order — you'll get a bubble per file with what I'm building.",
+    "3. Contract check → quality gates → Metro preview you can click.",
+    "",
+    `That's **${plan.files.length} files** on the board. The timeline below is the live script.`,
+  );
   return lines.join("\n");
 };
 

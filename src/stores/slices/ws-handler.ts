@@ -25,6 +25,14 @@ import {
   type ChatMessage,
 } from "@/features/chat/schemas/message.schema";
 import { formatBuildEventLine } from "@/shared/lib/format-build-event";
+import {
+  formatFileWritingNarration,
+  formatGenerationDoneNarration,
+  formatPhaseChatNarration,
+  formatPlanLockedNarration,
+  formatPreviewReadyNarration,
+  formatScaffoldReadyNarration,
+} from "@/shared/lib/chat-narration";
 import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -125,12 +133,24 @@ export const createWsHandler = (
       const statusProject = getMessageProjectName(msg);
       if (!matchesActiveProject(get, msg)) {
         if (statusProject) {
+          const bgPrevious =
+            get().projectList.find((p) => p.name === statusProject)?.status ?? null;
           patchProjectListEntry(set, get, statusProject, { status: msg.status });
           // Mirror phase transitions into the background project's chat cache so
           // returning to it shows a complete timeline, not just the final state.
-          const phaseLabel = GENERATION_STATUS_LABELS[msg.status];
-          if (phaseLabel) {
-            store.appendBackgroundMessage(statusProject, createProcessMessage("phase", phaseLabel));
+          const bgChat = get().projectChats[statusProject];
+          const bgPlan = bgChat?.plan ?? null;
+          const phaseText = formatPhaseChatNarration(
+            msg.status,
+            {
+              displayName:
+                typeof bgPlan?.displayName === "string" ? bgPlan.displayName : undefined,
+              projectName: statusProject,
+            },
+            bgPrevious,
+          ) ?? GENERATION_STATUS_LABELS[msg.status];
+          if (phaseText) {
+            store.appendBackgroundMessage(statusProject, createProcessMessage("phase", phaseText));
           }
         } else if (get().projectName) {
           log({ level: "warn", source: "ws", message: `Ignored unscoped status event: ${msg.status}` });
@@ -140,9 +160,18 @@ export const createWsHandler = (
       const previousStatus = get().status;
       store.setStatus(msg.status);
       if (previousStatus !== msg.status) {
-        const phaseLabel = GENERATION_STATUS_LABELS[msg.status];
-        if (phaseLabel) {
-          emitChat(createProcessMessage("phase", phaseLabel));
+        const plan = get().plan;
+        const phaseText = formatPhaseChatNarration(
+          msg.status,
+          {
+            displayName:
+              typeof plan?.displayName === "string" ? plan.displayName : undefined,
+            projectName: get().projectName ?? undefined,
+          },
+          previousStatus,
+        ) ?? GENERATION_STATUS_LABELS[msg.status];
+        if (phaseText) {
+          emitChat(createProcessMessage("phase", phaseText));
         }
       }
       if (msg.status === "planning") {
@@ -256,10 +285,10 @@ export const createWsHandler = (
 
       store.finalizePlanStream();
       store.clearStreamingContent();
-      const plannedFileCount = Array.isArray(plan.files) ? plan.files.length : "?";
+      const plannedFileCount = Array.isArray(plan.files) ? plan.files.length : 0;
       emitChat(createProcessMessage(
         "phase",
-        `Plan locked — **${displayName ?? planName ?? "project"}** (${plannedFileCount} files). Scaffolding…`,
+        formatPlanLockedNarration(displayName ?? planName ?? "project", plannedFileCount),
       ));
       log({ level: "info", source: "pipeline", message: "Plan complete" });
       break;
@@ -312,7 +341,7 @@ export const createWsHandler = (
       }
 
       set({ projectName, pendingProjectName: null, pendingCreationRequestId: null });
-      emitChat(createProcessMessage("phase", `Scaffold ready — \`${projectName}\``));
+      emitChat(createProcessMessage("phase", formatScaffoldReadyNarration(projectName)));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
       break;
@@ -338,7 +367,7 @@ export const createWsHandler = (
       }
       emitChat(createProcessMessage(
         "file",
-        `Writing \`${msg.filepath}\` (${Math.round(msg.progress * 100)}%)`,
+        formatFileWritingNarration(msg.filepath, msg.progress, get().plan),
       ));
       break;
     }
@@ -373,9 +402,7 @@ export const createWsHandler = (
 
     case "generation_complete":
       if (isActive) store.clearStreamingContent();
-      emitChat(createAssistantMessage(
-        `Done — wrote ${msg.filesCount} files. Spinning up the live preview now…`
-      ));
+      emitChat(createAssistantMessage(formatGenerationDoneNarration(msg.filesCount)));
       log({ level: "info", source: "generator", message: `Generated ${msg.filesCount} files` });
       break;
 
@@ -445,7 +472,12 @@ export const createWsHandler = (
         });
         store.setStatus("ready");
         if (prevPort !== msg.port) {
-          store.addMessage(createAssistantMessage(`Preview started on port ${msg.port}.`));
+          const plan = get().plan;
+          const previewName =
+            typeof plan?.displayName === "string" ? plan.displayName : undefined;
+          store.addMessage(
+            createAssistantMessage(formatPreviewReadyNarration(msg.port, previewName)),
+          );
         }
         if (currentProject) {
           void fetchProjectFiles(currentProject);

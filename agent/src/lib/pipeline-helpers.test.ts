@@ -33,12 +33,12 @@ describe("summarizePlanForChat", () => {
 
     const summary = summarizePlanForChat(plan);
 
-    expect(summary).toContain("Planned **Notes**");
-    expect(summary).toContain("Screens (2)");
-    expect(summary).toContain("Components (1): NoteCard.tsx");
-    expect(summary).toContain("State & logic: noteStore.ts");
-    expect(summary).toContain("Libraries: zustand");
-    expect(summary).toContain("Total: 5 files.");
+    expect(summary).toContain("**Notes**");
+    expect(summary).toContain("**2** screen");
+    expect(summary).toContain("**NoteCard.tsx**");
+    expect(summary).toContain("noteStore.ts");
+    expect(summary).toContain("**zustand**");
+    expect(summary).toContain("**5 files**");
   });
 
   it("reads as a design brief: a 'Building …' sentence and per-screen intent", () => {
@@ -58,10 +58,12 @@ describe("summarizePlanForChat", () => {
 
     const summary = summarizePlanForChat(plan);
 
-    expect(summary).toContain("Building a premium tabs app");
-    expect(summary).toContain("1 reusable component");
-    expect(summary).toContain("\u2022 index.tsx \u2014 List of notes with search.");
-    expect(summary).toContain("Scaffolding the project");
+    expect(summary).toContain("premium");
+    expect(summary).toContain("tabs");
+    expect(summary).toContain("**index.tsx**");
+    expect(summary).toContain("List of notes with search");
+    expect(summary).toContain("What happens next");
+    expect(summary).toContain("scaffold");
   });
 });
 
