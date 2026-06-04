@@ -38,6 +38,9 @@ const ERROR_PATTERNS = [
 ] as const;
 
 const FILE_LINE_PATTERN = /(?:at\s+)?([^\s(]+\.(?:tsx?|jsx?|css|json)):(\d+)/;
+/** Metro SyntaxError: `D:/proj/src/Foo.tsx: message (line:col)` */
+const SYNTAX_ERROR_FILE_PATTERN =
+  /SyntaxError:\s*(.+\.(?:tsx?|jsx?)):\s*.+\((\d+):(\d+)\)/i;
 const METRO_FILE_PATTERN = /(?:in|from)\s+['"]?([^\s'"]+\.(?:tsx?|jsx?))['"]?/;
 const UNABLE_RESOLVE_PATTERN = /Unable to resolve module\s+["']?([^"'\s]+)["']?.*from\s+["']?([^"'\s:]+)["']?/;
 
@@ -127,6 +130,14 @@ export const parseMetroError = (output: string): ParsedError | null => {
     // Never let a non-fatal Tamagui bailout define the error type/file/stack.
     if (isNonFatalLine(l)) {
       continue;
+    }
+
+    const syntaxLine = l.replace(/\\/g, "/");
+    const syntaxMatch = syntaxLine.match(SYNTAX_ERROR_FILE_PATTERN);
+    if (syntaxMatch && file === "unknown") {
+      errorType = l.trim();
+      file = syntaxMatch[1];
+      line = syntaxMatch[2];
     }
 
     for (const pattern of ERROR_PATTERNS) {

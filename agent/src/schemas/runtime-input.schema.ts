@@ -164,7 +164,8 @@ export const WsIterateSchema = z.object({
   userRequest: trimmedString("userRequest", 20_000),
   chatHistory: z.array(UserAssistantMessageSchema)
     .max(200, "chatHistory is too long")
-    .default([]),
+    .default([])
+    .transform((items) => items.filter((item) => item.content.trim().length > 0)),
   lmStudioUrl: OptionalHttpUrlSchema,
   model: OptionalModelSchema,
   editorModel: OptionalModelSchema,

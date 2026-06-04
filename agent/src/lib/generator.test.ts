@@ -82,6 +82,14 @@ describe("sanitizeGeneratedCode", () => {
     expect(sanitizeGeneratedCode(`import { Tabs } from "expo-router/tabs";`)).toContain(`from "expo-router"`);
   });
 
+  it("repairs bg= typos inside pressStyle object literals", () => {
+    const out = sanitizeGeneratedCode(
+      'pressStyle={{ scale: 0.95, bg="$gray2" }} hoverStyle={{ bg="$gray3" }}',
+    );
+    expect(out).toContain('bg: "$gray2"');
+    expect(out).toContain('bg: "$gray3"');
+  });
+
   it("hoists React.useX to a named react import when React is not imported", () => {
     const out = sanitizeGeneratedCode("const C = () => { const [n] = React.useState(0); return n; };");
     expect(out).toContain(`from "react"`);

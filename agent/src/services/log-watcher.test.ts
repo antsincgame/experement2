@@ -21,6 +21,17 @@ describe("parseMetroError", () => {
     expect(result!.type).toContain("Cannot find module");
   });
 
+  it("parses SyntaxError with absolute Windows project path", () => {
+    const output =
+      "SyntaxError: D:/projects/experement2/workspace/markdown-notes/src/components/Toolbar.tsx: Invalid shorthand property initializer. (55:43)";
+    const result = parseMetroError(output);
+    expect(result).not.toBeNull();
+    expect(result!.file).toBe(
+      "D:/projects/experement2/workspace/markdown-notes/src/components/Toolbar.tsx",
+    );
+    expect(result!.line).toBe("55");
+  });
+
   it('parses "SyntaxError" with file and line number', () => {
     const output = [
       "SyntaxError: Unexpected token (12:5)",

@@ -9,6 +9,8 @@ import { applySearchReplace } from "./search-replace.js";
 import { isUnsafeEditPath } from "./editor.js";
 import { getBareModuleName } from "./generation-contract.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
+import { applyDeterministicCodeRepairs } from "./code-style-repairs.js";
+import { toEditableProjectPath } from "./project-file-path.js";
 
 export interface MetroError {
   type: string;
@@ -85,6 +87,9 @@ export const getErrorHint = (raw: string): string => {
   if (raw.includes("TS2305")) {
     return "HINT: You imported a member that does not exist in the module. Pressable does NOT exist in 'tamagui' — import it from 'react-native'. View/Text do NOT exist in 'tamagui' — use YStack/XStack/Text from 'tamagui'.";
   }
+  if (raw.includes("Invalid shorthand property initializer") || raw.includes("TS1312")) {
+    return 'HINT: Inside pressStyle/hoverStyle object literals use colons: `bg: "$gray2"` not `bg="$gray2"`. Tamagui Separator uses `vertical` prop, not `orientation="vertical"`.';
+  }
   return "";
 };
 
@@ -102,10 +107,13 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
 
   const projectPath = getProjectPath(projectName);
 
+  const resolvedFile = toEditableProjectPath(error.file) || error.file?.trim() || "";
+  const errorForFix = { ...error, file: resolvedFile };
+
   // Non-actionable errors (Metro timeouts, crashes with no source location) parse to
   // file "unknown". Feeding those to the model just produces garbage SEARCH/REPLACE
   // blocks (often echoing stack-trace paths), so bail out early with a clear reason.
-  const targetFile = error.file?.trim();
+  const targetFile = resolvedFile;
   if (!targetFile || targetFile === "unknown" || isUnsafeEditPath(targetFile)) {
     // When the failing file is inside node_modules, the bundle broke in a dependency,
     // not project code — autofix can't edit it. Most often a native-only module that
@@ -128,18 +136,27 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
     };
   }
 
+  const existing = readFile(projectName, targetFile);
+  if (existing) {
+    const repaired = applyDeterministicCodeRepairs(existing);
+    if (repaired !== existing) {
+      writeFile(projectName, targetFile, repaired);
+      return { success: true, attempts: 0 };
+    }
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     onAttempt?.(attempt, maxAttempts);
 
     const skeleton = buildProjectSkeleton(projectPath);
-    const fileContent = readFile(projectName, error.file) ?? "// file not found";
+    const fileContent = readFile(projectName, targetFile) ?? "// file not found";
 
-    const errorHint = getErrorHint(error.raw);
+    const errorHint = getErrorHint(errorForFix.raw);
 
     // Surface a concrete "this error → this fix" exemplar from past successful
     // autofixes. Advisory only: no match means an empty string and a byte-identical prompt.
     const pastFix = buildPastFixBlock(
-      findSimilarFixes(error.raw, { file: error.file })
+      findSimilarFixes(errorForFix.raw, { file: targetFile })
     );
     const pastFixBlock = pastFix ? `${pastFix}\n\n` : "";
 
@@ -147,7 +164,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
       { role: "system" as const, content: SYSTEM_AUTOFIX },
       {
         role: "user" as const,
-        content: `/no_think\n${pastFixBlock}Project skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro/TypeScript error:\n${error.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
+        content: `/no_think\n${pastFixBlock}Project skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${targetFile} ===\n${fileContent}\n\nMetro/TypeScript error:\n${errorForFix.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
       },
     ];
 

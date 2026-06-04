@@ -9,6 +9,7 @@ import {
 import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isCreatingRoute } from "@/shared/lib/creation-flow";
+import { buildIterateChatHistory } from "@/shared/lib/iterate-chat-history";
 
 const logError = (source: string, message: string, details?: string) => {
   useSettingsStore.getState().addErrorLog({ level: "error", source, message, details });
@@ -380,15 +381,7 @@ export const useWebSocket = () => {
       return;
     }
 
-    const chatHistory = messages
-      .filter((message): message is ChatMessage & { role: "user" | "assistant" } => (
-        !message.isHidden &&
-        (message.role === "user" || message.role === "assistant")
-      ))
-      .map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
+    const chatHistory = buildIterateChatHistory(messages);
 
     const { lmStudioUrl, model, editorModel, temperature, maxTokens, topP } = useSettingsStore.getState();
     send({

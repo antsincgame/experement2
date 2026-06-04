@@ -13,6 +13,7 @@ import { getGenerationContext } from "./rag-retrieve.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 import { buildGoldenExampleBlock } from "./golden-examples.js";
 import { composeTeachingContext } from "./teaching-context.js";
+import { applyDeterministicCodeRepairs } from "./code-style-repairs.js";
 import { broadcast } from "./event-bus.js";
 import {
   BOILERPLATE_TEMPLATES,
@@ -175,6 +176,8 @@ export const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   result = ensureDefaultExport(result, filePath);
   result = normalizeImportDeclarations(result);
 
+  result = applyDeterministicCodeRepairs(result);
+
   // Fix: React.useState/useEffect/useCallback → direct import (if React not imported)
   if (result.includes("React.use") && !result.includes("import React")) {
     const reactHooks = new Set<string>();
@@ -288,6 +291,13 @@ export const extractCodeFromResponse = (response: string): { filepath: string; c
 
 /** Marker written when a file's first generation returned empty; triggers full regen. */
 const EMPTY_FILE_PLACEHOLDER = "// EMPTY — awaiting retry";
+
+/** Do not replace a substantial on-disk file with an EMPTY stub when LLM fails. */
+const shouldPreserveExistingOnFailure = (existing: string | null | undefined): boolean => {
+  if (!existing?.trim()) return false;
+  if (existing.includes(EMPTY_FILE_PLACEHOLDER)) return false;
+  return existing.length > 80;
+};
 
 interface EmptyRegenContext {
   projectName: string;
@@ -586,8 +596,15 @@ Generate the complete code for: ${fileSpec.path}`;
           generatedFiles.push(fileSpec.path);
         }
       } else {
-        console.warn(`[Generator] Empty/tiny code for ${fileSpec.path} (${code.length} chars) — will fully regenerate`);
-        writeFile(projectName, fileSpec.path, `${EMPTY_FILE_PLACEHOLDER}\n`);
+        const existing = readFile(projectName, fileSpec.path);
+        if (shouldPreserveExistingOnFailure(existing)) {
+          console.warn(
+            `[Generator] Empty/tiny LLM output for ${fileSpec.path} — keeping existing ${existing!.length} chars`,
+          );
+        } else {
+          console.warn(`[Generator] Empty/tiny code for ${fileSpec.path} (${code.length} chars) — will fully regenerate`);
+          writeFile(projectName, fileSpec.path, `${EMPTY_FILE_PLACEHOLDER}\n`);
+        }
         if (!generatedFiles.includes(fileSpec.path)) {
           generatedFiles.push(fileSpec.path);
         }
@@ -602,7 +619,7 @@ Generate the complete code for: ${fileSpec.path}`;
         message: `⚠️ ${fileSpec.path}: ${message.slice(0, 220)} — will retry in heal pass`,
       });
       const existing = readFile(projectName, fileSpec.path);
-      if (!existing || !existing.includes(EMPTY_FILE_PLACEHOLDER)) {
+      if (!shouldPreserveExistingOnFailure(existing) && !existing?.includes(EMPTY_FILE_PLACEHOLDER)) {
         writeFile(projectName, fileSpec.path, `${EMPTY_FILE_PLACEHOLDER}\n`);
       }
       if (!generatedFiles.includes(fileSpec.path)) {
