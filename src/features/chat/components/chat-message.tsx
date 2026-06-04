@@ -48,7 +48,15 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
   const isStreaming = message.status === "streaming";
   const isError = message.isError === true;
   // Actionable = points at a real source file the editor can open and fix.
-  const isActionableError = typeof message.errorFile === "string" && message.errorFile.trim().length > 0;
+  const errorBlob = `${message.content}\n${message.errorDetails ?? ""}`;
+  const isSelfHealingBuildNoise =
+    /could not fix after|metro build timed out|preview failed to start/i.test(errorBlob);
+  const isIterateOrEditorFailure =
+    /unrecoverable json|plan validation failed|applied 0 changes/i.test(errorBlob);
+  const isActionableError =
+    (typeof message.errorFile === "string" && message.errorFile.trim().length > 0) ||
+    (message.isError === true && isIterateOrEditorFailure) ||
+    (message.isError === true && !isSelfHealingBuildNoise && errorBlob.trim().length > 0);
 
   if (isError && !isUser) {
     return (
@@ -157,6 +165,10 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
                   Fix this file
                 </Text>
               </Pressable>
+            ) : isIterateOrEditorFailure ? (
+              <Text style={{ color: "#8888AA", fontSize: 10, fontStyle: "italic" }}>
+                Describe the fix in chat — the agent will retry iteration.
+              </Text>
             ) : (
               <Text style={{ color: "#8888AA", fontSize: 10, fontStyle: "italic" }}>
                 Auto-recovered during build — no action needed.
