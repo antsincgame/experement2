@@ -9,6 +9,11 @@
 // This config runs only the UI/state specs that pass deterministically, so the gate
 // is trustworthy. The full suite still runs locally via playwright.e2e.config.ts;
 // re-add specs here as live preview rendering is stabilized.
+//
+// web-project-deletion is intentionally EXCLUDED: its "Clear All" test deletes the
+// shared e2e-existing-project fixture from disk mid-run, so a later test in the same
+// file expects a fixture that no longer exists — order-dependent and unfit for a
+// shared-backend gate. Run it locally; the underlying spec ordering is tracked.
 import { defineConfig } from "@playwright/test";
 import base from "./playwright.e2e.config";
 
@@ -17,7 +22,6 @@ export default defineConfig({
   testMatch: [
     "**/web-settings-persistence.spec.ts",
     "**/web-navigation-stability.spec.ts",
-    "**/web-project-deletion.spec.ts",
     "**/web-preview-error-state.spec.ts",
   ],
 });
