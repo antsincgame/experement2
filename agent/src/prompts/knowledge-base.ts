@@ -96,6 +96,43 @@ The 'data' prop MUST exactly match this TS interface to prevent TS2322:
 { labels: string[], datasets: { data: number[], color?: (opacity: number) => string, strokeWidth?: number }[] }
 Hex/RGBA values are allowed inside chartConfig because this is third-party library config, not Tamagui styling.
 Example: <LineChart data={{ labels: ["A"], datasets: [{ data: [1] }] }} width={300} height={200} chartConfig={{ backgroundColor: "#fff", color: (o = 1) => \`rgba(0,0,0,\${o})\` }} />`,
+  navigation: `## 📚 RAG DOCS: EXPO-ROUTER NAVIGATION (FILE-BASED)
+1. ROUTES = FILES under app/. app/index.tsx = "/", app/profile.tsx = "/profile". A root app/index.tsx ("/") MUST exist or Expo web 404s a blank preview.
+2. LAYOUTS: app/_layout.tsx renders <Stack>; tab apps add app/(tabs)/_layout.tsx with <Tabs>. Route groups like (tabs) are invisible in the URL.
+3. STACK: import { Stack } from "expo-router"; <Stack screenOptions={{ headerShown: false }} />. Per-screen: <Stack.Screen name="profile" options={{ title: "Profile" }} />.
+4. TABS: import { Tabs } from "expo-router"; <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color }) => <Icon name="home" color={color} /> }} />. The name = the file segment, not a path.
+5. LINK (declarative): import { Link } from "expo-router"; <Link href="/profile">Profile</Link>, or <Link href="/profile" asChild><Button>Go</Button></Link>. typedRoutes is ON, so href must be a real route.
+6. ROUTER (imperative): import { useRouter } from "expo-router"; const router = useRouter(); router.push("/profile"); router.back(); router.replace("/").
+7. DYNAMIC ROUTE: file app/item/[id].tsx. Navigate type-safely with href={{ pathname: "/item/[id]", params: { id } }}. Read params via const { id } = useLocalSearchParams<{ id: string }>().
+8. NEVER import @react-navigation or use NavigationContainer/createStackNavigator — expo-router owns routing.`,
+
+  lists: `## 📚 RAG DOCS: LISTS & ASYNC DATA STATES
+1. LONG/DYNAMIC LISTS: use FlatList from "react-native" (Tamagui has no list). Do NOT .map() large arrays into a ScrollView.
+   <FlatList data={items} keyExtractor={(it) => it.id} renderItem={({ item }) => <Row item={item} />} contentContainerStyle={{ padding: 16, gap: 12 }} />
+2. keyExtractor MUST return a stable string id — never the array index for a list that can reorder or delete.
+3. LOAD: const [items, setItems] = useState<Todo[]>([]); const [loading, setLoading] = useState(true); useEffect(() => { todos.getAll().then(setItems).finally(() => setLoading(false)); }, []).
+4. EMPTY STATE: pass ListEmptyComponent={<YStack ai="center" p="$6"><Text color="$color10">Nothing yet</Text></YStack>}; render it only when !loading.
+5. LOADING: show <Spinner /> (tamagui) or <ActivityIndicator /> (react-native) while loading — not together with the empty state.
+6. MUTATE: after save/remove, update BOTH the data layer AND state (setItems(...)) so the list updates without a reload.
+7. SECTIONS: SectionList with sections={[{ title, data }]} + renderSectionHeader; separators via ItemSeparatorComponent.`,
+
+  stateZustand: `## 📚 RAG DOCS: ZUSTAND STATE MANAGEMENT
+NOTE: add "zustand" to the plan dependencies (known-safe extra). For small screen-local state, plain useState is enough — use Zustand for state shared across screens.
+1. STORE: import { create } from "zustand"; interface CartState { items: Item[]; add: (i: Item) => void } export const useCart = create<CartState>((set) => ({ items: [], add: (i) => set((s) => ({ items: [...s.items, i] })) })).
+2. SELECT NARROW: const items = useCart((s) => s.items) — subscribe to ONE field per call. Avoid const { items } = useCart(), which re-renders on every state change.
+3. ACTIONS IN STORE: define setters inside create(); only ever update via set() (a shallow merge). Never mutate state objects directly.
+4. ASYNC + PERSIST: inside an action, await @/services/db (kv.get / collection.getAll), then set(...). On every mutation, write through to the data layer AND set(...).
+5. NO PROVIDER: a store is just a hook — import and call it anywhere. Do NOT wrap the app in a context provider for it.
+6. DERIVED DATA: compute in the selector (useCart((s) => s.items.length)) or during render — do not duplicate it as extra state.`,
+
+  gesturesMotion: `## 📚 RAG DOCS: GESTURES, MOTION, SAFE AREA & IMAGES
+1. SAFE AREA: import { SafeAreaView } from "react-native-safe-area-context" (NOT react-native). Wrap screen roots, or use useSafeAreaInsets() for manual padding. The provider is already mounted in the root layout.
+2. KEYBOARD: wrap forms in <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}> (react-native); use <ScrollView keyboardShouldPersistTaps="handled"> so taps register while the keyboard is open.
+3. SIMPLE MOTION: prefer Tamagui animation / enterStyle / exitStyle / pressStyle (see the animations doc). Use Reanimated only for gesture-driven or continuous animation.
+4. REANIMATED: import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from "react-native-reanimated". const x = useSharedValue(0); const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] })); set x.value = withTiming(100). Read/write .value only in handlers/effects/worklets, never in render.
+5. GESTURES: import { GestureDetector, Gesture } from "react-native-gesture-handler". const pan = Gesture.Pan().onUpdate((e) => { x.value = e.translationX }); <GestureDetector gesture={pan}><Animated.View style={style} /></GestureDetector>. Do NOT use the legacy PanGestureHandler/Swipeable APIs.
+6. IMAGES: <Image source={{ uri }} style={{ width, height }} /> from react-native is always available; bundle local assets with require("../assets/x.png"). For caching/blurhash, add "expo-image" to deps and import { Image } from "expo-image".
+7. ACCESSIBILITY: give pressables accessibilityRole="button" and an accessibilityLabel; always label icon-only buttons so screen readers (and tests) can find them.`,
 };
 
 export const getRelevantDocs = (description: string, dependencies: string[]): string => {
@@ -110,6 +147,10 @@ export const getRelevantDocs = (description: string, dependencies: string[]): st
   if (text.match(/save|persist|store|data|list|todo|note|task|track|history|favorite|expense|budget|item|record|crud|collection/)) docs.push(KNOWLEDGE_BASE.persistence);
   if (text.match(/sqlite|database|db|sql|offline/)) docs.push(KNOWLEDGE_BASE.sqlite);
   if (text.match(/chart|stat|analytic|graph/)) docs.push(KNOWLEDGE_BASE.charts);
+  if (text.match(/navigat|route|router|screen|tabs|stack|link|expo-router|back button/)) docs.push(KNOWLEDGE_BASE.navigation);
+  if (text.match(/flatlist|sectionlist|feed|infinite|pagination|long list|scroll list|render list/)) docs.push(KNOWLEDGE_BASE.lists);
+  if (text.match(/zustand|global state|shared state|state management|app store/)) docs.push(KNOWLEDGE_BASE.stateZustand);
+  if (text.match(/gesture|swipe|drag|reanimat|safe ?area|keyboard|image|photo|avatar|carousel/)) docs.push(KNOWLEDGE_BASE.gesturesMotion);
 
   return docs.join("\n\n");
 };
