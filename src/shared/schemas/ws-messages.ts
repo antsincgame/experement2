@@ -71,6 +71,7 @@ export const PlanCompleteMessageSchema = z.object({
   plan: z.record(z.string(), z.unknown()),
   planBrief: z.string().optional(),
   blueprintPath: z.string().optional(),
+  briefPath: z.string().optional(),
 }).merge(OperationScopedMessageSchema);
 
 export const ScaffoldCompleteMessageSchema = z.object({
