@@ -6,6 +6,7 @@ import { Check, FileCode2 } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
 import { buildFileMeanings, type FileMeaning } from "@/shared/lib/generation-narration";
 import {
+  GENERATION_PHASE_RANK,
   GENERATION_STATUS_LABELS,
   isGenerationActive,
 } from "@/shared/lib/generation-status";
@@ -20,16 +21,6 @@ const PHASES: { key: ProjectStatus; label: string }[] = [
   { key: "building", label: "Build" },
   { key: "ready", label: "Ready" },
 ];
-
-const PHASE_RANK: Record<string, number> = {
-  planning: 0,
-  scaffolding: 1,
-  generating: 2,
-  analyzing: 3,
-  validating: 4,
-  building: 5,
-  ready: 6,
-};
 
 interface FileCardProps {
   file: FileMeaning;
@@ -82,11 +73,11 @@ const FileCard = ({ file }: FileCardProps) => {
 };
 
 const PhaseTimeline = ({ status }: { status: ProjectStatus }) => {
-  const currentRank = PHASE_RANK[status] ?? 0;
+  const currentRank = GENERATION_PHASE_RANK[status] ?? 0;
   return (
     <View className="flex-row items-center gap-1 mb-3 flex-wrap">
       {PHASES.map((phase, index) => {
-        const rank = PHASE_RANK[phase.key] ?? 0;
+        const rank = GENERATION_PHASE_RANK[phase.key] ?? 0;
         const isDone = rank < currentRank || status === "ready";
         const isActive = rank === currentRank && status !== "ready";
         const color = isActive ? "#00E5FF" : isDone ? "#00FF88" : "#5A5A72";

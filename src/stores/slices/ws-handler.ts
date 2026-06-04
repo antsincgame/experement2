@@ -33,7 +33,10 @@ import {
   formatPreviewReadyNarration,
   formatScaffoldReadyNarration,
 } from "@/shared/lib/chat-narration";
-import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
+import {
+  GENERATION_STATUS_LABELS,
+  shouldAdvanceGenerationStatus,
+} from "@/shared/lib/generation-status";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
 import type {
@@ -158,6 +161,14 @@ export const createWsHandler = (
         break;
       }
       const previousStatus = get().status;
+      if (!shouldAdvanceGenerationStatus(previousStatus, msg.status)) {
+        log({
+          level: "warn",
+          source: "status",
+          message: `Ignored regressive status ${previousStatus} → ${msg.status}`,
+        });
+        break;
+      }
       store.setStatus(msg.status);
       if (previousStatus !== msg.status) {
         const plan = get().plan;
@@ -347,6 +358,10 @@ export const createWsHandler = (
       }
 
       set({ projectName, pendingProjectName: null, pendingCreationRequestId: null });
+      if (shouldAdvanceGenerationStatus(get().status, "generating")) {
+        store.setStatus("generating");
+      }
+      patchProjectListEntry(set, get, projectName, { status: "generating" });
       emitChat(createProcessMessage("phase", formatScaffoldReadyNarration(projectName)));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
@@ -433,6 +448,13 @@ export const createWsHandler = (
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
       } else if (eventType === "build_success") {
         log({ level: "info", source: "metro", message: "Build success" });
+        if (isActive && shouldAdvanceGenerationStatus(get().status, "building")) {
+          store.setStatus("building");
+          const activeProject = get().projectName;
+          if (activeProject) {
+            patchProjectListEntry(set, get, activeProject, { status: "building" });
+          }
+        }
       } else {
         log({ level: "info", source: "metro", message: msg.message || eventType });
       }

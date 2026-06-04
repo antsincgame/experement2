@@ -527,6 +527,39 @@ describe("createWsHandler", () => {
     expect(harness.getState().status).toBe("generating");
   });
 
+  it("advances status to generating on scaffold_complete when stuck on scaffolding", () => {
+    const harness = createHarness();
+    startCreationSession(harness);
+    harness.getState().setPlan({ name: "spark-dating" });
+    harness.getState().setStatus("scaffolding");
+
+    harness.handle({
+      type: "scaffold_complete",
+      requestId: REQUEST_ID,
+      projectName: "spark-dating",
+    });
+
+    expect(harness.getState().status).toBe("generating");
+    expect(harness.getState().projectName).toBe("spark-dating");
+  });
+
+  it("build_success bumps status to building when UI lagged on scaffolding", () => {
+    const harness = createHarness();
+    harness.getState().setProjectName("spark-dating");
+    harness.getState().setStatus("scaffolding");
+
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "spark-dating",
+      buildId: BUILD_ID,
+      eventType: "build_success",
+      message: "Bundled",
+    });
+
+    expect(harness.getState().status).toBe("building");
+  });
+
   // ── project_created gate (H2) ──
   it("ignores project_created from a foreign requestId while creating", () => {
     const harness = createHarness();
