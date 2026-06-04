@@ -3,7 +3,6 @@ import crypto from "crypto";
 import path from "path";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import type { CompleteFn } from "../services/llm-proxy.js";
-import { killExpo, startExpo, runTypecheck } from "../services/process-manager.js";
 import { readFile as readProjectFile, writeFile as writeProjectFile } from "../services/file-manager.js";
 import { parseMetroError } from "../services/log-watcher.js";
 import { generateFiles, regenerateFileWithContracts, regenerateFileWithTypeErrors } from "./generator.js";
@@ -78,7 +77,10 @@ export const runCodegenAndShip = async (
     skipExistingFiles = false,
     gitCommitMessage = "v1: initial generation (build verified)",
   } = params;
-  const { runGitCommand, setPreviewPort, fetch } = ctx;
+  // startExpo/runTypecheck/killExpo MUST come from ctx so the mock-free
+  // integration test stays hermetic (the refactor had imported them directly,
+  // which ran real subprocesses and broke DI).
+  const { runGitCommand, setPreviewPort, fetch, startExpo, runTypecheck, killExpo } = ctx;
 
   // ── Step 3: Generate files ────────────────────────────
   emitOperation({ type: "status", status: "generating" });
