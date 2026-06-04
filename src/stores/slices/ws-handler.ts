@@ -33,10 +33,11 @@ import {
   formatPreviewReadyNarration,
   formatScaffoldReadyNarration,
 } from "@/shared/lib/chat-narration";
+import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
 import {
-  GENERATION_STATUS_LABELS,
-  shouldAdvanceGenerationStatus,
-} from "@/shared/lib/generation-status";
+  resolveGenerationPhase,
+  type GenerationPhaseSignal,
+} from "@/shared/lib/generation-phase-machine";
 import type { IncomingWsMessage } from "@/shared/schemas/ws-messages";
 import { useSettingsStore } from "@/stores/settings-store";
 import type {
@@ -49,8 +50,33 @@ import type {
 type StoreGet = ProjectStoreGet;
 type StoreSet = ProjectStoreSet;
 
+const commitActiveGenerationPhase = (
+  get: StoreGet,
+  store: ReturnType<StoreGet>,
+  signal: GenerationPhaseSignal,
+  logRegressive?: { source: string; from: AppStatus; to: AppStatus },
+): AppStatus | null => {
+  const previous = get().status;
+  const next = resolveGenerationPhase(previous, signal);
+  if (!next) {
+    if (logRegressive) {
+      useSettingsStore.getState().addErrorLog({
+        level: "warn",
+        source: logRegressive.source,
+        message: `Ignored regressive status ${logRegressive.from} → ${logRegressive.to}`,
+      });
+    }
+    return null;
+  }
+  if (next !== previous) {
+    store.setStatus(next);
+  }
+  return next;
+};
+
 const applyErrorState = (
   store: ReturnType<StoreGet>,
+  currentStatus: AppStatus,
   options: {
     clearPreview?: boolean;
     error?: string | null;
@@ -64,7 +90,10 @@ const applyErrorState = (
     error: options.error ?? null,
     buildId: options.buildId ?? null,
   });
-  store.setStatus("error");
+  const next = resolveGenerationPhase(currentStatus, { kind: "fatal_error" });
+  if (next) {
+    store.setStatus(next);
+  }
 };
 
 const patchProjectListEntry = (
@@ -137,8 +166,14 @@ export const createWsHandler = (
       if (!matchesActiveProject(get, msg)) {
         if (statusProject) {
           const bgPrevious =
-            get().projectList.find((p) => p.name === statusProject)?.status ?? null;
-          patchProjectListEntry(set, get, statusProject, { status: msg.status });
+            get().projectList.find((p) => p.name === statusProject)?.status ?? "idle";
+          const bgNext = resolveGenerationPhase(bgPrevious, {
+            kind: "agent_status",
+            status: msg.status,
+          });
+          if (bgNext && bgNext !== bgPrevious) {
+            patchProjectListEntry(set, get, statusProject, { status: bgNext });
+          }
           // Mirror phase transitions into the background project's chat cache so
           // returning to it shows a complete timeline, not just the final state.
           const bgChat = get().projectChats[statusProject];
@@ -161,26 +196,26 @@ export const createWsHandler = (
         break;
       }
       const previousStatus = get().status;
-      if (!shouldAdvanceGenerationStatus(previousStatus, msg.status)) {
-        log({
-          level: "warn",
-          source: "status",
-          message: `Ignored regressive status ${previousStatus} → ${msg.status}`,
-        });
+      const advanced = commitActiveGenerationPhase(
+        get,
+        store,
+        { kind: "agent_status", status: msg.status },
+        { source: "status", from: previousStatus, to: msg.status },
+      );
+      if (!advanced) {
         break;
       }
-      store.setStatus(msg.status);
-      if (previousStatus !== msg.status) {
+      if (previousStatus !== advanced) {
         const plan = get().plan;
         const phaseText = formatPhaseChatNarration(
-          msg.status,
+          advanced,
           {
             displayName:
               typeof plan?.displayName === "string" ? plan.displayName : undefined,
             projectName: get().projectName ?? undefined,
           },
           previousStatus,
-        ) ?? GENERATION_STATUS_LABELS[msg.status];
+        ) ?? GENERATION_STATUS_LABELS[advanced];
         if (phaseText) {
           emitChat(createProcessMessage("phase", phaseText));
         }
@@ -196,7 +231,7 @@ export const createWsHandler = (
         });
       }
       if (msg.status === "error" && msg.previewStatus === "error") {
-        applyErrorState(store, {
+        applyErrorState(store, get().status, {
           clearPreview: true,
           buildId: msg.buildId ?? null,
         });
@@ -339,7 +374,9 @@ export const createWsHandler = (
         }
       }
       const existing = store.projectList.find((p) => p.name === projectName);
-      const entryStatus: AppStatus = existing?.status ?? store.status ?? "generating";
+      const entryBase: AppStatus = existing?.status ?? store.status ?? "idle";
+      const entryStatus: AppStatus =
+        resolveGenerationPhase(entryBase, { kind: "scaffold_complete" }) ?? "generating";
       store.addProject({
         name: projectName,
         displayName: existing?.displayName ?? projectName,
@@ -358,10 +395,12 @@ export const createWsHandler = (
       }
 
       set({ projectName, pendingProjectName: null, pendingCreationRequestId: null });
-      if (shouldAdvanceGenerationStatus(get().status, "generating")) {
-        store.setStatus("generating");
+      const scaffoldNext = commitActiveGenerationPhase(get, store, {
+        kind: "scaffold_complete",
+      });
+      if (scaffoldNext) {
+        patchProjectListEntry(set, get, projectName, { status: scaffoldNext });
       }
-      patchProjectListEntry(set, get, projectName, { status: "generating" });
       emitChat(createProcessMessage("phase", formatScaffoldReadyNarration(projectName)));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
@@ -448,11 +487,11 @@ export const createWsHandler = (
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
       } else if (eventType === "build_success") {
         log({ level: "info", source: "metro", message: "Build success" });
-        if (isActive && shouldAdvanceGenerationStatus(get().status, "building")) {
-          store.setStatus("building");
+        if (isActive) {
+          const buildNext = commitActiveGenerationPhase(get, store, { kind: "build_success" });
           const activeProject = get().projectName;
-          if (activeProject) {
-            patchProjectListEntry(set, get, activeProject, { status: "building" });
+          if (buildNext && activeProject) {
+            patchProjectListEntry(set, get, activeProject, { status: buildNext });
           }
         }
       } else {
@@ -498,7 +537,7 @@ export const createWsHandler = (
           buildId: msg.buildId,
           error: null,
         });
-        store.setStatus("ready");
+        commitActiveGenerationPhase(get, store, { kind: "preview_ready" });
         if (prevPort !== msg.port) {
           const plan = get().plan;
           const previewName =
@@ -586,19 +625,27 @@ export const createWsHandler = (
         emitChat(createErrorMessage(`Applied ${applied} changes, ${failureCount} errors`, errors.join("\n") || undefined));
         log({ level: "error", source: "iteration", message: `${failureCount} blocks failed`, details: errors.join("\n") });
         if (isActive) {
-          applyErrorState(store, {
+          applyErrorState(store, get().status, {
             error: errors.join("\n") || "Iteration failed",
           });
         }
       } else if (isActive) {
-        store.setStatus("ready");
+        commitActiveGenerationPhase(get, store, {
+          kind: "iteration_complete",
+          failed: false,
+        });
         if (get().previewStatus === "starting") {
           store.setPreviewStatus("stopped", { buildId: get().previewBuildId });
         }
       }
       if (applied > 0 && !hasFailure) {
         emitChat(createAssistantMessage(`Applied ${applied} changes [ok]`));
-        if (isActive) store.setStatus("ready");
+        if (isActive) {
+          commitActiveGenerationPhase(get, store, {
+            kind: "iteration_complete",
+            failed: false,
+          });
+        }
       }
       break;
     }
@@ -636,7 +683,7 @@ export const createWsHandler = (
       emitChat(createErrorMessage(`Could not fix after ${msg.attempts} attempts.`, msg.error, msg.file));
       log({ level: "error", source: "autofix", message: `Autofix failed after ${msg.attempts} attempts`, details: `File: ${msg.file ?? "unknown"}\n${msg.error ?? ""}` });
       if (isActive) {
-        applyErrorState(store, {
+        applyErrorState(store, get().status, {
           error: msg.error ?? "Autofix failed",
           buildId: msg.buildId ?? null,
         });
@@ -651,7 +698,7 @@ export const createWsHandler = (
       emitChat(createErrorMessage(`Error: ${msg.error}`, msg.error, msg.file));
       log({ level: "error", source: "system", message: String(msg.error), details: msg.file ? `File: ${msg.file}` : undefined });
       if (isActive) {
-        applyErrorState(store, {
+        applyErrorState(store, get().status, {
           error: msg.error,
           buildId: msg.buildId ?? null,
         });
@@ -661,7 +708,7 @@ export const createWsHandler = (
     case "generation_aborted":
       emitChat(createSystemMessage("Generation aborted by user", false));
       if (isActive) {
-        store.setStatus("ready");
+        commitActiveGenerationPhase(get, store, { kind: "generation_aborted" });
         applyPreviewStatus(store, "stopped", { clearPreview: true });
       }
       log({ level: "warn", source: "pipeline", message: "Generation aborted by user" });
