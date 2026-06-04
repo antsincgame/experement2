@@ -1,5 +1,5 @@
 ﻿// Verifies that heavy project operations are serialized per queue key and isolated across projects.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   enqueueProjectOperation,
   getProjectOperationQueueKey,
@@ -74,6 +74,29 @@ describe("project-operation-lock", () => {
 
     releaseFirst();
     await Promise.all([first, second]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("honors per-operation timeoutMs override", async () => {
+    vi.useFakeTimers();
+    let rejected: Error | null = null;
+
+    const pending = enqueueProjectOperation(
+      getProjectOperationQueueKey("timeout-test"),
+      "slow",
+      () => new Promise<string>(() => undefined),
+      { timeoutMs: 5_000 },
+    ).catch((error: unknown) => {
+      rejected = error instanceof Error ? error : new Error(String(error));
+    });
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await pending;
+
+    expect(rejected?.message).toBe("Operation slow timed out after 5s");
   });
 });
 

@@ -49,10 +49,13 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
   const isError = message.isError === true;
   // Actionable = points at a real source file the editor can open and fix.
   const errorBlob = `${message.content}\n${message.errorDetails ?? ""}`;
+  const isQueueTimeout = /operation create_project timed out|timed out after 600s/i.test(
+    errorBlob,
+  );
   const isSelfHealingBuildNoise =
     /could not fix after|metro build timed out|autofix skipped: error has no editable source/i.test(
       errorBlob,
-    );
+    ) || isQueueTimeout;
   const isPreviewBlocked =
     /preview failed to start|cannot read properties of undefined.*undetermined|expo-contacts/i.test(
       errorBlob,
@@ -172,6 +175,11 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
                   Fix this file
                 </Text>
               </Pressable>
+            ) : isQueueTimeout ? (
+              <Text style={{ color: "#8888AA", fontSize: 10, fontStyle: "italic" }}>
+                Queue limit (10 min) — not a code bug. Generation may still be running; check
+                preview and file list, or wait and refresh.
+              </Text>
             ) : isIterateOrEditorFailure ? (
               <Text style={{ color: "#8888AA", fontSize: 10, fontStyle: "italic" }}>
                 Describe the fix in chat — the agent will retry iteration.

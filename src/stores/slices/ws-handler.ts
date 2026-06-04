@@ -700,7 +700,12 @@ export const createWsHandler = (
           const buildChatProject = eventProject ?? chatProject;
           upsertBuildSuccessChat(set, get, line, buildChatProject);
         } else {
-          const processKind = eventType === "moe_swap" ? "moe" : "build";
+          const processKind =
+            eventType === "moe_swap"
+              ? "moe"
+              : eventType === "pipeline_notice"
+                ? "phase"
+                : "build";
           emitChat(createProcessMessage(processKind, line));
         }
       }

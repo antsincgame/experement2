@@ -212,6 +212,17 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 // в”Ђв”Ђ WebSocket в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
+/** Full create_project often exceeds 10m; env override for slow local LLMs. */
+const CREATE_PROJECT_QUEUE_TIMEOUT_MS = Number(
+  process.env.CREATE_PROJECT_QUEUE_TIMEOUT_MS ?? "1800000",
+);
+
+const CREATE_PROJECT_STILL_RUNNING_NOTICE =
+  "Queue time limit reached — generation is still running on the agent. Watch file progress and preview; ignore the red timeout card.";
+
+const isOperationQueueTimeout = (error: unknown): boolean =>
+  error instanceof Error && /^Operation .+ timed out after \d+s$/i.test(error.message);
+
 const sendSystemErrorToClient = (
   clientId: string,
   error: string,
@@ -369,12 +380,17 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
         requestId?: string;
       };
 
-      runQueuedOperation(
-        clientId,
-        WORKSPACE_OPERATION_QUEUE_KEY,
-        "create_project",
-        "create_project",
-        () => {
+      const finishCreate = (result: Awaited<ReturnType<typeof createProject>>): void => {
+        runWithEventScope(
+          { clientId, projectName: result.projectName, requestId: message.requestId },
+          () => {
+            sendToClient(clientId, { type: "project_created", ...result });
+          },
+        );
+      };
+
+      const runCreateTask = (): Promise<Awaited<ReturnType<typeof createProject>>> =>
+        runWithEventScope(eventScope, () => {
           createOperation = createProject({
             description: message.description,
             lmStudioUrl: message.lmStudioUrl,
@@ -396,19 +412,72 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
                 attachOperationToQueueKey(
                   getProjectOperationQueueKey(projectName),
                   `create_project:${projectName}`,
-                  createOperation
+                  createOperation,
                 );
               }
             },
           });
-
           return createOperation;
-        },
-        (result) => {
-          sendToClient(clientId, { type: "project_created", ...result });
-        },
-        eventScope
-      );
+        });
+
+      void enqueueProjectOperation(
+        WORKSPACE_OPERATION_QUEUE_KEY,
+        "create_project",
+        runCreateTask,
+        { timeoutMs: CREATE_PROJECT_QUEUE_TIMEOUT_MS },
+      )
+        .then(finishCreate)
+        .catch(async (error) => {
+          if (isErrorReported(error)) {
+            return;
+          }
+
+          if (isOperationQueueTimeout(error) && createOperation) {
+            console.warn(
+              "[WS] create_project queue timeout — awaiting in-flight pipeline",
+            );
+            runWithEventScope(
+              { clientId, projectName: eventScope.projectName, requestId: message.requestId },
+              () => {
+                sendToClient(
+                  clientId,
+                  {
+                    type: "build_event",
+                    eventType: "pipeline_notice",
+                    message: CREATE_PROJECT_STILL_RUNNING_NOTICE,
+                    requestId: message.requestId,
+                    projectName: eventScope.projectName,
+                  },
+                  eventScope,
+                );
+              },
+            );
+            try {
+              finishCreate(await createOperation);
+            } catch (inner) {
+              if (!isErrorReported(inner)) {
+                runWithEventScope(eventScope, () => {
+                  sendSystemErrorToClient(
+                    clientId,
+                    inner instanceof Error ? inner.message : String(inner),
+                    "create_project",
+                    eventScope,
+                  );
+                });
+              }
+            }
+            return;
+          }
+
+          runWithEventScope(eventScope, () => {
+            sendSystemErrorToClient(
+              clientId,
+              error instanceof Error ? error.message : "Unknown error",
+              "create_project",
+              eventScope,
+            );
+          });
+        });
       return;
     }
 

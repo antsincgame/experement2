@@ -17,6 +17,9 @@ export const formatBuildEventLine = (
   if (eventType === "build_success") {
     return message?.trim() || "Metro bundle ready";
   }
+  if (eventType === "pipeline_notice" && message) {
+    return message;
+  }
   if (message?.trim()) {
     return message.trim();
   }

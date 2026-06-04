@@ -32,13 +32,19 @@ export const WORKSPACE_OPERATION_QUEUE_KEY = "workspace:create";
 export const getProjectOperationQueueKey = (projectName: string): string =>
   `project:${projectName}`;
 
-const OPERATION_TIMEOUT_MS = 600_000; // 10 minutes max per operation
+export const OPERATION_TIMEOUT_MS = 600_000; // 10 minutes default for iterate/revert/etc.
+
+export interface EnqueueProjectOperationOptions {
+  timeoutMs?: number;
+}
 
 export const enqueueProjectOperation = <T>(
   key: string,
   operationName: string,
-  task: () => Promise<T>
+  task: () => Promise<T>,
+  options: EnqueueProjectOperationOptions = {},
 ): Promise<T> => {
+  const timeoutMs = options.timeoutMs ?? OPERATION_TIMEOUT_MS;
   const entry = getQueueEntry(key);
   entry.pending += 1;
 
@@ -53,8 +59,8 @@ export const enqueueProjectOperation = <T>(
           task(),
           new Promise<never>((_, reject) => {
             timeoutId = setTimeout(() => {
-              reject(new Error(`Operation ${operationName} timed out after ${OPERATION_TIMEOUT_MS / 1000}s`));
-            }, OPERATION_TIMEOUT_MS);
+              reject(new Error(`Operation ${operationName} timed out after ${timeoutMs / 1000}s`));
+            }, timeoutMs);
             timeoutId.unref();
           }),
         ]);
