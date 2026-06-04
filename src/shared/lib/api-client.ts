@@ -13,6 +13,15 @@ export interface ProjectListItem {
   name: string;
   displayName: string;
   createdAt: number;
+  canResume?: boolean;
+  missingFileCount?: number;
+}
+
+export interface ProjectResumeStatus {
+  canResume: boolean;
+  hasSavedPlan: boolean;
+  missingFileCount: number;
+  totalPlanFiles: number;
 }
 
 export interface ProjectFilePayload {
@@ -260,6 +269,12 @@ class ApiClient {
   getProjectTree<T>(projectName: string): Promise<T> {
     return this.getData<T>(
       `/api/projects/${encodeURIComponent(projectName)}/files`
+    );
+  }
+
+  getProjectResumeStatus(projectName: string): Promise<ProjectResumeStatus> {
+    return this.getData<ProjectResumeStatus>(
+      `/api/projects/${encodeURIComponent(projectName)}/status`
     );
   }
 

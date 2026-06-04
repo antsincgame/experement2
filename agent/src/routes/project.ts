@@ -12,6 +12,7 @@ import {
   ProjectFileWriteSchema,
   ProjectParamsSchema,
 } from "../schemas/runtime-input.schema.js";
+import { getProjectResumeStatus } from "../lib/generation-state.js";
 import {
   getFileTree,
   readFile,
@@ -38,11 +39,16 @@ projectRouter.get("/", (_req, res) => {
         entry.name !== "template_cache" &&
         !entry.name.startsWith(".")
       ))
-      .map((entry) => ({
-        name: entry.name,
-        displayName: entry.name,
-        createdAt: fs.statSync(path.join(wsRoot, entry.name)).birthtimeMs,
-      }))
+      .map((entry) => {
+        const resume = getProjectResumeStatus(entry.name);
+        return {
+          name: entry.name,
+          displayName: entry.name,
+          createdAt: fs.statSync(path.join(wsRoot, entry.name)).birthtimeMs,
+          canResume: resume.canResume,
+          missingFileCount: resume.missingFileCount,
+        };
+      })
       .sort((left, right) => right.createdAt - left.createdAt);
 
     res.json({ data: projects });
@@ -157,6 +163,20 @@ projectRouter.get("/:name/file", (req, res) => {
       code: "INVALID_INPUT",
     });
   }
+});
+
+projectRouter.get("/:name/status", (req, res) => {
+  const params = parseOrRespond(ProjectParamsSchema, req.params, res);
+  if (!params) {
+    return;
+  }
+
+  if (!projectExists(params.name)) {
+    res.status(404).json({ error: "Project not found", code: "NOT_FOUND" });
+    return;
+  }
+
+  res.json({ data: getProjectResumeStatus(params.name) });
 });
 
 projectRouter.get("/:name/all-files", (req, res) => {

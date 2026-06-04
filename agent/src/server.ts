@@ -17,6 +17,7 @@ import { formatZodError } from "./lib/request-validation.js";
 import { assertLlmUrl, llmFetch } from "./lib/llm-url.js";
 import { getAllowedOrigins, isOriginAllowed } from "./lib/origin-allowlist.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
+import { resumeProjectGeneration } from "./lib/resume-generation.js";
 import { isErrorReported } from "./lib/reported-error.js";
 import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
 import { resolveFixModel } from "./lib/model-roles.js";
@@ -310,6 +311,7 @@ wss.on("connection", (ws: WebSocket) => {
 const processedMutationRequests = new Set<string>();
 const MUTATION_DEDUPE_TYPES = new Set([
   "create_project",
+  "resume_generation",
   "iterate",
   "revert_version",
 ]);
@@ -406,6 +408,37 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
           sendToClient(clientId, { type: "project_created", ...result });
         },
         eventScope
+      );
+      return;
+    }
+
+    case "resume_generation": {
+      console.log("[WS] Resume generation:", message.projectName);
+      runQueuedOperation(
+        clientId,
+        getProjectOperationQueueKey(message.projectName),
+        `resume_generation:${message.projectName}`,
+        "resume_generation",
+        () =>
+          resumeProjectGeneration({
+            projectName: message.projectName,
+            lmStudioUrl: message.lmStudioUrl,
+            model: message.model,
+            editorModel: message.editorModel,
+            embeddingModel: message.embeddingModel,
+            semanticRagEnabled: message.semanticRagEnabled,
+            autoPolishEnabled: message.autoPolishEnabled,
+            autoPolishMaxPasses: message.autoPolishMaxPasses,
+            polishModel: message.polishModel,
+            temperature: message.temperature,
+            maxTokens: message.maxTokens,
+            topP: message.topP,
+            requestId: message.requestId,
+          }),
+        (result) => {
+          sendToClient(clientId, { type: "project_created", ...result });
+        },
+        { projectName: message.projectName, requestId: message.requestId },
       );
       return;
     }

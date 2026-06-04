@@ -82,8 +82,9 @@ const ProjectSidebar = ({
               <View
                 className="w-2 h-2 rounded-full"
                 style={{
-                  backgroundColor:
-                    project.status === "ready"
+                  backgroundColor: project.canResume
+                    ? "#FF9500"
+                    : project.status === "ready"
                       ? "#00FF88"
                       : project.status === "error"
                         ? "#FF3366"

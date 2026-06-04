@@ -22,6 +22,8 @@ describe("hydrateStoredProjects", () => {
       status: "ready",
       port: null,
       createdAt: 123,
+      canResume: undefined,
+      missingFileCount: undefined,
     });
   });
 });

@@ -1,15 +1,18 @@
 // Extracts async workspace orchestration into testable helpers so screens stay declarative.
 import { isCreatingRoute } from "@/shared/lib/creation-flow";
 import type { ProjectListItem } from "@/shared/lib/api-client";
+import type { AppStatus } from "@/stores/project-store.types";
 
 interface HydrateStoredProjectsOptions {
   projects: ProjectListItem[];
   addProject: (project: {
     name: string;
     displayName: string;
-    status: "ready";
+    status: AppStatus;
     port: null;
     createdAt: number;
+    canResume?: boolean;
+    missingFileCount?: number;
   }) => void;
 }
 
@@ -31,9 +34,11 @@ export const hydrateStoredProjects = ({
     addProject({
       name: project.name,
       displayName: project.displayName,
-      status: "ready",
+      status: (project.canResume ? "idle" : "ready") as AppStatus,
       port: null,
       createdAt: project.createdAt ?? Date.now(),
+      canResume: project.canResume,
+      missingFileCount: project.missingFileCount,
     });
   }
 };

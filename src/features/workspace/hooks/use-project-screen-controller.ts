@@ -5,6 +5,7 @@ import { Linking } from "react-native";
 import { createUserMessage } from "@/features/chat/schemas/message.schema";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { apiClient } from "@/shared/lib/api-client";
+import { useProjectGeneration } from "./use-project-generation";
 import { fetchProjectFiles, useProjectStore } from "@/stores/project-store";
 import {
   getCreatingRouteSyncSlug,
@@ -39,6 +40,8 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const plan = useProjectStore((state) => state.plan);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
+  const { resumeStatus, isResuming, handleResumeGeneration } =
+    useProjectGeneration(routeProjectName);
   const previousPreviewStatus = useRef(previewStatus);
   const previousPreviewBuildId = useRef<string | null>(previewBuildId);
   const activeProjectRef = useRef<string | null>(null);
@@ -160,7 +163,10 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
     handleChatSend,
     handleCreateNew,
     handleExport,
+    handleResumeGeneration,
     handleSelectProject,
+    isResuming,
+    resumeStatus,
     openFile,
     openFiles,
     projectList,

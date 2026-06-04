@@ -678,6 +678,8 @@ export const createWsHandler = (
         status: existing?.status ?? store.status ?? "ready",
         port: msg.port ?? existing?.port ?? null,
         createdAt: existing?.createdAt ?? Date.now(),
+        canResume: false,
+        missingFileCount: 0,
       });
       log({ level: "info", source: "pipeline", message: `Project created: ${pName}`, details: `Port: ${msg.port ?? "none"}` });
       break;

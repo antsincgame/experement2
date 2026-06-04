@@ -10,6 +10,8 @@ import WorkspaceLayout from "@/features/workspace/components/workspace-layout";
 import { isCreatingRoute } from "@/shared/lib/creation-flow";
 import { GENERATION_STATUS_LABELS, isGenerationActive } from "@/shared/lib/generation-status";
 import { MoeIndicator } from "@/features/chat/components/moe-indicator";
+import { ResumeGenerationBanner } from "@/features/workspace/components/resume-generation-banner";
+import type { ProjectResumeStatus } from "@/shared/lib/api-client";
 import type { ProjectStatus } from "@/shared/schemas/ws-messages";
 import { mixedStyle } from "@/shared/lib/web-styles";
 import type { FileNode, ProjectEntry } from "@/stores/project-store";
@@ -25,7 +27,10 @@ interface ProjectScreenContentProps {
   handleChatSend: (text: string) => void;
   handleCreateNew: () => void;
   handleExport: () => void;
+  handleResumeGeneration: () => void;
   handleSelectProject: (name: string) => void;
+  isResuming: boolean;
+  resumeStatus: ProjectResumeStatus | null;
   openFile: (path: string) => void;
   openFiles: string[];
   projectList: ProjectEntry[];
@@ -53,7 +58,10 @@ export const ProjectScreenContent = ({
   handleChatSend,
   handleCreateNew,
   handleExport,
+  handleResumeGeneration,
   handleSelectProject,
+  isResuming,
+  resumeStatus,
   openFile,
   openFiles,
   projectList,
@@ -155,6 +163,16 @@ export const ProjectScreenContent = ({
             })}
           />
         </View>
+      )}
+
+      {resumeStatus?.canResume && routeProjectName && !isCreatingRoute(routeProjectName) && (
+        <ResumeGenerationBanner
+          projectName={routeProjectName}
+          missingFileCount={resumeStatus.missingFileCount}
+          totalPlanFiles={resumeStatus.totalPlanFiles}
+          isResuming={isResuming || isGenerationActive(status)}
+          onResume={handleResumeGeneration}
+        />
       )}
 
       <WorkspaceLayout

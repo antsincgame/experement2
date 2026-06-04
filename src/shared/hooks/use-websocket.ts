@@ -428,6 +428,38 @@ export const useWebSocket = () => {
     send({ type: "abort_generation", requestId: createRequestId() });
   }, [send]);
 
+  const resumeGeneration = useCallback((projectName: string): string => {
+    const {
+      lmStudioUrl,
+      model,
+      editorModel,
+      embeddingModel,
+      semanticRagEnabled,
+      autoPolishEnabled,
+      polishModel,
+      temperature,
+      maxTokens,
+      topP,
+    } = useSettingsStore.getState();
+    const requestId = createRequestId();
+    send({
+      type: "resume_generation",
+      requestId,
+      projectName,
+      lmStudioUrl,
+      ...(model ? { model } : {}),
+      ...(editorModel ? { editorModel } : {}),
+      semanticRagEnabled,
+      ...(autoPolishEnabled ? { autoPolishEnabled } : {}),
+      ...(autoPolishEnabled && polishModel.trim() ? { polishModel: polishModel.trim() } : {}),
+      ...(embeddingModel.trim() ? { embeddingModel: embeddingModel.trim() } : {}),
+      temperature,
+      maxTokens,
+      topP,
+    });
+    return requestId;
+  }, [send]);
+
   const revertVersion = useCallback((commitHash: string) => {
     const projectName = useProjectStore.getState().projectName;
     if (!projectName) {
@@ -449,6 +481,7 @@ export const useWebSocket = () => {
     abortGeneration,
     createProject,
     iterate,
+    resumeGeneration,
     revertVersion,
     send,
     startPreview,

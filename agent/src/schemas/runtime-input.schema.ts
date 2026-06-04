@@ -125,6 +125,22 @@ export const WsAbortGenerationSchema = z.object({
   type: z.literal("abort_generation"),
 }).merge(WsRequestMetadataSchema);
 
+export const WsResumeGenerationSchema = z.object({
+  type: z.literal("resume_generation"),
+  projectName: ProjectNameSchema,
+  lmStudioUrl: OptionalHttpUrlSchema,
+  model: OptionalModelSchema,
+  editorModel: OptionalModelSchema,
+  embeddingModel: OptionalModelSchema,
+  semanticRagEnabled: z.boolean().optional(),
+  autoPolishEnabled: z.boolean().optional(),
+  autoPolishMaxPasses: z.number().optional(),
+  polishModel: OptionalModelSchema,
+  temperature: z.number().min(0).optional(),
+  maxTokens: z.number().int().positive().optional(),
+  topP: z.number().min(0).max(1).optional(),
+}).merge(WsRequestMetadataSchema);
+
 export const WsCreateProjectSchema = z.object({
   type: z.literal("create_project"),
   description: trimmedString("description", 20_000),
@@ -176,6 +192,7 @@ export const WsRevertVersionSchema = z.object({
 export const WsMessageSchema = z.discriminatedUnion("type", [
   WsAbortGenerationSchema,
   WsCreateProjectSchema,
+  WsResumeGenerationSchema,
   WsIterateSchema,
   WsStartPreviewSchema,
   WsRevertVersionSchema,

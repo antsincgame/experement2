@@ -25,6 +25,7 @@ import {
   VECTOR_ICON_IMPORT_PATHS,
 } from "./generation-contract.js";
 import { validateAppPlan } from "./project-validator.js";
+import { isPlanFileComplete } from "./generation-state.js";
 import { collectStream } from "./stream-collect.js";
 
 interface GeneratorOptions {
@@ -47,6 +48,8 @@ interface GeneratorOptions {
   /** Per-file model reasoning (captured from <think>/<thinking> blocks) for chat humanization. */
   onThinking?: (filepath: string, reasoning: string) => void;
   onFileComplete?: (filepath: string) => void;
+  /** When true, skip LLM for files that already exist with a valid // EOF marker. */
+  skipExistingFiles?: boolean;
 }
 
 /**
@@ -360,6 +363,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     onChunk,
     onThinking,
     onFileComplete,
+    skipExistingFiles = false,
   } = options;
 
   const planIssues = validateAppPlan(plan);
@@ -437,6 +441,17 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     }
 
     onFileStart?.(fileSpec.path, i, totalFiles);
+
+    if (skipExistingFiles) {
+      const existing = readFile(projectName, fileSpec.path);
+      if (isPlanFileComplete(existing)) {
+        if (!generatedFiles.includes(fileSpec.path)) {
+          generatedFiles.push(fileSpec.path);
+        }
+        onFileComplete?.(fileSpec.path);
+        continue;
+      }
+    }
 
     const skeleton = buildProjectSkeleton(projectPath);
 

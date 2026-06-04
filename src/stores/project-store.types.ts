@@ -31,6 +31,9 @@ export interface ProjectEntry {
   status: AppStatus;
   port: number | null;
   createdAt: number;
+  /** Disk project has saved plan + missing planned files — show resume affordance. */
+  canResume?: boolean;
+  missingFileCount?: number;
 }
 
 export type GenerationFileStatus = "streaming" | "done";
