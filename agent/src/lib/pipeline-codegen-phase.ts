@@ -12,6 +12,7 @@ import { extractExportContracts, type ExportContract } from "./context-builder.j
 import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
 import { formatModelRoleLabel } from "./model-roles.js";
 import { autoFix } from "./auto-fixer.js";
+import { applyAutofixWithGate, countTypeErrors } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
 import { gitCommit, gitInit } from "./git.js";
 import type { PipelineContext } from "./pipeline-types.js";
@@ -364,32 +365,52 @@ export const runCodegenAndShip = async (
       error: parsed.raw,
     });
   
-    let lastFixedBlock: { filepath: string; replace: string } | null = null;
-    const fixResult = await autoFix({
-      projectName: projectSlug,
-      error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
-      lmStudioUrl,
-      model: fixModel,
-      complete,
-      maxAttempts: 1,
-      onAttempt: () =>
-        emitBuildScoped(buildId, {
-          type: "autofix_attempt",
-          attempt: autoFixAttempts,
-          maxAttempts: MAX_BUILD_AUTOFIX,
-        }),
-      onFix: (block) => {
-        lastFixedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
-        emitBuildScoped(buildId, {
-          type: "autofix_block",
-          filepath: block.filepath,
-        });
+    // Anti-regression gate: take a typecheck baseline BEFORE the fix so we can
+    // tell whether the applied fix introduced NEW type errors. Bounded/safe — if
+    // runTypecheck is unavailable or throws, the gate falls back to keeping the
+    // fix (today's behavior) and never breaks the loop.
+    let baselineErrors = 0;
+    try {
+      const baseline = await runTypecheck(projectPath);
+      baselineErrors = baseline.success ? 0 : countTypeErrors(baseline.combinedOutput);
+    } catch {
+      baselineErrors = 0;
+    }
+
+    const gated = await applyAutofixWithGate(
+      {
+        autoFix,
+        runTypecheck,
+        readFile: (fp) => readProjectFile(projectSlug, fp),
+        writeFile: (fp, content) => writeProjectFile(projectSlug, fp, content),
+        emit: (message) => emitBuildScoped(buildId, message),
       },
-    });
+      {
+        projectName: projectSlug,
+        projectPath,
+        error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
+        lmStudioUrl,
+        model: fixModel,
+        complete,
+        baselineErrors,
+        onAttempt: () =>
+          emitBuildScoped(buildId, {
+            type: "autofix_attempt",
+            attempt: autoFixAttempts,
+            maxAttempts: MAX_BUILD_AUTOFIX,
+          }),
+        onFix: (block) =>
+          emitBuildScoped(buildId, {
+            type: "autofix_block",
+            filepath: block.filepath,
+          }),
+      },
+    );
+    const fixResult = gated.fixResult;
   
-    if (fixResult.success) {
-      if (lastFixedBlock) {
-        const fixedBlock: { filepath: string; replace: string } = lastFixedBlock;
+    if (gated.applied) {
+      if (gated.lastAppliedBlock) {
+        const fixedBlock = gated.lastAppliedBlock;
         recordFix({
           errorSignature: parsed.raw,
           file: fixedBlock.filepath,
@@ -404,7 +425,10 @@ export const runCodegenAndShip = async (
       emitBuildScoped(buildId, {
         type: "autofix_failed",
         attempts: autoFixAttempts,
-        error: fixResult.lastError,
+        // A reverted fix regressed the typecheck; surface that as the reason.
+        error: gated.reverted
+          ? "Fix reverted: introduced new type errors"
+          : fixResult.lastError,
       });
     }
   
