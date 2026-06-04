@@ -36,6 +36,10 @@ import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber }
 import { streamCompletion, type CompleteFn } from "../services/llm-proxy.js";
 import { recordFix } from "./error-fix-store.js";
 import { markErrorReported } from "./reported-error.js";
+import { collectStream } from "./stream-collect.js";
+import { stripCodePreamble } from "./generator.js";
+import { runDesignPolish } from "./design-polish.js";
+import { KNOWLEDGE_BASE } from "../prompts/knowledge-base.js";
 
 interface CreateOptions {
   description: string;
@@ -47,6 +51,10 @@ interface CreateOptions {
   embeddingModel?: string;
   /** Smart semantic RAG (default true). */
   semanticRagEnabled?: boolean;
+  /** Opt-in "Auto-polish" design loop after the first successful build (default false). */
+  autoPolishEnabled?: boolean;
+  /** Number of bounded polish passes (clamped 1..4 inside the loop; default 2). */
+  autoPolishMaxPasses?: number;
   temperature?: number;
   maxTokens?: number;
   /** Nucleus sampling (0–1). When undefined, the model default applies. */
@@ -267,6 +275,91 @@ const runProjectQualityGates = async (
   return { success: true, errors };
 };
 
+/** Generated route screens the polish loop is allowed to touch: app/**\/*.tsx. */
+const selectPolishScreens = (files: string[]): string[] =>
+  files.filter(
+    (fp) =>
+      /^app\//.test(fp) &&
+      fp.endsWith(".tsx") &&
+      !fp.endsWith(".test.tsx") &&
+      !fp.endsWith(".spec.tsx")
+  );
+
+/**
+ * Opt-in design-refinement stage. Wraps the pure runDesignPolish loop with the
+ * pipeline's real seams (LLM `complete`, file-manager IO, typecheck) and emits
+ * scoped `polish_progress` events. Wrapped in try/catch by the caller so it can
+ * NEVER break an already-successful generation.
+ */
+const runPolishStage = async (
+  projectSlug: string,
+  projectPath: string,
+  files: string[],
+  maxPasses: number,
+  options: { lmStudioUrl?: string; model?: string; maxTokens?: number },
+  ctx: PipelineContext,
+  emitOperation: (message: Record<string, unknown>) => void
+): Promise<void> => {
+  const screens = selectPolishScreens(files);
+  if (screens.length === 0) return;
+
+  const { complete, runTypecheck } = ctx;
+
+  await runDesignPolish(screens, maxPasses, {
+    critique: async ({ path, content }) => {
+      const messages = [
+        {
+          role: "system" as const,
+          content: `You improve the VISUAL DESIGN of ONE React Native (Expo + Tamagui) screen.
+Apply this design system where it helps:
+${KNOWLEDGE_BASE.designSystem}
+
+RULES:
+- Change ONLY styling/layout/visual structure. NEVER change behavior, data flow, props, exports, imports of logic, or navigation.
+- Keep every existing export and component name unchanged.
+- UI primitives and icons come from "@/ui" (e.g. import { Box, Row, Text, Button, Input, Icon } from "@/ui"); <Icon name="..."> accepts ANY string.
+- Output ONLY the complete improved file as raw TSX. NO markdown fences. NO explanations. NO preamble. NO // EOF.
+- If the screen is already well-designed, return the EXACT same code unchanged.`,
+        },
+        {
+          role: "user" as const,
+          content: `File: ${path}\n\nCurrent file content:\n${content}`,
+        },
+      ];
+
+      const stream = await complete(messages, {
+        temperature: 0.3,
+        maxTokens: options.maxTokens ?? 65536,
+        lmStudioUrl: options.lmStudioUrl,
+        model: options.model,
+      });
+      const raw = await collectStream(stream);
+      const cleaned = stripCodePreamble(raw).replace(/\s*\/\/\s*EOF\s*$/, "").trim();
+
+      // Treat empty / unchanged / too-short output as "no change".
+      if (cleaned.length < 20 || cleaned === content.trim()) return null;
+      return cleaned;
+    },
+    validate: async () => {
+      try {
+        const result = await runTypecheck(projectPath);
+        return result.success;
+      } catch {
+        return false;
+      }
+    },
+    writeFile: (path, content) => writeProjectFile(projectSlug, path, content),
+    readFile: (path) => readProjectFile(projectSlug, path),
+    emit: (pass, maxPassesEmitted, message) =>
+      emitOperation({
+        type: "polish_progress",
+        pass,
+        maxPasses: maxPassesEmitted,
+        message,
+      }),
+  });
+};
+
 export const createProject = async (
   options: CreateOptions,
   ctx: PipelineContext = createDefaultContext()
@@ -310,6 +403,8 @@ const _createProjectInner = async (
     editorModel,
     embeddingModel,
     semanticRagEnabled = true,
+    autoPolishEnabled = false,
+    autoPolishMaxPasses = 2,
     temperature,
     maxTokens,
     topP,
@@ -800,6 +895,29 @@ const _createProjectInner = async (
         hash,
         description: description.slice(0, 60),
       });
+    }
+  }
+
+  // ── Step 7 (OPT-IN): Auto-polish design loop ──────────
+  // Runs ONLY when explicitly enabled AND the project built successfully. Each
+  // accepted change is gated by a typecheck (anti-regression). Fully wrapped so it
+  // can never break an already-verified generation; the running Metro web bundle
+  // hot-reloads on file change, so no explicit preview refresh is required.
+  if (autoPolishEnabled && buildSuccess) {
+    try {
+      await runPolishStage(
+        projectSlug,
+        projectPath,
+        files,
+        autoPolishMaxPasses,
+        { lmStudioUrl, model, maxTokens },
+        ctx,
+        emitOperation
+      );
+    } catch (err) {
+      console.warn(
+        `[Pipeline] Auto-polish stage failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 

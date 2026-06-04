@@ -381,6 +381,8 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             editorModel: message.editorModel,
             embeddingModel: message.embeddingModel,
             semanticRagEnabled: message.semanticRagEnabled,
+            autoPolishEnabled: message.autoPolishEnabled,
+            autoPolishMaxPasses: message.autoPolishMaxPasses,
             temperature: message.temperature,
             maxTokens: message.maxTokens,
             topP: message.topP,

@@ -134,6 +134,8 @@ export const WsCreateProjectSchema = z.object({
   editorModel: OptionalModelSchema,
   embeddingModel: OptionalModelSchema,
   semanticRagEnabled: z.boolean().optional(),
+  autoPolishEnabled: z.boolean().optional(),
+  autoPolishMaxPasses: z.number().optional(),
   temperature: z.number().min(0).optional(),
   maxTokens: z.number().int().positive().optional(),
   topP: z.number().min(0).max(1).optional(),

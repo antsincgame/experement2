@@ -545,6 +545,14 @@ export const createWsHandler = (
       log({ level: "info", source: "git", message: `Version v${msg.version} committed`, details: `Hash: ${msg.hash.slice(0, 8)}` });
       break;
 
+    case "polish_progress":
+      if (!matchesActiveProject(get, msg)) {
+        break;
+      }
+      emitChat(createSystemMessage(`✨ Polishing design (pass ${msg.pass}/${msg.maxPasses})…`, false));
+      log({ level: "info", source: "polish", message: `Polish pass ${msg.pass}/${msg.maxPasses}`, details: msg.message });
+      break;
+
     case "autofix_start":
       emitChat(createSystemMessage(`Autofix: ${msg.file ?? "unknown"} - ${msg.error.slice(0, 100)}`, false));
       log({ level: "warn", source: "autofix", message: `Starting autofix: ${msg.file ?? "unknown"}`, details: msg.error.slice(0, 300) });

@@ -72,6 +72,8 @@ interface SettingsState {
 
   semanticRagEnabled: boolean;
 
+  autoPolishEnabled: boolean;
+
   settingsHydrated: boolean;
 
   errorLogs: ErrorLogEntry[];
@@ -103,6 +105,8 @@ interface SettingsState {
   setEmbeddingModel: (model: string) => void;
 
   setSemanticRagEnabled: (enabled: boolean) => void;
+
+  setAutoPolishEnabled: (enabled: boolean) => void;
 
   addErrorLog: (entry: Omit<ErrorLogEntry, "id" | "timestamp">) => void;
 
@@ -155,6 +159,8 @@ export const useSettingsStore = create<SettingsState>()(
       setEmbeddingModel: (embeddingModel) => set({ embeddingModel }),
 
       setSemanticRagEnabled: (semanticRagEnabled) => set({ semanticRagEnabled }),
+
+      setAutoPolishEnabled: (autoPolishEnabled) => set({ autoPolishEnabled }),
 
       addErrorLog: (entry) =>
 
@@ -252,6 +258,7 @@ export const applySettingsDraft = (draft: SettingsDraft): void => {
     enhancerEnabled: draft.enhancerEnabled,
     embeddingModel: draft.embeddingModel,
     semanticRagEnabled: draft.semanticRagEnabled,
+    autoPolishEnabled: draft.autoPolishEnabled,
   });
   flushSettingsToStorage(draft);
 };
