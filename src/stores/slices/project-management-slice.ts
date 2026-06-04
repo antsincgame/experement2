@@ -31,19 +31,29 @@ export const createProjectManagementSlice = (set: ProjectStoreSet) => ({
   setPendingCreationRequestId: (pendingCreationRequestId: string | null) =>
     set({ pendingCreationRequestId }),
 
+  // Update an existing entry IN PLACE (preserve list order) so the sidebar does
+  // not reshuffle to the bottom on every lifecycle/status event; only append when
+  // the project is genuinely new.
   addProject: (entry: ProjectEntry) =>
-    set((state) => ({
-      projectList: [
-        ...state.projectList.filter((project) => project.name !== entry.name),
-        entry,
-      ],
-      projectChats: state.projectChats[entry.name]
-        ? state.projectChats
-        : {
-          ...state.projectChats,
-          [entry.name]: createEmptyChat(),
-        },
-    })),
+    set((state) => {
+      const index = state.projectList.findIndex(
+        (project) => project.name === entry.name
+      );
+      const projectList = index >= 0
+        ? state.projectList.map((project, i) =>
+          i === index ? { ...project, ...entry } : project
+        )
+        : [...state.projectList, entry];
+      return {
+        projectList,
+        projectChats: state.projectChats[entry.name]
+          ? state.projectChats
+          : {
+            ...state.projectChats,
+            [entry.name]: createEmptyChat(),
+          },
+      };
+    }),
 
   removeProject: (projectName: string) =>
     set((state) => buildProjectRemovalState(state, projectName)),
