@@ -79,6 +79,25 @@ export const TEMPLATE_PACKAGE_DEV_DEPENDENCIES = {
   "@tamagui/babel-plugin": "^1.114.0",
 } as const;
 
+/** Expo SDK 55 pins for extra deps — prevents expo-contacts@56 web crash (PermissionStatus.UNDETERMINED). */
+export const EXPO_SDK_EXTRA_PINS: Record<string, string> = {
+  "expo-contacts": "~55.0.11",
+  "expo-haptics": "~55.0.11",
+  "expo-clipboard": "~55.0.7",
+  "expo-image-picker": "~55.0.9",
+  "expo-camera": "~55.0.9",
+  "expo-location": "~55.0.7",
+  "expo-notifications": "~55.0.10",
+  "expo-av": "~55.0.9",
+  "expo-file-system": "~55.0.9",
+  "expo-secure-store": "~55.0.8",
+  "expo-image": "~55.0.5",
+  "expo-calendar": "~55.0.8",
+  "expo-web-browser": "~55.0.9",
+  "expo-sharing": "~55.0.10",
+  "expo-local-authentication": "~55.0.8",
+};
+
 export const REQUIRED_TEMPLATE_FILES = [
   "app.json",
   "tsconfig.json",

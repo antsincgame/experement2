@@ -101,6 +101,11 @@ ${SAFE_EXTRA_DEPENDENCIES_LIST}
 
 For charting, prefer react-native-chart-kit unless the user explicitly needs a different supported library.
 
+## Native-only Expo modules (web preview):
+- expo-contacts, expo-haptics, expo-camera, etc. work on iOS/Android only.
+- If the plan uses expo-contacts, you MUST add BOTH app/(tabs)/contacts.tsx (native) AND app/(tabs)/contacts.web.tsx (web fallback UI without importing expo-contacts).
+- List only the bare package name in extraDependencies (e.g. "expo-contacts") — the scaffold pins SDK-compatible versions.
+
 You MUST strictly use standard React Native libraries. DO NOT invent npm packages.
 DO NOT use expo-local-notifications (use expo-notifications instead).
 DO NOT use packages not in the safe list above unless absolutely necessary.

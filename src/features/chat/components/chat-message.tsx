@@ -50,12 +50,19 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
   // Actionable = points at a real source file the editor can open and fix.
   const errorBlob = `${message.content}\n${message.errorDetails ?? ""}`;
   const isSelfHealingBuildNoise =
-    /could not fix after|metro build timed out|preview failed to start/i.test(errorBlob);
+    /could not fix after|metro build timed out|autofix skipped: error has no editable source/i.test(
+      errorBlob,
+    );
+  const isPreviewBlocked =
+    /preview failed to start|cannot read properties of undefined.*undetermined|expo-contacts/i.test(
+      errorBlob,
+    );
   const isIterateOrEditorFailure =
     /unrecoverable json|plan validation failed|applied 0 changes/i.test(errorBlob);
   const isActionableError =
     (typeof message.errorFile === "string" && message.errorFile.trim().length > 0) ||
     (message.isError === true && isIterateOrEditorFailure) ||
+    (message.isError === true && isPreviewBlocked) ||
     (message.isError === true && !isSelfHealingBuildNoise && errorBlob.trim().length > 0);
 
   if (isError && !isUser) {

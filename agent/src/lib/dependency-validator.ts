@@ -1,4 +1,8 @@
-import { SAFE_EXTRA_DEPENDENCIES, TEMPLATE_PACKAGE_DEPENDENCIES } from "./generation-contract.js";
+import {
+  EXPO_SDK_EXTRA_PINS,
+  SAFE_EXTRA_DEPENDENCIES,
+  TEMPLATE_PACKAGE_DEPENDENCIES,
+} from "./generation-contract.js";
 
 const REGISTRY_TIMEOUT_MS = 5000;
 
@@ -8,6 +12,27 @@ const REGISTRY_TIMEOUT_MS = 5000;
 const VALID_PACKAGE_NAME = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i;
 
 const UNSAFE_SPEC_CHARS = /[;&|`$()<>\s]/;
+
+/** Pin safe Expo modules to the template SDK so v56 stubs do not break web Metro. */
+export const pinExtraDependencyForSdk = (dep: string): string => {
+  const name = extractPackageName(dep);
+  if (!name) {
+    return dep;
+  }
+  const pin = EXPO_SDK_EXTRA_PINS[name];
+  if (!pin) {
+    return dep;
+  }
+  const versionAt = name.startsWith("@") ? dep.indexOf("@", 1) : dep.indexOf("@");
+  if (versionAt === -1) {
+    return `${name}@${pin}`;
+  }
+  const version = dep.slice(versionAt + 1);
+  if (/^(\^|~)?56\./.test(version)) {
+    return `${name}@${pin}`;
+  }
+  return dep;
+};
 
 const extractPackageName = (dep: string): string | null => {
   const trimmed = dep.trim();
@@ -75,14 +100,14 @@ export const validateDependencies = async (
 
     // Known safe — skip registry check
     if (SAFE_EXTRA_DEPENDENCIES.has(name)) {
-      valid.push(dep);
+      valid.push(pinExtraDependencyForSdk(dep));
       continue;
     }
 
     // Check npm registry
     const exists = await checkNpmPackageExists(name);
     if (exists) {
-      valid.push(dep);
+      valid.push(pinExtraDependencyForSdk(dep));
     } else {
       console.warn(`[DepValidator] Package not found on npm: ${dep}`);
       rejected.push(dep);

@@ -99,7 +99,16 @@ const BOILERPLATE_FILES: Record<string, string> = {
   "tamagui.config.ts": `import { config } from '@tamagui/config/v3'
 import { createTamagui } from 'tamagui'
 
-const tamaguiConfig = createTamagui(config)
+const PRIMARY = '#7C4DFF'
+
+const tamaguiConfig = createTamagui({
+  ...config,
+  themes: {
+    ...config.themes,
+    light: { ...config.themes.light, primary: PRIMARY },
+    dark: { ...config.themes.dark, primary: PRIMARY },
+  },
+})
 
 export type AppConfig = typeof tamaguiConfig
 
