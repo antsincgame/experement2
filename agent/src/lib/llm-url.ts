@@ -90,3 +90,26 @@ export const assertLlmUrl = (url: string): string => {
 
   return `${parsed.protocol}//${parsed.host}`;
 };
+
+/**
+ * fetch() for LLM-server calls that refuses to follow redirects. assertLlmUrl only
+ * validates the INITIAL host, so a 3xx from an allow-listed host pointing at an
+ * internal address (e.g. http://169.254.169.254/…) would otherwise be followed
+ * transparently by the runtime (SSRF). We pin redirect:"manual" and reject any
+ * redirect instead of chasing it. LM Studio / OpenAI-compatible servers respond
+ * directly and never redirect, so legitimate calls are unaffected.
+ */
+export const llmFetch: typeof fetch = async (input, init) => {
+  const response = await fetch(input, { ...init, redirect: "manual" });
+  if (
+    response.type === "opaqueredirect" ||
+    (response.status >= 300 && response.status < 400)
+  ) {
+    const target =
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    throw new Error(
+      `LLM_REDIRECT_BLOCKED: ${target} attempted a redirect — refusing to follow (possible SSRF).`
+    );
+  }
+  return response;
+};

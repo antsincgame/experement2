@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { assertLlmUrl, normalizeLmStudioUrl } from "./llm-url.js";
+import { assertLlmUrl, llmFetch, normalizeLmStudioUrl } from "./llm-url.js";
 
 // These tests assume LM_STUDIO_URL / LM_STUDIO_ALLOWED_HOSTS are unset in the
 // test environment, so only loopback hosts are permitted.
@@ -47,5 +47,56 @@ describe("normalizeLmStudioUrl respects the env allowlist", () => {
     vi.resetModules();
     const mod = await import("./llm-url.js");
     expect(mod.normalizeLmStudioUrl("http://192.168.1.50:1234")).toBe("http://127.0.0.1:1234");
+  });
+});
+
+describe("llmFetch (SSRF redirect guard)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("pins redirect:'manual' and returns a normal response", async () => {
+    const ok = { status: 200, type: "default", ok: true } as unknown as Response;
+    const spy = vi.fn().mockResolvedValue(ok);
+    vi.stubGlobal("fetch", spy);
+
+    await expect(llmFetch("http://127.0.0.1:1234/v1/models")).resolves.toBe(ok);
+    expect(spy).toHaveBeenCalledWith(
+      "http://127.0.0.1:1234/v1/models",
+      expect.objectContaining({ redirect: "manual" })
+    );
+  });
+
+  it("rejects an opaque redirect (manual-mode response)", async () => {
+    const redirect = { status: 0, type: "opaqueredirect", ok: false } as unknown as Response;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(redirect));
+    await expect(llmFetch("http://127.0.0.1:1234/v1/models")).rejects.toThrow(/LLM_REDIRECT_BLOCKED/);
+  });
+
+  it("rejects an exposed 3xx redirect", async () => {
+    const redirect = { status: 302, type: "default", ok: false } as unknown as Response;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(redirect));
+    await expect(llmFetch("http://127.0.0.1:1234/v1/models")).rejects.toThrow(/LLM_REDIRECT_BLOCKED/);
+  });
+
+  it("preserves caller init (method/signal) while pinning redirect", async () => {
+    const ok = { status: 200, type: "default", ok: true } as unknown as Response;
+    const spy = vi.fn().mockResolvedValue(ok);
+    vi.stubGlobal("fetch", spy);
+    const controller = new AbortController();
+
+    await llmFetch("http://127.0.0.1:1234/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      "http://127.0.0.1:1234/v1/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        redirect: "manual",
+        signal: controller.signal,
+      })
+    );
   });
 });

@@ -2,7 +2,7 @@
 // LM Studio /v1/embeddings endpoint behind the same SSRF guard as the chat proxy.
 // Every failure mode (no embedding model loaded, 404, network) resolves to null so
 // the caller can fall back to the keyword RAG — semantic search is always optional.
-import { assertLlmUrl } from "../lib/llm-url.js";
+import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 import { isFiniteVector } from "../lib/vector-store.js";
 import { resolveEmbeddingModel } from "./embedding-model.js";
 
@@ -38,7 +38,7 @@ export const embedTexts = async (
     return null;
   }
 
-  const doFetch = options.fetchFn ?? fetch;
+  const doFetch = options.fetchFn ?? llmFetch;
   const model = await resolveEmbeddingModel({
     url: baseUrl,
     explicitModel: options.model,
