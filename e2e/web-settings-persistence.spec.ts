@@ -67,29 +67,16 @@ test.beforeAll(() => {
 });
 
 const openSettings = async (page: import("@playwright/test").Page) => {
-  const settingsButton = page.locator('[aria-label*="Settings"], [aria-label*="settings"]').first();
-  const hasDedicatedButton = await settingsButton.isVisible().catch(() => false);
-
-  if (hasDedicatedButton) {
-    await settingsButton.click();
-  } else {
-    const gearIcon = page.locator("svg").filter({ has: page.locator("circle, path") }).first();
-    if (await gearIcon.isVisible()) {
-      await gearIcon.click();
-    }
-  }
-
-  await expect(page.getByText(/LM Studio/i).first()).toBeVisible({ timeout: 5_000 });
+  // The header gear carries accessibilityLabel="Open settings" (→ aria-label on web),
+  // so target it directly instead of guessing at an unlabeled <svg>.
+  await page.getByLabel("Open settings").click();
+  await expect(page.getByText(/LM Studio/i).first()).toBeVisible({ timeout: 10_000 });
 };
 
 const closeSettings = async (page: import("@playwright/test").Page) => {
-  const closeButton = page.locator('[aria-label="Close"], [aria-label="close"]').first();
-  const hasClose = await closeButton.isVisible().catch(() => false);
-  if (hasClose) {
-    await closeButton.click();
-  } else {
-    await page.keyboard.press("Escape");
-  }
+  // The drawer's X carries accessibilityLabel="Close settings" (→ aria-label). The
+  // Modal does not close on Escape, so target the button directly.
+  await page.getByLabel("Close settings").click();
   await expect(page.getByText(/LM Studio/i).first()).not.toBeVisible({ timeout: 5_000 });
 };
 
@@ -119,11 +106,12 @@ test("settings drawer opens and shows current values", async ({ page }) => {
 
   await openSettings(page);
 
-  // Settings drawer should show LM Studio URL, Agent URL labels
-  await expect(page.getByText("LM Studio URL")).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText("Agent URL")).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText("Temperature")).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText("Max Tokens")).toBeVisible({ timeout: 5_000 });
+  // Settings drawer should show LM Studio URL, Agent URL labels. Use exact matches —
+  // "Temperature"/"Max Tokens" also appear inside the helper sentence below the fields.
+  await expect(page.getByText("LM Studio URL", { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText("Agent URL", { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText("Temperature", { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText("Max Tokens", { exact: true })).toBeVisible({ timeout: 5_000 });
 
   await closeSettings(page);
 });

@@ -137,6 +137,8 @@ export const HomeScreenContent = ({
             </View>
             <Pressable
               onPress={() => setSettingsVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
               className="w-9 h-9 rounded-xl items-center justify-center"
               style={{
                 backgroundColor: "rgba(255,215,0,0.08)",

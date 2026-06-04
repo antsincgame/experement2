@@ -1,6 +1,6 @@
 ﻿// Orchestrates HTTP, WebSocket, and preview runtime state with explicit build scope for each client flow.
 import express, { type NextFunction, type Request, type Response } from "express";
-import { createServer } from "http";
+import { createServer, type IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 
 import {
@@ -14,7 +14,8 @@ import {
   unregisterClient,
 } from "./lib/event-bus.js";
 import { formatZodError } from "./lib/request-validation.js";
-import { assertLlmUrl } from "./lib/llm-url.js";
+import { assertLlmUrl, llmFetch } from "./lib/llm-url.js";
+import { getAllowedOrigins, isOriginAllowed } from "./lib/origin-allowlist.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { isErrorReported } from "./lib/reported-error.js";
 import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
@@ -53,12 +54,23 @@ const PORT = Number(process.env.AGENT_PORT ?? 3100);
 const HOST = process.env.AGENT_HOST?.trim() || "127.0.0.1";
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const MAX_WS_PAYLOAD_BYTES = 1024 * 1024;
+const ALLOWED_ORIGINS = getAllowedOrigins();
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({
   server,
   maxPayload: MAX_WS_PAYLOAD_BYTES,
   perMessageDeflate: false,
+  // Reject cross-site WebSocket upgrades: browsers don't enforce same-origin for
+  // WS, so a malicious page could otherwise drive create/iterate/revert. The Origin
+  // header (always sent by browsers) is checked against the same allowlist as CORS.
+  verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => {
+    if (isOriginAllowed(info.origin, ALLOWED_ORIGINS)) {
+      return true;
+    }
+    console.warn(`[WS] Rejected upgrade from disallowed origin: ${info.origin}`);
+    return false;
+  },
 });
 let lmStudioInterval: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
@@ -66,13 +78,6 @@ let currentLlmServerUrl = DEFAULT_LM_STUDIO_URL;
 
 app.use(express.json({ limit: "10mb" }));
 
-const ALLOWED_ORIGINS = (
-  process.env.AGENT_ALLOWED_ORIGINS
-    ?.split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-  ?? ["http://localhost:8081", "http://localhost:8082", "http://127.0.0.1:8081"]
-);
 const ALLOWED_HEADERS = ["Content-Type", "X-App-Factory-Confirm"];
 type ArchiverFactory = (
   format: string,
@@ -628,7 +633,7 @@ export const updateLlmServerUrl = (url: string): void => {
 
 const checkLlmServer = async (): Promise<void> => {
   try {
-    const resp = await fetch(`${currentLlmServerUrl}/v1/models`);
+    const resp = await llmFetch(`${currentLlmServerUrl}/v1/models`);
     if (resp.ok) {
       broadcast({ type: "llm_server_status", status: "connected" });
     } else {

@@ -1,6 +1,6 @@
 // Picks a chat/completion model from LM Studio /v1/models, skipping embedding-only ids.
 // Used by llm-proxy when no explicit model is set (enhance, auto generation, etc.).
-import { assertLlmUrl } from "../lib/llm-url.js";
+import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const ENV_CHAT_MODEL = process.env.CHAT_MODEL?.trim() || "";
@@ -127,7 +127,7 @@ export const resolveChatModel = async (
     return existing;
   }
 
-  const fetchFn = options.fetchFn ?? fetch;
+  const fetchFn = options.fetchFn ?? llmFetch;
   const promise = (async () => {
     try {
       const ids = await fetchModelIds(baseUrl, fetchFn);

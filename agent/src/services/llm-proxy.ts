@@ -2,7 +2,7 @@
 import type { Request, Response as ExpressResponse } from "express";
 import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
-import { assertLlmUrl } from "../lib/llm-url.js";
+import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 import { clearChatModelCache, resolveChatModel } from "./chat-model.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
@@ -134,7 +134,7 @@ export const streamCompletion = async (
       controller.abort();
     }, HEADER_TIMEOUT_MS);
     try {
-      response = await fetch(`${baseUrl}/v1/chat/completions`, {
+      response = await llmFetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -199,7 +199,7 @@ export const streamCompletion = async (
         console.log(`[LLM] Model '${resolvedModel}' not found, falling back to '${fallbackModel}'`);
         body.model = fallbackModel;
         try {
-          const retryResp = await fetch(`${baseUrl}/v1/chat/completions`, {
+          const retryResp = await llmFetch(`${baseUrl}/v1/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -340,7 +340,7 @@ export const completeNonStreaming = async (
     const timeout = setTimeout(() => controller.abort(), NON_STREAMING_TIMEOUT_MS);
 
     try {
-      const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+      const response = await llmFetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

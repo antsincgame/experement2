@@ -1,7 +1,7 @@
 // Resolves which LM Studio model to use for /v1/embeddings. Priority: explicit
 // override (settings) -> EMBEDDING_MODEL env -> auto-pick from /v1/models by name.
 // Cached per base URL so generation does not hammer the models endpoint.
-import { assertLlmUrl } from "../lib/llm-url.js";
+import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const ENV_EMBEDDING_MODEL = process.env.EMBEDDING_MODEL?.trim() || "";
@@ -132,7 +132,7 @@ export const resolveEmbeddingModel = async (
   const existing = inflight.get(baseUrl);
   if (existing) return existing;
 
-  const fetchFn = options.fetchFn ?? fetch;
+  const fetchFn = options.fetchFn ?? llmFetch;
   const promise = (async () => {
     try {
       const resolved = await resolveFromServer(baseUrl, fetchFn);

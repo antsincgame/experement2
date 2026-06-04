@@ -3,7 +3,7 @@ import { Router } from "express";
 import { parseOrRespond } from "../lib/request-validation.js";
 import { LlmEnhanceBodySchema } from "../schemas/runtime-input.schema.js";
 import { handleLLMProxyRoute, completeNonStreaming, getActiveRequestCount } from "../services/llm-proxy.js";
-import { assertLlmUrl } from "../lib/llm-url.js";
+import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 import { stripThinkingFromText } from "../lib/strip-thinking.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
@@ -88,7 +88,7 @@ YOUR INSTRUCTIONS:
 
 llmRouter.get("/health", async (_req, res) => {
   try {
-    const response = await fetch(`${DEFAULT_LM_STUDIO_URL}/v1/models`);
+    const response = await llmFetch(`${DEFAULT_LM_STUDIO_URL}/v1/models`);
     if (response.ok) {
       const data = await response.json();
       res.json({
@@ -131,7 +131,7 @@ llmRouter.get("/models", async (req, res) => {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5_000);
-    const response = await fetch(`${baseUrl}/v1/models`, { signal: controller.signal });
+    const response = await llmFetch(`${baseUrl}/v1/models`, { signal: controller.signal });
     clearTimeout(timer);
 
     if (!response.ok) {
