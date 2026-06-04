@@ -24,6 +24,8 @@
 // Neutral domain ("items"/"notes") on purpose: the model copies PATTERNS, not the
 // example's domain or names.
 
+import { findBestExemplar } from "./exemplar-store.js";
+
 /** A LIST screen: load a collection in useEffect, loading + empty states, card rows. */
 export const LIST_SCREEN_EXAMPLE = `import { useEffect, useState } from "react";
 import { FlatList, Pressable } from "react-native";
@@ -291,15 +293,36 @@ export const selectGoldenExample = (file: {
 };
 
 /**
- * Render the selected exemplar into a clearly-labelled prompt block, or "" when
- * there is no match (so the caller adds no empty section and the prompt stays
- * byte-identical to today). Inject AT MOST ONE.
+ * Pick the single best exemplar for a file, preferring a LEARNED one (path B —
+ * captured from the user's own clean generations) over the curated GOLDEN one
+ * (path A). A learned real example from the user's own domain teaches better than the
+ * neutral golden one, but only clean-build / zero-repair files are ever learned (see
+ * exemplar-store.ts + the capture gate in pipeline-codegen-phase.ts), so quality is
+ * preserved.
+ *
+ * Strictly ADDITIVE: returns `findBestExemplar(file)` when a learned exemplar exists,
+ * else `selectGoldenExample(file)`, else null. When there is neither learned nor
+ * golden, the result is null and the prompt stays byte-identical to today.
  */
-export const buildGoldenExampleBlock = (file: {
-  type: string;
-  description: string;
-}): string => {
-  const example = selectGoldenExample(file);
+export const selectExemplar = (
+  file: { type: string; description: string },
+  opts: { dir?: string } = {}
+): string | null => {
+  const learned = findBestExemplar(file, opts);
+  if (learned) return learned;
+  return selectGoldenExample(file);
+};
+
+/**
+ * Render the selected exemplar (learned-then-golden) into a clearly-labelled prompt
+ * block, or "" when there is no match (so the caller adds no empty section and the
+ * prompt stays byte-identical to today). Inject AT MOST ONE.
+ */
+export const buildGoldenExampleBlock = (
+  file: { type: string; description: string },
+  opts: { dir?: string } = {}
+): string => {
+  const example = selectExemplar(file, opts);
   if (!example) return "";
   return `## WORKING EXAMPLE — mirror these patterns (imports, Tamagui/@/ui usage, state, empty/loading states). Adapt to THIS file's purpose; do NOT copy the example's domain or names.\n\n${example}`;
 };
