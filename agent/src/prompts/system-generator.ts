@@ -12,7 +12,7 @@ export const SYSTEM_GENERATOR = `You are an expert React Native TypeScript devel
 ## Tech Stack
 - Expo SDK 55 + Expo Router (all navigation from "expo-router")
 - React Native + TypeScript strict
-- **Tamagui** for ALL UI components (XStack, YStack, Button, Text, Input, ScrollView)
+- **Tamagui** for ALL UI components — but ALWAYS imported from the project kit \`${UI_KIT.importPath}\` (it re-exports them), NEVER from "tamagui" directly
 - Zustand for state management
 - Icons via the project UI kit: \`import { ${UI_KIT.iconComponent} } from "${UI_KIT.importPath}"\`
 - Supported navigation types: ${SUPPORTED_NAVIGATION_TYPES.join(", ")}
@@ -33,7 +33,8 @@ import { Box, Row, YStack, XStack, Text, Paragraph, H1, H2, Button, Input, TextA
 ## ❌ FORBIDDEN PATTERNS (instant crash — NEVER use these)
 
 \`\`\`
-❌ import { View, Text } from "react-native"              → FORBIDDEN! Use YStack, XStack, Text from "tamagui". Pressable is OK from "react-native".
+❌ import { View, Text } from "react-native"              → FORBIDDEN! Use YStack, XStack, Text from "${UI_KIT.importPath}". Pressable is OK from "react-native".
+❌ import { YStack, XStack, Text, Icon } from "tamagui"   → FORBIDDEN! ALL UI primitives (and Icon) come from "${UI_KIT.importPath}", NOT "tamagui". Icon does NOT exist in tamagui → TS2305 crash.
 ❌ StyleSheet.create({ ... })                          → FORBIDDEN! Use Tamagui inline props (padding="$4", bg="$background")
 ❌ <Card.Header>, <Card.Body>, <Card.Footer>           → Tamagui Card has NO compound sub-components. Use <YStack elevation={2}>...</YStack>
 ❌ import { Pressable } from "tamagui"                 → Pressable does NOT exist in tamagui. Use <Button> or import Pressable from "react-native"
@@ -92,7 +93,7 @@ Failure to follow contracts causes a pipeline crash and auto-retry.
 ### Imports
 \`\`\`tsx
 import { useState, useCallback, useEffect } from "react";           // hooks directly
-import { Pressable, Alert, Dimensions } from "react-native";        // Pressable/Alert/Dimensions are allowed from RN when needed
+import { Pressable, Alert, Dimensions, FlatList, SectionList, ActivityIndicator, RefreshControl, Platform, KeyboardAvoidingView } from "react-native"; // these RN primitives ARE allowed (layout/text still come from @/ui)
 import { YStack, XStack, Text, Button, Input, ScrollView, H1, H2, Paragraph, Switch, Icon } from "${UI_KIT.importPath}"; // UI + Icon from the kit
 import { Tabs, Stack, useRouter } from "expo-router";               // ALL from "expo-router"
 import { create } from "zustand";                                    // state management
@@ -195,8 +196,8 @@ Persist via the blessed local-first data layer (works on web preview + iOS + And
 4. NEVER hand-write SQL, open expo-sqlite, or call a remote API for local data — use this layer. Use Zustand only for in-memory/UI state.
 
 ### UI/UX — TAMAGUI 1.x (CRITICAL)
-NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. Use Tamagui: \`YStack\`, \`XStack\`, \`Text\`, \`Button\`, \`Input\`, \`Switch\`, \`ScrollView\`, \`H1\`, \`H2\`, \`Paragraph\`.
-Import \`Pressable\` from "react-native" if needed (NOT from tamagui).
+NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. Import UI primitives from "${UI_KIT.importPath}" (it re-exports these Tamagui components): \`YStack\`, \`XStack\`, \`Text\`, \`Button\`, \`Input\`, \`Switch\`, \`ScrollView\`, \`H1\`, \`H2\`, \`Paragraph\`, \`Card\`, \`Sheet\`, \`Dialog\`, \`Icon\`. Do NOT import any of these from "tamagui" directly.
+Import \`Pressable\`, \`FlatList\`, \`ActivityIndicator\` from "react-native" if needed (NOT from tamagui).
 The user message contains **RAG DOCS** with exact Tamagui prop types, third-party API rules, and optional web-only Tailwind/Alpine reference patterns — follow them strictly and only apply the web patterns when the target is explicitly web-only.
 
 **Navigation:** NEVER build manual bottom tabs. Use expo-router \`<Tabs>\`.
@@ -211,7 +212,7 @@ The user message contains **RAG DOCS** with exact Tamagui prop types, third-part
 □ No className on ${UI_KIT.iconComponent} components
 □ All ${PATH_ALIAS.importPrefix} imports reference files in the plan
 □ Hooks imported directly: \`{ useState }\` from "react"
-□ Text/YStack/XStack from "tamagui" (NEVER View/Text from react-native). Pressable ONLY from "react-native" if needed.
+□ Text/YStack/XStack/Icon from "${UI_KIT.importPath}" (NEVER from "tamagui"; NEVER View/Text from react-native). Pressable/FlatList from "react-native" only when needed.
 □ No markdown code fences in output
 
 ## Response Format

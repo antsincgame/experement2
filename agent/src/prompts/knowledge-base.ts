@@ -2,7 +2,7 @@
 
 export const KNOWLEDGE_BASE = {
   tamaguiCore: `## 📚 RAG DOCS: TAMAGUI 1.x CORE (CRITICAL)
-1. LAYOUT: ALWAYS use <YStack> (col), <XStack> (row), <ZStack> (absolute). NEVER use React Native View. Use \`separator={<Separator />}\` for lists.
+1. LAYOUT: ALWAYS use <YStack> (col), <XStack> (row). NEVER use React Native View. Import ALL primitives (YStack, XStack, Text, Paragraph, H1-H4, Button, Input, TextArea, ScrollView, Card, Switch, Slider, Spinner, Sheet, Dialog, Icon) from "@/ui" — NEVER from "tamagui" directly. Use \`separator={<Separator />}\` for lists.
 2. TEXT: Use <Text>, <Paragraph>, <H1>-<H6>. NEVER use React Native Text.
 3. TOKENS: p="$4", m="$2", gap="$3", br="$4", w="100%", h="$4", flex={1}.
 4. COLORS: Prefer Tamagui tokens like bg="$background", color="$color", borderColor="$borderColor" for Tamagui components. Hex/RGBA values are acceptable for planner theme values and third-party library configs.
@@ -41,13 +41,13 @@ export const KNOWLEDGE_BASE = {
 5. DATE: NEVER use DatePickerIOS/Android. Use a formatted <Input placeholder="YYYY-MM-DD" />.`,
 
   overlays: `## 📚 RAG DOCS: TAMAGUI OVERLAYS (Sheet, Dialog, Toast)
-1. SHEET (Bottom Sheet): Import Sheet from "tamagui". Use COMPOUND syntax (Sheet.Overlay, Sheet.Handle, Sheet.Frame). NEVER import SheetHandle/SheetFrame/SheetOverlay separately. Do NOT use animation prop on Sheet (it does not exist). Do NOT use animation on Sheet.Overlay.
+1. SHEET (Bottom Sheet): Import Sheet from "@/ui". Use COMPOUND syntax (Sheet.Overlay, Sheet.Handle, Sheet.Frame). NEVER import SheetHandle/SheetFrame/SheetOverlay separately. Do NOT use animation prop on Sheet (it does not exist). Do NOT use animation on Sheet.Overlay.
    <Sheet modal open={open} onOpenChange={setOpen} snapPoints={[50]} position={0} dismissOnSnapToBottom>
      <Sheet.Overlay />
      <Sheet.Handle />
      <Sheet.Frame p="$4"><Text>Content</Text></Sheet.Frame>
    </Sheet>
-2. DIALOG (Modal): Import Dialog from "tamagui". Use COMPOUND syntax (Dialog.Portal, Dialog.Overlay, Dialog.Content).
+2. DIALOG (Modal): Import Dialog from "@/ui". Use COMPOUND syntax (Dialog.Portal, Dialog.Overlay, Dialog.Content).
    <Dialog modal open={open} onOpenChange={setOpen}>
      <Dialog.Portal>
        <Dialog.Overlay key="overlay" opacity={0.5} />
@@ -98,12 +98,13 @@ import { createCollection, kv } from "@/services/db";
 4. PATTERN: on mount load getAll() into state; on each mutation call save/remove AND update state.
 NEVER hand-write SQL or call a remote API for local data — use this layer.`,
 
-  sqlite: `## 📚 RAG DOCS: EXPO-SQLITE (MODERN API SDK 51+)
-NEVER use .transaction() or .executeSql(). They WILL CRASH.
-1. INIT: \`const db = SQLite.openDatabaseSync('db.db');\`
-2. WRITE: \`await db.runAsync('INSERT INTO t (col) VALUES (?)', ['val']);\`
-3. READ: \`const rows = await db.getAllAsync('SELECT * FROM t');\`
-4. DDL: \`await db.execAsync('CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY);');\``,
+  sqlite: `## 📚 RAG DOCS: DATABASE / SQL / OFFLINE STORAGE
+This project does NOT use expo-sqlite (it is not installed and is not web-compatible).
+For ALL local/offline/database storage use the blessed "@/services/db" layer instead:
+import { createCollection, kv } from "@/services/db";
+- A "database table" of records → \`const items = createCollection<Item>("items")\`; save/getAll/remove/clear.
+- A single settings/object row → \`kv.set(key, value)\` / \`kv.get<T>(key)\`.
+NEVER import expo-sqlite, write raw SQL, .transaction(), .executeSql(), or open a database file.`,
 
   charts: `## 📚 RAG DOCS: REACT-NATIVE-CHART-KIT
 The 'data' prop MUST exactly match this TS interface to prevent TS2322:
@@ -158,13 +159,12 @@ export const getRelevantDocs = (description: string, dependencies: string[]): st
   if (text.match(/animat|bouncy|toggle|interactive|pressstyle|motion|smooth/)) docs.push(KNOWLEDGE_BASE.animations);
   if (text.match(/alpine|x-data|x-show|x-transition|accordion|dropdown|modal web|micro-?interaction/)) docs.push(KNOWLEDGE_BASE.alpineWeb);
   if (text.match(/tailwind|tailwindcss|hero|landing|marketing|template|dashboard|admin|card grid|pricing|auth form/)) docs.push(KNOWLEDGE_BASE.tailwindTemplates);
-  if (text.match(/save|persist|store|data|list|todo|note|task|track|history|favorite|expense|budget|item|record|crud|collection/)) docs.push(KNOWLEDGE_BASE.persistence);
-  if (text.match(/sqlite|database|db|sql|offline/)) docs.push(KNOWLEDGE_BASE.sqlite);
+  if (text.match(/save|persist|store|data|list|todo|note|task|track|history|favorite|expense|budget|item|record|crud|collection|sqlite|database|db|sql|offline/)) docs.push(KNOWLEDGE_BASE.persistence);
   if (text.match(/chart|stat|analytic|graph/)) docs.push(KNOWLEDGE_BASE.charts);
   if (text.match(/navigat|route|router|screen|tabs|stack|link|expo-router|back button/)) docs.push(KNOWLEDGE_BASE.navigation);
   if (text.match(/flatlist|sectionlist|feed|infinite|pagination|long list|scroll list|render list/)) docs.push(KNOWLEDGE_BASE.lists);
   if (text.match(/zustand|global state|shared state|state management|app store/)) docs.push(KNOWLEDGE_BASE.stateZustand);
   if (text.match(/gesture|swipe|drag|reanimat|safe ?area|keyboard|image|photo|avatar|carousel/)) docs.push(KNOWLEDGE_BASE.gesturesMotion);
 
-  return docs.join("\n\n");
+  return [...new Set(docs)].join("\n\n");
 };

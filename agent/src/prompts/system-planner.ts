@@ -101,9 +101,9 @@ ${SAFE_EXTRA_DEPENDENCIES_LIST}
 
 For charting, prefer react-native-chart-kit unless the user explicitly needs a different supported library.
 
-## Native-only Expo modules (web preview):
-- expo-contacts, expo-haptics, expo-camera, etc. work on iOS/Android only.
-- If the plan uses expo-contacts, you MUST add BOTH app/(tabs)/contacts.tsx (native) AND app/(tabs)/contacts.web.tsx (web fallback UI without importing expo-contacts).
+## Native device modules (contacts, camera, location, sensors, notifications, maps, etc.):
+- They run for real on iOS/Android. On the WEB preview the scaffold AUTOMATICALLY stubs them to safe no-ops (the bundle NEVER crashes), so you do NOT need — and must NOT add — a separate ".web.tsx" fallback file. Plan ONE normal screen (e.g. app/(tabs)/contacts.tsx).
+- Because the stub returns EMPTY data on web, every screen that uses a device module MUST describe a graceful empty/loading state so the web preview still looks intentional.
 - List only the bare package name in extraDependencies (e.g. "expo-contacts") — the scaffold pins SDK-compatible versions.
 
 You MUST strictly use standard React Native libraries. DO NOT invent npm packages.
