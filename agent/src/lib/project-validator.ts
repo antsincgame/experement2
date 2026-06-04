@@ -4,6 +4,7 @@ import path from "path";
 import { Project, ScriptKind, SyntaxKind, type InterfaceDeclaration } from "ts-morph";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import {
+  AUTO_GENERATED_PLAN_FILES,
   getBareModuleName,
   getNavigationLayoutPath,
   ICON_CONTRACT,
@@ -155,14 +156,14 @@ const getNavigationFileIssues = (plan: AppPlan): ValidationIssue[] => {
   const issues: ValidationIssue[] = [];
   const fileSet = new Set(plan.files.map((file) => file.path));
   const navigationType: SupportedNavigationType = plan.navigation?.type ?? "stack";
-  const layoutPath = getNavigationLayoutPath(navigationType);
-
-  if (plan.files.some((file) => file.path === layoutPath)) {
-    issues.push({
-      code: "reserved_layout_path",
-      filePath: layoutPath,
-      message: `${layoutPath} is auto-generated and must not be included in plan.files`,
-    });
+  for (const layoutPath of AUTO_GENERATED_PLAN_FILES) {
+    if (plan.files.some((file) => file.path === layoutPath)) {
+      issues.push({
+        code: "reserved_layout_path",
+        filePath: layoutPath,
+        message: `${layoutPath} is auto-generated and must not be included in plan.files`,
+      });
+    }
   }
 
   for (const screen of plan.navigation?.screens ?? []) {

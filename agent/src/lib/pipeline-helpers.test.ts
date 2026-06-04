@@ -131,6 +131,17 @@ describe("autoHealPlanDependencies", () => {
     expect(added?.description).toContain("Auto-added");
   });
 
+  it("does not auto-add navigation layout files as plan screens", () => {
+    const plan = makePlan([
+      file("app/(tabs)/index.tsx", ["app/(tabs)/_layout.tsx"]),
+    ]);
+
+    autoHealPlanDependencies(plan);
+
+    expect(plan.files.some((f) => f.path === "app/(tabs)/_layout.tsx")).toBe(false);
+    expect(plan.files.some((f) => f.path === "app/_layout.tsx")).toBe(false);
+  });
+
   it("heals EmptyState referenced by tabs but omitted from plan.files", () => {
     const plan = makePlan([
       file("src/types/index.ts", []),
