@@ -15,6 +15,8 @@ const PHASES: { key: ProjectStatus; label: string }[] = [
   { key: "planning", label: "Plan" },
   { key: "scaffolding", label: "Scaffold" },
   { key: "generating", label: "Generate" },
+  { key: "analyzing", label: "Analyze" },
+  { key: "validating", label: "Validate" },
   { key: "building", label: "Build" },
   { key: "ready", label: "Ready" },
 ];
@@ -23,10 +25,10 @@ const PHASE_RANK: Record<string, number> = {
   planning: 0,
   scaffolding: 1,
   generating: 2,
-  analyzing: 2,
-  validating: 3,
-  building: 3,
-  ready: 4,
+  analyzing: 3,
+  validating: 4,
+  building: 5,
+  ready: 6,
 };
 
 interface FileCardProps {

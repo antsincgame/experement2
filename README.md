@@ -53,7 +53,7 @@ Open http://localhost:8081 and start building.
 - 🎯 **Export signature validation** — catches `import { X }` vs `import X` mismatches before Metro
 - 🔍 **Event Log** — full pipeline visibility with filters (ERROR/WARN/INFO)
 - ⚡ **Multi-project preview** — each project gets its own proxy URL
-- ⚙️ **Role-based models** — separate Generation, Planner, **Editor/Fix**, Enhancer, Embedding (optional; empty = auto)
+- ⚙️ **Role-based models** — Planner (architecture), Generation (initial files), **Editor/Fix** (contract/type/Metro fixes + chat iterate), Enhancer, Embedding (optional; empty = auto)
 - 💾 **Settings draft + Save** — edit LM Studio URL and models, then **Save**; close without saving discards changes
 - 🧩 **Thinking-model friendly** — strips `<think>` / `<thinking>`; stream parser + `json_object` on planner/analyze
 - 📦 **Compact generation context** — file manifest + dependency intent instead of full plan JSON on every file (scales to large plans)
@@ -68,7 +68,7 @@ Open http://localhost:8081 and start building.
 | Qwen 2.5 Coder 32B | ~20 GB | High accuracy |
 | GLM 4.7 Flash | ~18 GB | Fast enhance/planning |
 
-**Tip:** set **Planner** and **Editor/Fix** to your strongest loaded model if auto-pick swaps to a weaker one during long runs. Use `/no_think` in prompts where supported; reasoning models still work via strip + parser.
+**Tip:** set **Planner** for architecture and **Editor/Fix** for repairs (contract violations, `tsc` loop, Metro autofix, chat edits). **Generation** is only the first pass over planned files. Use `/no_think` where supported; reasoning models still work via strip + parser.
 
 ## Settings (web UI)
 

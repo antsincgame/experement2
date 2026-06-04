@@ -239,7 +239,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           {/* Model Selectors */}
           <ModelSelector
             label="Generation Model (Code)"
-            hint="Used for all code generation. Leave on auto to use whichever model is first loaded in LM Studio."
+            hint="Used only for the initial file-generation step (screens, components, stores). Contract/type fixes and Metro autofix use Editor/Fix below."
             models={models}
             loading={modelsLoading}
             open={modelDropdownOpen}
@@ -261,7 +261,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
           />
           <ModelSelector
             label="Editor / Fix Model"
-            hint="Used when fixing build/type errors and applying chat edits (Fix Error). Pick a strong instruct/coder model so JSON analysis stays valid. Auto = same as generation."
+            hint="Contract validation, TypeScript type-fix, Metro autofix during create, and chat iterate. Pick a strong instruct/coder model. Auto = same as Generation."
             models={models}
             loading={modelsLoading}
             open={editorDropdownOpen}

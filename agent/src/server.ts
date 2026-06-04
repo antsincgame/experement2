@@ -19,6 +19,7 @@ import { getAllowedOrigins, isOriginAllowed } from "./lib/origin-allowlist.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { isErrorReported } from "./lib/reported-error.js";
 import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
+import { resolveFixModel } from "./lib/model-roles.js";
 import { projectRouter } from "./routes/project.js";
 import { llmRouter } from "./routes/llm.js";
 import { processRouter } from "./routes/process.js";
@@ -531,7 +532,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
                       raw: parsed.raw,
                     },
                     lmStudioUrl: message.lmStudioUrl,
-                    model: message.editorModel || message.model,
+                    model: resolveFixModel(message.editorModel, message.model),
                     maxAttempts: 3,
                     onAttempt: (attempt, max) => emitBuildScopedEvent({
                       type: "autofix_attempt",

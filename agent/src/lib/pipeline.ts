@@ -24,6 +24,12 @@ import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { validateGeneratedProject, validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
+import {
+  formatModelRoleLabel,
+  resolveFixModel,
+  resolveGenerationModel,
+  resolvePlannerModel,
+} from "./model-roles.js";
 import type { SupportedNavigationType } from "./generation-contract.js";
 import { summarizeOutput, autoHealPlanDependencies, dedupeProjectSlug, summarizePlanForChat } from "./pipeline-helpers.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, gitInit, getVersionNumber } from "./git.js";
@@ -310,6 +316,9 @@ const _createProjectInner = async (
     requestId,
     onProjectNameResolved,
   } = options;
+  const generationModel = resolveGenerationModel(model);
+  const fixModel = resolveFixModel(editorModel, model);
+  const plannerResolved = resolvePlannerModel(plannerModel, model);
   const {
     complete,
     createProjectFromCache,
@@ -340,13 +349,13 @@ const _createProjectInner = async (
   emitOperation({
     type: "build_event",
     eventType: "moe_swap",
-    message: `🧠 [MoE] Loading Planner Model (${plannerModel || model || "Auto"})...`,
+    message: formatModelRoleLabel("planner", plannerResolved),
   });
 
   const plan = await planApp({
     description,
     lmStudioUrl,
-    model: plannerModel || model,
+    model: plannerResolved,
     temperature,
     maxTokens,
     topP,
@@ -383,7 +392,7 @@ const _createProjectInner = async (
   emitOperation({
     type: "build_event",
     eventType: "moe_swap",
-    message: `💻 [MoE] Swapping to Generation Model (${model || "Auto"})...`,
+    message: formatModelRoleLabel("generation", generationModel),
   });
 
   const files = await generateFiles({
@@ -391,7 +400,7 @@ const _createProjectInner = async (
     projectPath,
     plan,
     lmStudioUrl,
-    model,
+    model: generationModel,
     embeddingModel,
     semanticRagEnabled,
     temperature,
@@ -415,6 +424,11 @@ const _createProjectInner = async (
 
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
+    emitOperation({
+      type: "build_event",
+      eventType: "moe_swap",
+      message: formatModelRoleLabel("fix", fixModel),
+    });
     const MAX_CONTRACT_RETRIES = 2;
 
     // Build contracts from all generated files
@@ -460,7 +474,7 @@ const _createProjectInner = async (
 
         const fixSuccess = await regenerateFileWithContracts(
           projectSlug, projectPath, fp, violations, allContracts,
-          { lmStudioUrl, model, maxTokens, complete },
+          { lmStudioUrl, model: fixModel, maxTokens, complete },
         );
 
         if (!fixSuccess) {
@@ -482,6 +496,11 @@ const _createProjectInner = async (
   {
     const MAX_TYPE_FIX_ROUNDS = 3;
     emitOperation({ type: "status", status: "validating" });
+    emitOperation({
+      type: "build_event",
+      eventType: "moe_swap",
+      message: `${formatModelRoleLabel("fix", fixModel)} — type-check loop`,
+    });
 
     for (let round = 1; round <= MAX_TYPE_FIX_ROUNDS; round++) {
       const typecheck = await runTypecheck(projectPath);
@@ -523,7 +542,7 @@ const _createProjectInner = async (
             fp,
             fileDiagnostics,
             allContracts,
-            { lmStudioUrl, model, maxTokens, complete }
+            { lmStudioUrl, model: fixModel, maxTokens, complete }
           );
           if (fixed) fixedAny = true;
         } catch (err) {
@@ -628,8 +647,17 @@ const _createProjectInner = async (
   }
 
   // Auto-fix loop: if build failed, try to fix with LLM
+  let metroFixMoeAnnounced = false;
   while (buildError && autoFixAttempts < MAX_BUILD_AUTOFIX) {
     autoFixAttempts++;
+    if (!metroFixMoeAnnounced) {
+      emitBuildScoped(buildId, {
+        type: "build_event",
+        eventType: "moe_swap",
+        message: `${formatModelRoleLabel("fix", fixModel)} — Metro autofix`,
+      });
+      metroFixMoeAnnounced = true;
+    }
     const parsed = parseMetroError(buildError);
     if (!parsed) break;
 
@@ -651,7 +679,7 @@ const _createProjectInner = async (
       projectName: projectSlug,
       error: { type: parsed.type, file: parsed.file, line: parsed.line, raw: parsed.raw },
       lmStudioUrl,
-      model: editorModel || model,
+      model: fixModel,
       complete,
       maxAttempts: 1,
       onAttempt: () =>
@@ -807,6 +835,7 @@ const _iterateProjectInner = async (
   options: IterateOptions
 ): Promise<IterateResult> => {
   const { projectName, userRequest, chatHistory, lmStudioUrl, model, editorModel, temperature, maxTokens, topP, requestId } = options;
+  const fixModel = resolveFixModel(editorModel, model);
   const projectPath = getProjectPath(projectName);
   const emitProject = (message: Record<string, unknown>): void => {
     broadcast({
@@ -817,13 +846,18 @@ const _iterateProjectInner = async (
   };
 
   emitProject({ type: "status", status: "analyzing" });
+  emitProject({
+    type: "build_event",
+    eventType: "moe_swap",
+    message: formatModelRoleLabel("fix", fixModel),
+  });
 
   const result = await editProject({
     projectName,
     userRequest,
     chatHistory,
     lmStudioUrl,
-    model: editorModel || model,
+    model: fixModel,
     temperature,
     maxTokens,
     topP,
