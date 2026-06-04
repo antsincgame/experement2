@@ -194,7 +194,7 @@ Persist via the blessed local-first data layer (works on web preview + iOS + And
 3. **Async:** every method returns a Promise. Load with \`getAll()\` inside \`useEffect\` on mount, push the result into Zustand/useState, and call \`save\`/\`remove\` on every mutation.
 4. NEVER hand-write SQL, open expo-sqlite, or call a remote API for local data — use this layer. Use Zustand only for in-memory/UI state.
 
-### UI/UX — TAMAGUI v2 (CRITICAL)
+### UI/UX — TAMAGUI 1.x (CRITICAL)
 NEVER use react-native \`StyleSheet\`, \`View\`, or \`Text\`. Use Tamagui: \`YStack\`, \`XStack\`, \`Text\`, \`Button\`, \`Input\`, \`Switch\`, \`ScrollView\`, \`H1\`, \`H2\`, \`Paragraph\`.
 Import \`Pressable\` from "react-native" if needed (NOT from tamagui).
 The user message contains **RAG DOCS** with exact Tamagui prop types, third-party API rules, and optional web-only Tailwind/Alpine reference patterns — follow them strictly and only apply the web patterns when the target is explicitly web-only.

@@ -38,12 +38,13 @@ llmRouter.post("/enhance", async (req, res) => {
 The user will give you a short app idea. Your task is to expand it into a rich, tactile, and highly professional product specification.
 
 CRITICAL TECH STACK (DO NOT SUGGEST ANYTHING ELSE):
-- UI Framework: STRICTLY Tamagui v2 (NO Material, NO NativeWind).
+- UI Framework: Tamagui 1.x only (tamagui ~1.114 — YStack, XStack, Button, Text, token props like p="$4"). NO Material, NO NativeWind.
+- NEVER say "Tamagui v2" in your output — this generator does NOT use Tamagui 2. (@tamagui/config/v3 is only a config preset name, not "version 2".)
 - State Management: Zustand.
 - Icons: @expo/vector-icons/Feather.
 - Routing: Expo Router (file-based).
 
-THE TAMAGUI V2 ARSENAL (Weave 3-5 of these into your specification to make it premium):
+THE TAMAGUI DESIGN ARSENAL (1.x APIs — weave 3-5 of these into your specification to make it premium):
 1. Advanced Layouts: YStack/XStack/ZStack with separator={<Separator />}. Use <ThemeInverse> or theme="alt1" for contrasting highlighted sections.
 2. Tactile Interactivity: Specify the use of pseudo-props like pressStyle={{ scale: 0.97 }}, hoverStyle, and focusStyle for highly responsive buttons and cards.
 3. Rich Components: Propose using advanced inputs like ToggleGroup, Slider, Progress, Select (dropdowns), Tabs, and Accordion.

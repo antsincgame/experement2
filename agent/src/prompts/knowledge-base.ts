@@ -1,7 +1,7 @@
 // Surgical RAG knowledge base — token-optimized API snippets injected per-file by keyword matching.
 
 export const KNOWLEDGE_BASE = {
-  tamaguiCore: `## 📚 RAG DOCS: TAMAGUI V2 CORE (CRITICAL)
+  tamaguiCore: `## 📚 RAG DOCS: TAMAGUI 1.x CORE (CRITICAL)
 1. LAYOUT: ALWAYS use <YStack> (col), <XStack> (row), <ZStack> (absolute). NEVER use React Native View. Use \`separator={<Separator />}\` for lists.
 2. TEXT: Use <Text>, <Paragraph>, <H1>-<H6>. NEVER use React Native Text.
 3. TOKENS: p="$4", m="$2", gap="$3", br="$4", w="100%", h="$4", flex={1}.
