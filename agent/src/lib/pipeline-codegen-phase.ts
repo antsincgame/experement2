@@ -14,6 +14,7 @@ import { formatModelRoleLabel } from "./model-roles.js";
 import { autoFix } from "./auto-fixer.js";
 import { applyAutofixWithGate, countTypeErrors } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
+import { recordExemplar } from "./exemplar-store.js";
 import { gitCommit, gitInit } from "./git.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { waitForBuildOutcome, runProjectQualityGates } from "./pipeline-gates.js";
@@ -119,7 +120,14 @@ export const runCodegenAndShip = async (
   
   emitOperation({ type: "generation_complete", filesCount: files.length });
   advanceGenerationCheckpoint(projectSlug, "codegen");
-  
+
+  // Repair signals for the learned-exemplar capture gate (path B). We only learn
+  // exemplars from a generation that built CLEAN with ZERO repair — any contract-fix,
+  // type-fix, or Metro autofix invocation flips one of these flags and disqualifies
+  // the whole project from being used as teaching material (quality-drift guard).
+  let didContractFix = false;
+  let didTypeFix = false;
+
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
     emitOperation({ type: "status", status: "analyzing" });
@@ -165,6 +173,7 @@ export const runCodegenAndShip = async (
         }
   
         retries++;
+        didContractFix = true; // repair ran → disqualify from exemplar capture
         emitOperation({
           type: "autofix_start",
           file: fp,
@@ -233,6 +242,7 @@ export const runCodegenAndShip = async (
           file: fp,
           error: `${fileDiagnostics.length} type error(s)`,
         });
+        didTypeFix = true; // type repair ran → disqualify from exemplar capture
   
         try {
           const fixed = await regenerateFileWithTypeErrors(
@@ -517,7 +527,44 @@ export const runCodegenAndShip = async (
       });
     }
   }
-  
+
+  // ── Learned-exemplar capture (win-rate lever #4, path B) ──
+  // STRICT GATE: learn exemplars ONLY from a CLEAN generation — the project reached
+  // build success / ready preview AND required ZERO repair (no Metro autofix, no
+  // contract-fix, no type-fix). When all three are true, every file is known
+  // first-pass-correct, so a few representative ones (one screen, one store, one
+  // component) become teaching material for future generations. Captured BEFORE the
+  // opt-in auto-polish stage so we learn the model's first-pass output, never polished
+  // edits. Fully wrapped in try/catch + best-effort store: capture can NEVER affect the
+  // already-verified generation result. When in doubt (any repair flag set, or capture
+  // throws), we DON'T learn — the prompt simply falls back to the curated golden one.
+  const cleanGeneration =
+    buildSuccess && autoFixAttempts === 0 && !didContractFix && !didTypeFix;
+  if (cleanGeneration) {
+    try {
+      const seenTypes = new Set<string>();
+      for (const fileSpec of plan.files) {
+        const type = fileSpec.type.toLowerCase().trim();
+        // One representative file per type (screen/store/component) keeps the store
+        // diverse and bounded; the per-type cap in recordExemplar does the rest.
+        if (!["screen", "store", "component"].includes(type)) continue;
+        if (seenTypes.has(type)) continue;
+        const code = readProjectFile(projectSlug, fileSpec.path);
+        if (!code) continue;
+        recordExemplar({
+          type: fileSpec.type,
+          description: fileSpec.description,
+          code,
+        });
+        seenTypes.add(type);
+      }
+    } catch (err) {
+      console.warn(
+        `[Pipeline] Exemplar capture failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
   // ── Step 7 (OPT-IN): Auto-polish design loop ──────────
   // Runs ONLY when explicitly enabled AND the project built successfully. Each
   // accepted change is gated by a typecheck (anti-regression). Fully wrapped so it
