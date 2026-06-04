@@ -18,7 +18,7 @@ import {
   resolvePlannerModel,
 } from "./model-roles.js";
 import { autoHealPlanDependencies, dedupeProjectSlug } from "./pipeline-helpers.js";
-import { formatPlanBriefForChat } from "@shared/plan-brief.js";
+import { formatPlanBriefForChat } from "./plan-brief.js";
 import { saveGenerationState, advanceGenerationCheckpoint } from "./generation-state.js";
 import { createPipelineEmitter } from "./pipeline-emitter.js";
 import { executeCodegenRun } from "./generation-run.js";

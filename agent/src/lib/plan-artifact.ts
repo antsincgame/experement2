@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 import { getProjectPath } from "../services/file-manager.js";
-import { formatPlanBriefForModels } from "@shared/plan-brief.js";
+import { formatPlanBriefForModels } from "./plan-brief.js";
 
 export const PLAN_ARTIFACT_DIR = ".appfactory";
 export const PLAN_BLUEPRINT_FILE = "blueprint.json";

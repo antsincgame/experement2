@@ -17,12 +17,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/plan-brief": ["../src/shared/lib/plan-brief.ts"],
-      "@shared/plan-brief.js": ["../src/shared/lib/plan-brief.ts"]
-    }
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts", "../src/shared/lib/plan-brief.ts"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
