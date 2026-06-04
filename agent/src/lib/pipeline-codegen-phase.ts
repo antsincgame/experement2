@@ -156,7 +156,7 @@ export const runCodegenAndShip = async (
         if (!content) break;
   
         // Auto-heal import mismatches with regex before LLM retry
-        const healed = autoHealImportContracts(content, allContracts);
+        const healed = autoHealImportContracts(content, allContracts, fp);
         if (healed !== content) {
           writeProjectFile(projectSlug, fp, healed);
           content = healed;

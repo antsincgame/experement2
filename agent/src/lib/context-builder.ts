@@ -90,24 +90,31 @@ export const extractExportContracts = (filePath: string): ExportContract[] | nul
               returnObjectKeys = returnType.getProperties().map((p) => p.getName());
             }
           }
-          // Fallback: scan file for store interface
+          // Fallback: UNION all store-shaped interfaces. The dominant Zustand idiom
+          // splits state and actions (`create<CounterState & CounterActions>(...)`);
+          // picking a single interface dropped the action keys and led downstream
+          // contract checks to reject correct destructures.
           if (returnObjectKeys.length === 0) {
             const storeName = actualName.replace(/^use/, "").replace(/Store$/, "");
             const interfaces = sf.getInterfaces();
 
-            // Priority 1: interface matching store name
-            let matched = interfaces.find((i) => {
+            let matched = interfaces.filter((i) => {
               const n = i.getName();
-              return n.includes(storeName) || n.includes("Store") || n.includes("State");
+              return n.includes(storeName) || /(?:Store|State|Actions|Slice)$/.test(n);
             });
 
-            // Priority 2: any interface with 3+ properties (likely the store shape)
-            if (!matched) {
-              matched = interfaces.find((i) => i.getProperties().length >= 3);
+            // Fallback: any interface with 3+ properties (likely the store shape)
+            if (matched.length === 0) {
+              const big = interfaces.find((i) => i.getProperties().length >= 3);
+              if (big) matched = [big];
             }
 
-            if (matched) {
-              returnObjectKeys = matched.getProperties().map((p) => p.getName());
+            if (matched.length > 0) {
+              const keys = new Set<string>();
+              for (const iface of matched) {
+                for (const p of iface.getProperties()) keys.add(p.getName());
+              }
+              returnObjectKeys = [...keys];
               returnTypeStr = `{ ${returnObjectKeys.join("; ")} }`;
             }
           }

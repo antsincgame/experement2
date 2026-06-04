@@ -394,7 +394,7 @@ export interface ContractViolation {
   actual: string;
 }
 
-const IMPORT_SHAPE_REGEX = /import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
+const IMPORT_SHAPE_REGEX = /import\s+(?:type\s+)?(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
 const DESTRUCTURE_HOOK_REGEX = /const\s+\{\s*([^}]+)\s*\}\s*=\s*(use[A-Za-z0-9_]+)\s*\(/g;
 
 const collectTopLevelInterfaceKeys = (iface: InterfaceDeclaration): string[] =>
@@ -417,11 +417,19 @@ const extractStoreKeysFromSource = (
       scriptKind: scriptKindForPath(storePath),
     });
 
-    const storeIface = sourceFile.getInterfaces().find((iface) =>
-      /(?:Store|State)$/.test(iface.getName())
-    );
-    if (storeIface) {
-      return collectTopLevelInterfaceKeys(storeIface);
+    // Union EVERY store-shaped interface, not just the first. The dominant Zustand
+    // idiom splits state and actions (`create<CounterState & CounterActions>(...)`),
+    // so reading only the first `*State` interface dropped all the action keys and
+    // produced false `invalid_destructured_key` violations on correct stores.
+    const storeIfaces = sourceFile
+      .getInterfaces()
+      .filter((iface) => /(?:Store|State|Actions|Slice)$/.test(iface.getName()));
+    if (storeIfaces.length > 0) {
+      const keys = new Set<string>();
+      for (const iface of storeIfaces) {
+        for (const key of collectTopLevelInterfaceKeys(iface)) keys.add(key);
+      }
+      return [...keys];
     }
 
     const fallback = sourceFile.getInterfaces().find((iface) => iface.getProperties().length >= 3);
@@ -432,42 +440,77 @@ const extractStoreKeysFromSource = (
 };
 
 /**
- * Auto-heal import mismatches by rewriting the file on disk.
- * Returns the healed content (or original if nothing changed).
+ * Resolve an import specifier (from `fromFilePath`) to the export contracts of the
+ * module it actually points at, or [] when it resolves to no KNOWN generated file
+ * (a node_modules package, or a scaffold barrel like "@/ui"/"@/services/db" that is
+ * not in the generated-contracts map).
+ *
+ * This is what makes contract matching PATH-SCOPED: a symbol name only matches the
+ * contract of the module that is actually imported. The previous name-only matching
+ * collided a local default `Button` with the named `@/ui` `Button` and silently
+ * rewrote correct code into a typecheck failure.
+ */
+const contractsForSpecifier = (
+  contracts: Record<string, ExportContract[]>,
+  fromFilePath: string,
+  specifier: string,
+): ExportContract[] => {
+  const resolved = resolveImportPath(fromFilePath, specifier);
+  if (!resolved) return [];
+  for (const candidate of candidatePaths(resolved)) {
+    if (contracts[candidate]) return contracts[candidate];
+  }
+  return [];
+};
+
+// Matches one import statement, capturing: type-only modifier, a solo default name,
+// a braced named group, and the module specifier.
+const IMPORT_STATEMENT_REGEX =
+  /import\s+(type\s+)?(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
+
+/**
+ * Auto-heal default/named import-shape mismatches by rewriting the file on disk.
+ * PATH-SCOPED: only rewrites when the import's RESOLVED module owns a contract for
+ * that exact name with the opposite shape — never because a same-named symbol exists
+ * in some other module. Returns the healed content (or the original if unchanged).
  */
 export const autoHealImportContracts = (
   fileContent: string,
   contracts: Record<string, ExportContract[]>,
-): string => {
-  const allContracts = Object.values(contracts).flat();
-  let result = fileContent;
+  fromFilePath = "",
+): string =>
+  fileContent.replace(
+    IMPORT_STATEMENT_REGEX,
+    (full, typeKw, defaultName, namedGroup, modulePath) => {
+      if (typeKw) return full; // type-only imports have no runtime shape to heal
+      const moduleContracts = contractsForSpecifier(contracts, fromFilePath, modulePath);
+      if (moduleContracts.length === 0) return full;
 
-  // Fix: import X from "path" → import { X } from "path" (when X is named export)
-  for (const contract of allContracts) {
-    if (contract.isDefaultExport) continue;
-    const defaultPattern = new RegExp(
-      `import\\s+${contract.name}\\s+from\\s+["']([^"']+)["']`,
-      "g"
-    );
-    result = result.replace(defaultPattern, (_match, modulePath: string) =>
-      `import { ${contract.name} } from "${modulePath}"`
-    );
-  }
+      // import X from "path" → import { X } from "path"  (X is actually a named export)
+      if (defaultName && !namedGroup) {
+        const contract = moduleContracts.find((c) => c.name === defaultName);
+        if (contract && !contract.isDefaultExport) {
+          return `import { ${defaultName} } from "${modulePath}"`;
+        }
+      }
 
-  // Fix: import { X } from "path" → import X from "path" (when X is default export)
-  for (const contract of allContracts) {
-    if (!contract.isDefaultExport) continue;
-    const namedPattern = new RegExp(
-      `import\\s+\\{\\s*${contract.name}\\s*\\}\\s+from\\s+["']([^"']+)["']`,
-      "g"
-    );
-    result = result.replace(namedPattern, (_match, modulePath: string) =>
-      `import ${contract.name} from "${modulePath}"`
-    );
-  }
+      // import { X } from "path" → import X from "path"  (X is actually the default export)
+      if (!defaultName && namedGroup) {
+        const names = namedGroup
+          .split(",")
+          .map((n: string) => n.trim().split(/\s+as\s+/)[0].trim())
+          .filter(Boolean);
+        if (names.length === 1) {
+          const contract = moduleContracts.find((c) => c.name === names[0]);
+          if (contract && contract.isDefaultExport) {
+            return `import ${names[0]} from "${modulePath}"`;
+          }
+        }
+      }
 
-  return result;
-};
+      return full;
+    },
+  );
 
 /** Validate that generated files respect export contracts of their dependencies */
 export const validateFileContracts = (
@@ -487,8 +530,12 @@ export const validateFileContracts = (
     const namedImports = match[2];
     const modulePath = match[3];
 
+    // PATH-SCOPED: only compare against the contract of the module ACTUALLY imported,
+    // so a local symbol never gets flagged because a same-named export lives elsewhere.
+    const moduleContracts = contractsForSpecifier(contracts, filePath, modulePath);
+
     if (defaultImport) {
-      const contract = allContracts.find((c) => c.name === defaultImport);
+      const contract = moduleContracts.find((c) => c.name === defaultImport);
       if (contract && !contract.isDefaultExport) {
         violations.push({
           filePath, dependencyPath: modulePath, code: "named_import_mismatch",
@@ -503,7 +550,7 @@ export const validateFileContracts = (
       for (const raw of namedImports.split(",")) {
         const imp = raw.trim().split(/\s+as\s+/)[0].trim();
         if (!imp) continue;
-        const contract = allContracts.find((c) => c.name === imp);
+        const contract = moduleContracts.find((c) => c.name === imp);
         if (contract && contract.isDefaultExport) {
           violations.push({
             filePath, dependencyPath: modulePath, code: "default_import_mismatch",
