@@ -34,8 +34,11 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
     ? projectList.find((p) => p.name === resumeProjectName)
     : undefined;
 
+  const setGenerationCheckpoint = useProjectStore((state) => state.setGenerationCheckpoint);
+
   const syncResumeStatus = useCallback((fetched: ProjectResumeStatus) => {
     setResumeStatus(fetched);
+    setGenerationCheckpoint(fetched.checkpoint ?? null);
     if (!resumeProjectName) {
       return;
     }
@@ -47,21 +50,12 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
         missingFileCount: fetched.missingFileCount,
       });
     }
-  }, [addProject, resumeProjectName]);
+  }, [addProject, resumeProjectName, setGenerationCheckpoint]);
 
   useEffect(() => {
     if (!resumeProjectName) {
       setResumeStatus(null);
       return;
-    }
-
-    if (listHint?.canResume === false) {
-      setResumeStatus({
-        canResume: false,
-        hasSavedPlan: false,
-        missingFileCount: 0,
-        totalPlanFiles: 0,
-      });
     }
 
     let cancelled = false;

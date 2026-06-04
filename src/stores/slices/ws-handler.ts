@@ -648,6 +648,16 @@ export const createWsHandler = (
       if (!eventProject) {
         break;
       }
+      const checkpoint =
+        msg.checkpoint === "planned" ||
+        msg.checkpoint === "scaffolded" ||
+        msg.checkpoint === "codegen" ||
+        msg.checkpoint === "shipped"
+          ? msg.checkpoint
+          : null;
+      if (isActive) {
+        store.setGenerationCheckpoint(checkpoint);
+      }
       const resumeEntry = store.projectList.find((entry) => entry.name === eventProject);
       if (resumeEntry) {
         store.addProject({

@@ -50,6 +50,7 @@ const initialState = {
   generationProgress: 0,
   currentGeneratingFile: null,
   generationFiles: [],
+  generationCheckpoint: null,
   isConnected: false,
   lmStudioStatus: "checking" as const,
   pendingProjectName: null,

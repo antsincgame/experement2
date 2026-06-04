@@ -7,4 +7,7 @@ export const createProjectRuntimeSlice = (set: ProjectStoreSet) => ({
   setConnected: (isConnected: boolean) => set({ isConnected }),
   setPendingProjectName: (pendingProjectName: string | null) => set({ pendingProjectName }),
   setLmStudioStatus: (lmStudioStatus: LlmStatus) => set({ lmStudioStatus }),
+  setGenerationCheckpoint: (
+    generationCheckpoint: ProjectStateData["generationCheckpoint"],
+  ) => set({ generationCheckpoint }),
 });

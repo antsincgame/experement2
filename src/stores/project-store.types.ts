@@ -83,6 +83,8 @@ export interface ProjectStateData {
   generationProgress: number;
   currentGeneratingFile: string | null;
   generationFiles: GenerationFile[];
+  /** Agent checkpoint from resume_status / status API — truth for pipeline completeness. */
+  generationCheckpoint: "planned" | "scaffolded" | "codegen" | "shipped" | null;
   isConnected: boolean;
   lmStudioStatus: "connected" | "disconnected" | "checking";
   pendingProjectName: string | null;
@@ -121,6 +123,9 @@ export interface ProjectStateActions {
   setGenerationProgress: (progress: number, file: string | null) => void;
   setConnected: (connected: boolean) => void;
   setLmStudioStatus: (status: "connected" | "disconnected" | "checking") => void;
+  setGenerationCheckpoint: (
+    checkpoint: ProjectStateData["generationCheckpoint"],
+  ) => void;
   setPendingProjectName: (name: string | null) => void;
   setPendingCreationRequestId: (requestId: string | null) => void;
   appendStreamingContent: (chunk: string) => void;

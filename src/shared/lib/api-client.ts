@@ -20,6 +20,7 @@ export interface ProjectListItem {
 export interface ProjectResumeStatus {
   canResume: boolean;
   hasSavedPlan: boolean;
+  checkpoint: "planned" | "scaffolded" | "codegen" | "shipped" | null;
   missingFileCount: number;
   totalPlanFiles: number;
 }

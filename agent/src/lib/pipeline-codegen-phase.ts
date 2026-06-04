@@ -20,7 +20,7 @@ import { gitCommit, gitInit } from "./git.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { waitForBuildOutcome, runProjectQualityGates } from "./pipeline-gates.js";
 import { runPolishStage } from "./pipeline-polish.js";
-import { advanceGenerationCheckpoint } from "./generation-state.js";
+import { saveGenerationState } from "./generation-state.js";
 
 export interface CodegenShipResult {
   projectName: string;
@@ -120,8 +120,8 @@ export const runCodegenAndShip = async (
   });
   
   emitOperation({ type: "generation_complete", filesCount: files.length });
+  saveGenerationState(projectSlug, plan, "codegen");
   emitOperation(buildResumeStatusMessage(projectSlug));
-  advanceGenerationCheckpoint(projectSlug, "codegen");
 
   // Repair signals for the learned-exemplar capture gate (path B). We only learn
   // exemplars from a generation that built CLEAN with ZERO repair — any contract-fix,
@@ -279,6 +279,7 @@ export const runCodegenAndShip = async (
   );
   if (!gateResult.success) {
     const message = gateResult.errors.join("\n\n");
+    saveGenerationState(projectSlug, plan, "codegen");
     emitOperation({ type: "system_error", error: message });
     emitOperation({ type: "status", status: "error" });
     emitOperation(buildResumeStatusMessage(projectSlug));
@@ -494,7 +495,7 @@ export const runCodegenAndShip = async (
         previewStatus: "ready",
         buildId,
       });
-      advanceGenerationCheckpoint(projectSlug, "shipped");
+      saveGenerationState(projectSlug, plan, "shipped");
     } else {
       buildSuccess = false;
       buildError = `Metro not ready on port ${expoPort}`;

@@ -5,11 +5,13 @@ import { View, Text, ActivityIndicator } from "react-native";
 import { Check, FileCode2 } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
 import { buildFileMeanings, type FileMeaning } from "@/shared/lib/generation-narration";
+import { GENERATION_PHASE_RANK, isGenerationActive } from "@/shared/lib/generation-status";
 import {
-  GENERATION_PHASE_RANK,
-  GENERATION_STATUS_LABELS,
-  isGenerationActive,
-} from "@/shared/lib/generation-status";
+  getGenerationActivityHeader,
+  isPipelineFullyShipped,
+  resolveTimelineRank,
+  type GenerationCheckpoint,
+} from "@/shared/lib/generation-pipeline-truth";
 import type { ProjectStatus } from "@/shared/schemas/ws-messages";
 
 const PHASES: { key: ProjectStatus; label: string }[] = [
@@ -72,14 +74,21 @@ const FileCard = ({ file }: FileCardProps) => {
   );
 };
 
-const PhaseTimeline = ({ status }: { status: ProjectStatus }) => {
-  const currentRank = GENERATION_PHASE_RANK[status] ?? 0;
+const PhaseTimeline = ({
+  status,
+  checkpoint,
+}: {
+  status: ProjectStatus;
+  checkpoint: GenerationCheckpoint;
+}) => {
+  const currentRank = resolveTimelineRank(status, checkpoint);
+  const fullyShipped = isPipelineFullyShipped(checkpoint);
   return (
     <View className="flex-row items-center gap-1 mb-3 flex-wrap">
       {PHASES.map((phase, index) => {
         const rank = GENERATION_PHASE_RANK[phase.key] ?? 0;
-        const isDone = rank < currentRank || status === "ready";
-        const isActive = rank === currentRank && status !== "ready";
+        const isDone = fullyShipped ? rank <= GENERATION_PHASE_RANK.ready : rank < currentRank;
+        const isActive = !fullyShipped && rank === currentRank && isGenerationActive(status);
         const color = isActive ? "#00E5FF" : isDone ? "#00FF88" : "#5A5A72";
         return (
           <View key={phase.key} className="flex-row items-center gap-1">
@@ -109,6 +118,7 @@ const PhaseTimeline = ({ status }: { status: ProjectStatus }) => {
 
 const GenerationActivity = () => {
   const status = useProjectStore((s) => s.status);
+  const checkpoint = useProjectStore((s) => s.generationCheckpoint);
   const files = useProjectStore((s) => s.generationFiles);
   const progress = useProjectStore((s) => s.generationProgress);
   const plan = useProjectStore((s) => s.plan);
@@ -134,9 +144,7 @@ const GenerationActivity = () => {
         <View className="flex-row items-center gap-2 mb-2">
           {active && <ActivityIndicator size="small" color="#7C4DFF" />}
           <Text style={{ fontSize: 13, fontWeight: "700", color: "#E8E8F4", flex: 1 }}>
-            {active
-              ? GENERATION_STATUS_LABELS[status] ?? "Building your app…"
-              : "Build complete"}
+            {getGenerationActivityHeader(status, checkpoint)}
           </Text>
           {files.length > 0 && (
             <Text style={{ fontSize: 11, color: "#A0A8C0", fontWeight: "600" }}>
@@ -145,7 +153,7 @@ const GenerationActivity = () => {
           )}
         </View>
 
-        <PhaseTimeline status={status} />
+        <PhaseTimeline status={status} checkpoint={checkpoint} />
 
         {active && progress > 0 && progress < 1 && (
           <View
