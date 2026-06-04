@@ -5,7 +5,7 @@ import { writeFile, readFile } from "../services/file-manager.js";
 import path from "path";
 import { buildProjectSkeleton, extractExportContracts, type ExportContract } from "./context-builder.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
-import { formatPlanBriefForModels } from "./plan-brief.js";
+import { formatPlanBriefForModels } from "@shared/plan-brief.js";
 import type { ContractViolation } from "./project-validator.js";
 import { formatDiagnosticsForPrompt, type TypeDiagnostic } from "./typecheck.js";
 import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";

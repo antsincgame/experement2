@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
-import { summarizePlanForChat } from "./plan-brief.js";
+import { summarizePlanForChat } from "@shared/plan-brief.js";
 import {
   summarizeOutput,
   dedupeProjectSlug,

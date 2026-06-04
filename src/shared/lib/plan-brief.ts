@@ -1,4 +1,4 @@
-// Human-readable plan for chat (Cursor-style); JSON lives in .appfactory/blueprint.json on disk.
+// Single source: plan narrative for chat, LLM prompts, and .appfactory/blueprint-brief.md.
 export interface PlanFileEntry {
   path: string;
   type: string;
@@ -12,8 +12,22 @@ export interface PlanBriefInput {
   description?: string;
   files?: PlanFileEntry[];
   extraDependencies?: string[];
-  theme?: { style?: string };
-  navigation?: { type?: string; screens?: Array<{ name: string; path: string }> };
+  theme?: {
+    style?: string;
+    background?: string;
+    surface?: string;
+    primary?: string;
+    primaryText?: string;
+    secondaryText?: string;
+    accent?: string;
+    cardRadius?: number;
+    buttonRadius?: number;
+    isDark?: boolean;
+  };
+  navigation?: {
+    type?: string;
+    screens?: Array<{ name: string; path: string; icon?: string }>;
+  };
 }
 
 const fileLabel = (path: string): string => path.split("/").pop() ?? path;
@@ -23,10 +37,90 @@ const firstSentence = (text: string, max = 110): string => {
   return sentence.length > max ? `${sentence.slice(0, max - 1).trimEnd()}…` : sentence;
 };
 
+const sectionFiles = (
+  title: string,
+  files: PlanFileEntry[],
+  fullDescriptions: boolean,
+): string[] => {
+  if (files.length === 0) return [];
+  const lines = [`## ${title}`];
+  for (const file of files) {
+    lines.push(`### \`${file.path}\` (${file.type})`);
+    lines.push(fullDescriptions ? file.description : firstSentence(file.description, 200));
+    const deps = file.dependencies ?? [];
+    if (deps.length > 0) {
+      lines.push(`Imports: ${deps.join(", ")}`);
+    }
+    lines.push("");
+  }
+  return lines;
+};
+
 /**
- * Markdown brief shown in the Plan card — mirrors agent summarizePlanForChat.
+ * Rich product blueprint for codegen / editor / fix models.
+ * Full descriptions on screens + target-adjacent types; JSON stays for validators only.
  */
-export const formatPlanBrief = (plan: PlanBriefInput): string => {
+export const formatPlanBriefForModels = (plan: PlanBriefInput): string => {
+  const files = plan.files ?? [];
+  const theme = plan.theme;
+  const nav = plan.navigation;
+  const screens = files.filter((f) => f.type === "screen");
+  const components = files.filter((f) => f.type === "component");
+  const stores = files.filter((f) => f.type === "store");
+  const hooks = files.filter((f) => f.type === "hook");
+  const types = files.filter((f) => f.type === "type");
+  const other = files.filter(
+    (f) => !["screen", "component", "store", "hook", "type"].includes(f.type),
+  );
+  const displayName = plan.displayName ?? plan.name ?? "App";
+  const slug = plan.name ?? "app";
+
+  const lines: string[] = [
+    `# ${displayName} (\`${slug}\`)`,
+    "",
+    "## Vision",
+    plan.description ?? "",
+    "",
+    "## Design system",
+    `Style: ${theme?.style ?? "premium"} · ${theme?.isDark ? "dark" : "light"} UI`,
+    `Colors: background ${theme?.background}, surface ${theme?.surface}, primary ${theme?.primary}, accent ${theme?.accent}`,
+    `Typography: primaryText ${theme?.primaryText}, secondaryText ${theme?.secondaryText}`,
+    `Radii: cards ${theme?.cardRadius}px, buttons ${theme?.buttonRadius}px`,
+    "",
+    "## Navigation",
+    `Type: ${nav?.type ?? "stack"}`,
+  ];
+
+  for (const screen of nav?.screens ?? []) {
+    lines.push(
+      `- **${screen.name}** → \`${screen.path}\`${screen.icon ? ` (icon: ${screen.icon})` : ""}`,
+    );
+  }
+
+  const extraDeps = plan.extraDependencies ?? [];
+  if (extraDeps.length > 0) {
+    lines.push("", "## Packages", extraDeps.map((d) => `- ${d}`).join("\n"));
+  }
+
+  lines.push(
+    "",
+    "## Build map",
+    `${files.length} files total. Follow this narrative first; \`.appfactory/blueprint.json\` is the exact path/dependency graph.`,
+    "",
+  );
+
+  lines.push(...sectionFiles("Screens (full spec)", screens, true));
+  lines.push(...sectionFiles("Reusable components", components, true));
+  lines.push(...sectionFiles("State (Zustand)", stores, true));
+  lines.push(...sectionFiles("Hooks", hooks, true));
+  lines.push(...sectionFiles("Types", types, true));
+  lines.push(...sectionFiles("Other", other, true));
+
+  return lines.join("\n").trim();
+};
+
+/** Scannable brief for the UI chat card (first-person, no token dump). */
+export const formatPlanBriefForChat = (plan: PlanBriefInput): string => {
   const files = plan.files ?? [];
   const byType = (type: string): PlanFileEntry[] => files.filter((f) => f.type === type);
   const screens = byType("screen");
@@ -47,21 +141,13 @@ export const formatPlanBrief = (plan: PlanBriefInput): string => {
   ];
 
   const scope: string[] = [];
-  if (screens.length > 0) {
-    scope.push(`**${screens.length}** screen${screens.length > 1 ? "s" : ""}`);
-  }
+  if (screens.length > 0) scope.push(`**${screens.length}** screen${screens.length > 1 ? "s" : ""}`);
   if (components.length > 0) {
     scope.push(`**${components.length}** component${components.length > 1 ? "s" : ""}`);
   }
-  if (stores.length > 0) {
-    scope.push(`**${stores.length}** store${stores.length > 1 ? "s" : ""}`);
-  }
-  if (hooks.length > 0) {
-    scope.push(`**${hooks.length}** hook${hooks.length > 1 ? "s" : ""}`);
-  }
-  if (scope.length > 0) {
-    lines.push("", scope.join(" · "));
-  }
+  if (stores.length > 0) scope.push(`**${stores.length}** store${stores.length > 1 ? "s" : ""}`);
+  if (hooks.length > 0) scope.push(`**${hooks.length}** hook${hooks.length > 1 ? "s" : ""}`);
+  if (scope.length > 0) lines.push("", scope.join(" · "));
 
   if (screens.length > 0) {
     lines.push("", "**Screens**");
@@ -72,8 +158,8 @@ export const formatPlanBrief = (plan: PlanBriefInput): string => {
 
   if (components.length > 0) {
     lines.push("", "**Shared UI**");
-    for (const component of components) {
-      lines.push(`- **${fileLabel(component.path)}** — ${firstSentence(component.description, 90)}`);
+    for (const c of components) {
+      lines.push(`- **${fileLabel(c.path)}** — ${firstSentence(c.description, 90)}`);
     }
   }
 
@@ -92,20 +178,26 @@ export const formatPlanBrief = (plan: PlanBriefInput): string => {
     }
   }
 
-  const extras = plan.extraDependencies ?? [];
-  if (extras.length > 0) {
-    lines.push("", `**Packages:** ${extras.map((d) => `\`${d}\``).join(", ")}`);
+  const chatExtras = plan.extraDependencies ?? [];
+  if (chatExtras.length > 0) {
+    lines.push("", `**Packages:** ${chatExtras.map((d) => `\`${d}\``).join(", ")}`);
   }
 
   lines.push(
     "",
     `**${files.length} files** in the build queue.`,
     "",
-    "*Full narrative for models:* `.appfactory/blueprint-brief.md` · *dependency graph:* `blueprint.json`.",
+    "*Models read the full narrative from* `.appfactory/blueprint-brief.md` *; JSON in* `blueprint.json` *is for tools and validation.*",
   );
 
   return lines.join("\n");
 };
+
+/** @deprecated Alias — use formatPlanBriefForChat */
+export const summarizePlanForChat = formatPlanBriefForChat;
+
+/** @deprecated Alias — use formatPlanBriefForChat */
+export const formatPlanBrief = formatPlanBriefForChat;
 
 export const PLAN_DRAFTING_PLACEHOLDER =
   "**Drafting the blueprint…**\n\n" +

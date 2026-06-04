@@ -5,7 +5,7 @@ import {
   resolveFixModel,
   resolveGenerationModel,
 } from "./model-roles.js";
-import { formatPlanBriefForChat } from "./plan-brief.js";
+import { formatPlanBriefForChat } from "@shared/plan-brief.js";
 import { createPipelineEmitter } from "./pipeline-emitter.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { runCodegenAndShip, type CodegenShipResult } from "./pipeline-codegen-phase.js";
