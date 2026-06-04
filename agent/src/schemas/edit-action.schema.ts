@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const EditActionSchema = z.object({
-  thinking: z.string(),
+  thinking: z.string().default(""),
   action: z.enum(["read_files", "no_changes_needed", "install_package"]),
   files: z.array(z.string()).default([]),
   newFiles: z

@@ -111,17 +111,26 @@ export const editProject = async (
     model,
   });
 
-  const parseAnalyzeAction = (raw: string): EditAction | null => {
+  const parseAnalyzeAction = (
+    raw: string,
+  ): { action: EditAction | null; rawSnippet: string } => {
     const cleaned = stripThinkingFromText(raw);
+    const snippet = cleaned.trim().slice(0, 400);
     const parsed = safeJsonParse(cleaned);
     if (parsed === null) {
-      return null;
+      return { action: null, rawSnippet: snippet };
     }
     const result = EditActionSchema.safeParse(parsed);
-    return result.success ? result.data : null;
+    return {
+      action: result.success ? result.data : null,
+      rawSnippet: snippet,
+    };
   };
 
-  let action = parseAnalyzeAction(await collectStream(analyzeGen));
+  let lastSnippet = "";
+  let firstPass = parseAnalyzeAction(await collectStream(analyzeGen));
+  let action = firstPass.action;
+  lastSnippet = firstPass.rawSnippet;
 
   if (!action) {
     const retryGen = await complete(
@@ -130,22 +139,26 @@ export const editProject = async (
         {
           role: "user" as const,
           content:
-            "/no_think\nYour previous reply was not valid JSON. Respond with ONLY one JSON object matching the edit-action schema. No markdown, no prose.",
+            "/no_think\nYour previous reply was not valid JSON. Respond with ONLY one JSON object matching the edit-action schema (fields: thinking, action, files, newFiles, filesToDelete, newDependencies). No markdown, no prose.",
         },
       ],
       {
         temperature: 0,
-        maxTokens: 4096,
+        maxTokens: 8192,
         responseFormat: { type: "json_object" },
         lmStudioUrl,
         model,
       },
     );
-    action = parseAnalyzeAction(await collectStream(retryGen));
+    const retryPass = parseAnalyzeAction(await collectStream(retryGen));
+    action = retryPass.action;
+    lastSnippet = retryPass.rawSnippet || lastSnippet;
   }
 
   if (!action) {
-    throw new Error("Editor analysis returned unrecoverable JSON");
+    throw new Error(
+      `Editor analysis returned unrecoverable JSON\n${lastSnippet || "(empty model response)"}`,
+    );
   }
 
   onAnalysis?.(action);

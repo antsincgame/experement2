@@ -41,13 +41,12 @@ describe("EditActionSchema", () => {
     ).toThrow();
   });
 
-  it("requires thinking field", () => {
-    expect(() =>
-      EditActionSchema.parse({
-        action: "read_files",
-        files: [],
-      })
-    ).toThrow();
+  it("defaults thinking to empty string when omitted", () => {
+    const result = EditActionSchema.parse({
+      action: "read_files",
+      files: [],
+    });
+    expect(result.thinking).toBe("");
   });
 
   it("parses newFiles and filesToDelete", () => {
