@@ -114,6 +114,40 @@ const patchProjectListEntry = (
   });
 };
 
+/** Keep projectList in sync even when live workspace projectName lags behind WS events. */
+const advanceProjectListPhase = (
+  set: StoreSet,
+  get: StoreGet,
+  projectName: string,
+  signal: GenerationPhaseSignal,
+): AppStatus | null => {
+  const previous =
+    get().projectList.find((project) => project.name === projectName)?.status ?? "idle";
+  const next = resolveGenerationPhase(previous, signal);
+  if (next && next !== previous) {
+    patchProjectListEntry(set, get, projectName, { status: next });
+  }
+  return next;
+};
+
+const advanceProjectPhase = (
+  set: StoreSet,
+  get: StoreGet,
+  store: ReturnType<StoreGet>,
+  projectName: string | null,
+  signal: GenerationPhaseSignal,
+  options: { syncActive: boolean; logRegressive?: { source: string; from: AppStatus; to: AppStatus } },
+): AppStatus | null => {
+  let listNext: AppStatus | null = null;
+  if (projectName) {
+    listNext = advanceProjectListPhase(set, get, projectName, signal);
+  }
+  if (!options.syncActive) {
+    return listNext;
+  }
+  return commitActiveGenerationPhase(get, store, signal, options.logRegressive) ?? listNext;
+};
+
 const applyPreviewStatus = (
   store: ReturnType<StoreGet>,
   previewStatus: "stopped" | "starting" | "ready" | "error",
@@ -167,28 +201,25 @@ export const createWsHandler = (
         if (statusProject) {
           const bgPrevious =
             get().projectList.find((p) => p.name === statusProject)?.status ?? "idle";
-          const bgNext = resolveGenerationPhase(bgPrevious, {
+          const bgNext = advanceProjectListPhase(set, get, statusProject, {
             kind: "agent_status",
             status: msg.status,
           });
           if (bgNext && bgNext !== bgPrevious) {
-            patchProjectListEntry(set, get, statusProject, { status: bgNext });
-          }
-          // Mirror phase transitions into the background project's chat cache so
-          // returning to it shows a complete timeline, not just the final state.
-          const bgChat = get().projectChats[statusProject];
-          const bgPlan = bgChat?.plan ?? null;
-          const phaseText = formatPhaseChatNarration(
-            msg.status,
-            {
-              displayName:
-                typeof bgPlan?.displayName === "string" ? bgPlan.displayName : undefined,
-              projectName: statusProject,
-            },
-            bgPrevious,
-          ) ?? GENERATION_STATUS_LABELS[msg.status];
-          if (phaseText) {
-            store.appendBackgroundMessage(statusProject, createProcessMessage("phase", phaseText));
+            const bgChat = get().projectChats[statusProject];
+            const bgPlan = bgChat?.plan ?? null;
+            const phaseText = formatPhaseChatNarration(
+              bgNext,
+              {
+                displayName:
+                  typeof bgPlan?.displayName === "string" ? bgPlan.displayName : undefined,
+                projectName: statusProject,
+              },
+              bgPrevious,
+            ) ?? GENERATION_STATUS_LABELS[bgNext];
+            if (phaseText) {
+              store.appendBackgroundMessage(statusProject, createProcessMessage("phase", phaseText));
+            }
           }
         } else if (get().projectName) {
           log({ level: "warn", source: "ws", message: `Ignored unscoped status event: ${msg.status}` });
@@ -196,11 +227,17 @@ export const createWsHandler = (
         break;
       }
       const previousStatus = get().status;
-      const advanced = commitActiveGenerationPhase(
+      const phaseTarget = statusProject ?? get().projectName;
+      const advanced = advanceProjectPhase(
+        set,
         get,
         store,
+        phaseTarget,
         { kind: "agent_status", status: msg.status },
-        { source: "status", from: previousStatus, to: msg.status },
+        {
+          syncActive: true,
+          logRegressive: { source: "status", from: previousStatus, to: msg.status },
+        },
       );
       if (!advanced) {
         break;
@@ -395,12 +432,9 @@ export const createWsHandler = (
       }
 
       set({ projectName, pendingProjectName: null, pendingCreationRequestId: null });
-      const scaffoldNext = commitActiveGenerationPhase(get, store, {
-        kind: "scaffold_complete",
+      advanceProjectPhase(set, get, store, projectName, { kind: "scaffold_complete" }, {
+        syncActive: true,
       });
-      if (scaffoldNext) {
-        patchProjectListEntry(set, get, projectName, { status: scaffoldNext });
-      }
       emitChat(createProcessMessage("phase", formatScaffoldReadyNarration(projectName)));
       log({ level: "info", source: "pipeline", message: `Scaffold complete: ${projectName}` });
       void fetchProjectFiles(projectName);
@@ -487,13 +521,10 @@ export const createWsHandler = (
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
       } else if (eventType === "build_success") {
         log({ level: "info", source: "metro", message: "Build success" });
-        if (isActive) {
-          const buildNext = commitActiveGenerationPhase(get, store, { kind: "build_success" });
-          const activeProject = get().projectName;
-          if (buildNext && activeProject) {
-            patchProjectListEntry(set, get, activeProject, { status: buildNext });
-          }
-        }
+        const buildTarget = eventProject ?? get().projectName;
+        advanceProjectPhase(set, get, store, buildTarget, { kind: "build_success" }, {
+          syncActive: isActive,
+        });
       } else {
         log({ level: "info", source: "metro", message: msg.message || eventType });
       }
@@ -523,10 +554,8 @@ export const createWsHandler = (
 
     case "preview_ready": {
       if (!matchesActiveProject(get, msg)) {
-        patchProjectListEntry(set, get, msg.projectName, {
-          status: "ready",
-          port: msg.port,
-        });
+        advanceProjectListPhase(set, get, msg.projectName, { kind: "preview_ready" });
+        patchProjectListEntry(set, get, msg.projectName, { port: msg.port });
         break;
       }
       const currentProject = get().projectName;
@@ -537,7 +566,9 @@ export const createWsHandler = (
           buildId: msg.buildId,
           error: null,
         });
-        commitActiveGenerationPhase(get, store, { kind: "preview_ready" });
+        advanceProjectPhase(set, get, store, msg.projectName, { kind: "preview_ready" }, {
+          syncActive: true,
+        });
         if (prevPort !== msg.port) {
           const plan = get().plan;
           const previewName =

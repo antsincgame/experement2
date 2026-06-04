@@ -207,6 +207,20 @@ describe("buildProjectSwitchState", () => {
     });
   });
 
+  it("restores the more advanced phase when list lags during __creating__ handoff", () => {
+    const state = createState();
+    state.projectName = "__creating__";
+    state.status = "building";
+    state.plan = { name: "beta" };
+    state.projectList = [
+      { name: "beta", displayName: "Beta", status: "scaffolding", port: null, createdAt: 2 },
+    ];
+
+    const nextState = buildProjectSwitchState(state, "beta");
+
+    expect(nextState.status).toBe("building");
+  });
+
   it("restores cached generation progress when returning to a project", () => {
     const state = createState();
     state.generationFiles = [{ path: "app/index.tsx", code: "", status: "streaming" }];

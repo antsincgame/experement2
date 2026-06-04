@@ -1,5 +1,11 @@
 // Keeps project and preview store transitions pure so lifecycle changes remain testable.
-import { CREATING_PROJECT_SLUG, isCreatingRoute } from "@/shared/lib/creation-flow";
+import {
+  CREATING_PROJECT_SLUG,
+  getPlannedProjectSlug,
+  isCreatingRoute,
+} from "@/shared/lib/creation-flow";
+import { pickMonotonicGenerationStatus } from "@/shared/lib/generation-phase-machine";
+import type { ProjectStatus } from "@/shared/schemas/ws-messages";
 import { readProjectWorkspaceCache } from "./project-cache";
 import type {
   ProjectChat,
@@ -183,9 +189,18 @@ export const buildProjectSwitchState = (
       streamingContent: state.streamingContent || storedChat.streamingContent,
     }
     : storedChat;
+  const listStatus: ProjectStatus =
+    state.projectList.find((project) => project.name === projectName)?.status ?? "ready";
+  const creatingForTarget =
+    isCreatingRoute(state.projectName) &&
+    getPlannedProjectSlug(state.plan) === projectName;
+  const liveStatus: ProjectStatus =
+    state.projectName === projectName || creatingForTarget
+      ? state.status
+      : listStatus;
   const nextStatus = creating
     ? state.status
-    : state.projectList.find((project) => project.name === projectName)?.status ?? "ready";
+    : pickMonotonicGenerationStatus(listStatus, liveStatus);
   const workspace = readProjectWorkspaceCache(projectChats, projectName);
 
   return {

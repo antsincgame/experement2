@@ -68,3 +68,17 @@ export const resolveGenerationPhase = (
   }
   return target;
 };
+
+/** When switching projects, never restore a regressive phase from a stale list entry. */
+export const pickMonotonicGenerationStatus = (
+  stored: ProjectStatus,
+  live: ProjectStatus,
+): ProjectStatus => {
+  if (shouldAdvanceGenerationStatus(stored, live)) {
+    return live;
+  }
+  if (shouldAdvanceGenerationStatus(live, stored)) {
+    return stored;
+  }
+  return stored;
+};

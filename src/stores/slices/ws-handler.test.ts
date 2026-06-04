@@ -543,6 +543,31 @@ describe("createWsHandler", () => {
     expect(harness.getState().projectName).toBe("spark-dating");
   });
 
+  it("build_success updates project list while viewing another project", () => {
+    const harness = createHarness();
+    harness.getState().setProjectName("alpha");
+    harness.getState().setStatus("ready");
+    harness.getState().addProject({
+      name: "buddy",
+      displayName: "Buddy",
+      status: "scaffolding",
+      port: null,
+      createdAt: 2,
+    });
+
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "buddy",
+      buildId: BUILD_ID,
+      eventType: "build_success",
+      message: "Bundled",
+    });
+
+    expect(harness.getState().projectList.find((p) => p.name === "buddy")?.status).toBe("building");
+    expect(harness.getState().status).toBe("ready");
+  });
+
   it("build_success bumps status to building when UI lagged on scaffolding", () => {
     const harness = createHarness();
     harness.getState().setProjectName("spark-dating");

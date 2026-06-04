@@ -1,9 +1,9 @@
 // Transition matrix for centralized generation phase machine.
 import { describe, expect, it } from "vitest";
 import {
+  pickMonotonicGenerationStatus,
   resolveGenerationPhase,
   shouldAdvanceGenerationStatus,
-  type GenerationPhaseSignal,
 } from "./generation-phase-machine";
 
 describe("resolveGenerationPhase", () => {
@@ -44,6 +44,13 @@ describe("resolveGenerationPhase", () => {
       resolveGenerationPhase("ready", { kind: "iteration_complete", failed: true }),
     ).toBe("error");
     expect(resolveGenerationPhase("building", { kind: "fatal_error" })).toBe("error");
+  });
+});
+
+describe("pickMonotonicGenerationStatus", () => {
+  it("prefers the more advanced phase when list lags live workspace", () => {
+    expect(pickMonotonicGenerationStatus("scaffolding", "building")).toBe("building");
+    expect(pickMonotonicGenerationStatus("building", "scaffolding")).toBe("building");
   });
 });
 
