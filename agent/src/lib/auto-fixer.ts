@@ -7,6 +7,7 @@ import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
 import { SYSTEM_AUTOFIX } from "../prompts/system-editor.js";
 import { applySearchReplace } from "./search-replace.js";
 import { isUnsafeEditPath } from "./editor.js";
+import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 
 export interface MetroError {
   type: string;
@@ -120,11 +121,18 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
 
     const errorHint = getErrorHint(error.raw);
 
+    // Surface a concrete "this error → this fix" exemplar from past successful
+    // autofixes. Advisory only: no match means an empty string and a byte-identical prompt.
+    const pastFix = buildPastFixBlock(
+      findSimilarFixes(error.raw, { file: error.file })
+    );
+    const pastFixBlock = pastFix ? `${pastFix}\n\n` : "";
+
     const messages = [
       { role: "system" as const, content: SYSTEM_AUTOFIX },
       {
         role: "user" as const,
-        content: `/no_think\nProject skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro/TypeScript error:\n${error.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
+        content: `/no_think\n${pastFixBlock}Project skeleton:\n${skeleton.summary}\n\nFile with error:\n// === ${error.file} ===\n${fileContent}\n\nMetro/TypeScript error:\n${error.raw}\n${errorHint}\n\nFix this error with SEARCH/REPLACE blocks. DO NOT change anything else.`,
       },
     ];
 
