@@ -17,6 +17,20 @@ export const KNOWLEDGE_BASE = {
 11. TYPES: If you use a custom type (like Todo), you MUST import it: import type { Todo } from "@/types/index".
 12. THEME NAME: <Theme name="light"> or <Theme name="dark"> ONLY. For conditional styling use inline props: bg={isActive ? "$blue5" : "$gray3"}.`,
 
+  designSystem: `## 📚 RAG DOCS: PREMIUM DESIGN SYSTEM & PATTERNS
+1. SPACING SCALE: one rhythm everywhere — p="$4" screens, gap="$3" between list items, "$2" inside cards, "$5"+ between sections. Consistent spacing is the biggest driver of a "designed" look.
+2. TYPE SCALE: <H1> hero, <H2> screen title, bold <Text> for card titles, <Paragraph> body, small + opacity={0.6} for meta. Pair a bold title with a muted subtitle.
+3. CARD (the default building block): <YStack p="$4" br="$6" borderWidth={1} borderColor="$borderColor" elevation={2} gap="$2">. Group content into cards instead of loose stacked elements.
+4. STAT CARD: a Row of 2-3 cards, each = small muted label + big bold number (<H2>) + tiny trend caption. Ideal for dashboards/home.
+5. LIST ROW: <XStack ai="center" gap="$3" p="$3"> leading Icon/avatar, <YStack f={1}> title + muted subtitle </YStack>, trailing chevron or value. Wrap in Pressable with pressStyle.
+6. SECTION HEADER: small uppercase muted label, optional trailing "See all" text button, above a group of cards.
+7. EMPTY STATE: centered <YStack ai="center" gap="$3" p="$6"> big Icon + <H3> title + muted one-line subtitle + a primary Button CTA. Never show a blank list.
+8. SKELETON LOADING: while loading render 3-5 placeholder rows (YStack bg="$borderColor" opacity={0.4} br="$4" with a fixed height) instead of a blank screen or bare spinner.
+9. FAB: floating circular primary action — <Button position="absolute" b="$5" r="$5" w={56} h={56} br={28} bg="$primary" elevation={4}>.
+10. PRIMARY CTA: exactly one filled bg="$primary" button per view; secondary actions are outline/ghost. Full-width primary at the bottom of forms.
+11. MICRO-INTERACTION: pressStyle={{ scale: 0.97 }} on every tappable; animation="bouncy" + enterStyle on cards/lists/sheets; expo-haptics on key actions.
+12. AVOID (reads as primitive): single font size, gray-on-white flat blocks with no cards, no empty/loading states, default unstyled buttons, no press feedback, cramped or zero spacing, everything left-aligned.`,
+
   forms: `## 📚 RAG DOCS: TAMAGUI FORMS & INPUTS
 1. INPUTS: <Input placeholder="Type..." bw={1} bc="$borderColor" /> or <TextArea />.
 2. SWITCH: MUST use 'checked' and 'onCheckedChange' (NOT value/onChange).
@@ -136,7 +150,7 @@ NOTE: add "zustand" to the plan dependencies (known-safe extra). For small scree
 };
 
 export const getRelevantDocs = (description: string, dependencies: string[]): string => {
-  const docs = [KNOWLEDGE_BASE.tamaguiCore];
+  const docs = [KNOWLEDGE_BASE.tamaguiCore, KNOWLEDGE_BASE.designSystem];
   const text = (description + " " + dependencies.join(" ")).toLowerCase();
 
   if (text.match(/form|input|setting|switch|slider|check|radio/)) docs.push(KNOWLEDGE_BASE.forms);

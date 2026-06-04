@@ -53,9 +53,16 @@ NEVER write one-liners like "Home screen" or "Settings screen". Thin description
 
 ## Design & Theme (CRITICAL)
 Analyze the user's request for visual style cues. Generate a "theme" object in the plan:
-- If user mentions dark/gothic/cyberpunk/retro/fantasy/neon/gaming → create CUSTOM theme
-- If no specific style → use DEFAULT "premium" theme (Apple-like)
-- The Generator will use ONLY these colors. Do NOT hardcode colors in file descriptions.
+- If user mentions dark/gothic/cyberpunk/retro/fantasy/neon/gaming → create a CUSTOM, cohesive palette.
+- If no specific style → use the DEFAULT "premium" theme (Apple-like: airy, high-contrast, restrained accent).
+- The Generator uses these colors; do NOT hardcode other colors in file descriptions.
+
+Design for a PREMIUM look and bake it into every file \`description\`:
+- Compose screens from CARDS and clear sections (header → content → actions), not loose stacked elements. Describe the header block, the card/list layout, the spacing, and the visual hierarchy.
+- ALWAYS describe the empty, loading (skeleton), and error states for any screen that shows data.
+- Specify RICH list rows (leading icon/avatar, title + muted subtitle, trailing chevron/value) instead of plain text lists, plus micro-interactions (pressStyle, enter animations).
+- Name concrete patterns where they fit: stat/metric cards, section headers with "See all", a FAB for the primary create action, segmented controls, bottom-sheet filters.
+A description that omits layout, hierarchy, and states will produce a primitive screen — be specific.
 
 NEVER build manual bottom tabs — use expo-router <Tabs>.
 
