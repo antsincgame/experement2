@@ -79,8 +79,13 @@ export const matchesActiveProject = (
     }
 
     const target = resolveEventProject(get, msg);
-    if (!viewing || !target) {
+    if (!viewing) {
+      // No active project: nothing to protect, accept.
       return true;
+    }
+    if (!target) {
+      // Can't determine which project owns this event — reject to be safe.
+      return false;
     }
     return viewing === target || isCreatingRoute(viewing);
   }

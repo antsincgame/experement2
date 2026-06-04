@@ -88,6 +88,7 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   const [editorDropdownOpen, setEditorDropdownOpen] = useState(false);
   const [enhancerDropdownOpen, setEnhancerDropdownOpen] = useState(false);
   const [embeddingDropdownOpen, setEmbeddingDropdownOpen] = useState(false);
+  const [polishDropdownOpen, setPolishDropdownOpen] = useState(false);
 
   const fetchModels = useCallback(async () => {
     setModelsLoading(true);
@@ -417,11 +418,24 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
                 </Text>
               </Pressable>
             </View>
-            <Text style={{ fontSize: 10, color: "#8888AA", lineHeight: 15 }}>
+            <Text style={{ fontSize: 10, color: "#8888AA", lineHeight: 15, marginBottom: draft.autoPolishEnabled ? 8 : 0 }}>
               Опционально (по умолчанию ВЫКЛ). После первой успешной сборки агент сделает
               несколько проходов, улучшая дизайн экранов. Изменение принимается только если
               проект всё ещё проходит typecheck.
             </Text>
+            {draft.autoPolishEnabled && (
+              <ModelSelector
+                label="Модель для Auto-polish"
+                hint="Отдельная модель для дизайн-итераций. Пусто = как у генерации."
+                models={models}
+                loading={modelsLoading}
+                open={polishDropdownOpen}
+                onToggle={() => { setPolishDropdownOpen(!polishDropdownOpen); setModelDropdownOpen(false); setPlannerDropdownOpen(false); setEditorDropdownOpen(false); setEnhancerDropdownOpen(false); setEmbeddingDropdownOpen(false); }}
+                onSelect={(id) => { patchDraft({ polishModel: id }); setPolishDropdownOpen(false); }}
+                savedModel={draft.polishModel}
+                autoLabel="same as generation"
+              />
+            )}
           </View>
 
           {/* Error Logs */}

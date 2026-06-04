@@ -124,6 +124,7 @@ export interface ProjectStateActions {
   appendPlanStreamChunk: (chunk: string, targetProject?: string | null) => void;
   finalizePlanStream: (targetProject?: string | null) => void;
   appendReasoningMessage: (thinking: string, targetProject?: string | null) => void;
+  completeFileMessage: (filepath: string, targetProject?: string | null) => void;
   syncProjectWorkspace: (
     projectName: string,
     patch: Partial<ProjectWorkspaceCache>,

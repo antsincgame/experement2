@@ -96,6 +96,7 @@ const createState = (): ProjectState => ({
   startGenerationFile: () => undefined,
   appendGenerationCode: () => undefined,
   completeGenerationFile: () => undefined,
+  completeFileMessage: () => undefined,
   resetGenerationFiles: () => undefined,
   toggleFileTree: () => undefined,
   toggleTerminal: () => undefined,

@@ -283,6 +283,7 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
     semanticRagEnabled: z.boolean().optional(),
     autoPolishEnabled: z.boolean().optional(),
     autoPolishMaxPasses: z.number().optional(),
+    polishModel: z.string().optional(),
     temperature: z.number().optional(),
     maxTokens: z.number().optional(),
     topP: z.number().optional(),

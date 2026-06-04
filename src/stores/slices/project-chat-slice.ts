@@ -105,6 +105,48 @@ export const createProjectChatSlice = (set: ProjectStoreSet) => ({
       };
     }),
 
+  /**
+   * Find the last "file" process message for this filepath in the active chat and
+   * update its content in-place (Writing → ✓). Falls back to appending if not found.
+   */
+  completeFileMessage: (filepath: string, targetProject?: string | null) =>
+    set((state) => {
+      const target = targetProject ?? state.projectName;
+      if (!target) return {};
+
+      const updateMessages = (msgs: ChatMessage[]): ChatMessage[] => {
+        const next = [...msgs];
+        for (let i = next.length - 1; i >= 0; i--) {
+          const m = next[i];
+          if (m.processKind === "file" && m.content.includes(`\`${filepath}\``)) {
+            next[i] = { ...m, content: `✓ \`${filepath}\``, status: "complete" };
+            return next;
+          }
+        }
+        // Fallback: just append a done message.
+        return trimMessages([...next, {
+          id: crypto.randomUUID(),
+          role: "assistant" as const,
+          content: `✓ \`${filepath}\``,
+          timestamp: Date.now(),
+          status: "complete" as const,
+          processKind: "file" as const,
+        }]);
+      };
+
+      if (target === state.projectName) {
+        const messages = updateMessages(state.messages);
+        return {
+          messages,
+          projectChats: saveProjectChatPatch(state.projectChats, target, { messages }),
+        };
+      }
+      const chat = state.projectChats[target];
+      if (!chat) return {};
+      const messages = updateMessages(chat.messages);
+      return { projectChats: saveProjectChatPatch(state.projectChats, target, { messages }) };
+    }),
+
   appendReasoningMessage: (thinking: string, targetProject?: string | null) =>
     set((state) => {
       const target = targetProject ?? state.projectName;

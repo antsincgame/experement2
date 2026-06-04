@@ -55,6 +55,8 @@ interface CreateOptions {
   autoPolishEnabled?: boolean;
   /** Number of bounded polish passes (clamped 1..4 inside the loop; default 2). */
   autoPolishMaxPasses?: number;
+  /** Override the LLM model used specifically for the auto-polish stage (empty = uses generation model). */
+  polishModel?: string;
   temperature?: number;
   maxTokens?: number;
   /** Nucleus sampling (0–1). When undefined, the model default applies. */
@@ -405,6 +407,7 @@ const _createProjectInner = async (
     semanticRagEnabled = true,
     autoPolishEnabled = false,
     autoPolishMaxPasses = 2,
+    polishModel,
     temperature,
     maxTokens,
     topP,
@@ -911,7 +914,7 @@ const _createProjectInner = async (
         projectPath,
         files,
         autoPolishMaxPasses,
-        { lmStudioUrl, model, maxTokens },
+        { lmStudioUrl, model: polishModel || model, maxTokens },
         ctx,
         emitOperation
       );

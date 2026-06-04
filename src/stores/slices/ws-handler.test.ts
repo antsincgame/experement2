@@ -225,6 +225,7 @@ const createHarness = () => {
       ),
     })),
     resetGenerationFiles: () => setState({ generationFiles: [] }),
+    completeFileMessage: () => undefined,
     syncProjectWorkspace: (name, patch) => setState((current) => ({
       projectChats: {
         ...current.projectChats,

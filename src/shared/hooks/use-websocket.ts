@@ -354,7 +354,7 @@ export const useWebSocket = () => {
   }, []);
 
   const createProject = useCallback((description: string): string => {
-    const { lmStudioUrl, model, plannerModel, editorModel, embeddingModel, semanticRagEnabled, autoPolishEnabled, temperature, maxTokens, topP } =
+    const { lmStudioUrl, model, plannerModel, editorModel, embeddingModel, semanticRagEnabled, autoPolishEnabled, polishModel, temperature, maxTokens, topP } =
       useSettingsStore.getState();
     // Return the requestId so the caller can scope WS events to THIS creation.
     const requestId = createRequestId();
@@ -368,6 +368,7 @@ export const useWebSocket = () => {
       ...(editorModel ? { editorModel } : {}),
       semanticRagEnabled,
       ...(autoPolishEnabled ? { autoPolishEnabled } : {}),
+      ...(autoPolishEnabled && polishModel.trim() ? { polishModel: polishModel.trim() } : {}),
       ...(embeddingModel.trim() ? { embeddingModel: embeddingModel.trim() } : {}),
       temperature,
       maxTokens,

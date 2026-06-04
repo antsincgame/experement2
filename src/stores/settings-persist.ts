@@ -24,6 +24,7 @@ export interface PersistedSettings {
   embeddingModel: string;
   semanticRagEnabled: boolean;
   autoPolishEnabled: boolean;
+  polishModel: string;
 }
 
 export const defaultPersistedSettings = (): PersistedSettings => ({
@@ -41,24 +42,10 @@ export const defaultPersistedSettings = (): PersistedSettings => ({
   embeddingModel: "",
   semanticRagEnabled: true,
   autoPolishEnabled: false,
+  polishModel: "",
 });
 
-export const pickPersistedSettings = (state: {
-  lmStudioUrl: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number;
-  maxContextTokens: number;
-  agentUrl: string;
-  plannerModel: string;
-  editorModel: string;
-  enhancerModel: string;
-  enhancerEnabled: boolean;
-  embeddingModel: string;
-  semanticRagEnabled: boolean;
-  autoPolishEnabled: boolean;
-}): PersistedSettings => ({
+export const pickPersistedSettings = (state: PersistedSettings): PersistedSettings => ({
   lmStudioUrl: state.lmStudioUrl,
   model: state.model,
   temperature: state.temperature,
@@ -73,6 +60,7 @@ export const pickPersistedSettings = (state: {
   embeddingModel: state.embeddingModel,
   semanticRagEnabled: state.semanticRagEnabled,
   autoPolishEnabled: state.autoPolishEnabled,
+  polishModel: state.polishModel,
 });
 
 const asNumber = (value: unknown, fallback: number): number =>
@@ -115,26 +103,12 @@ export const migratePersistedSettings = (
     embeddingModel: asString(raw.embeddingModel, defaults.embeddingModel),
     semanticRagEnabled: asBoolean(raw.semanticRagEnabled, defaults.semanticRagEnabled),
     autoPolishEnabled: asBoolean(raw.autoPolishEnabled, defaults.autoPolishEnabled),
+    polishModel: asString(raw.polishModel, defaults.polishModel),
   };
 };
 
 /** Force-write current settings to localStorage/AsyncStorage (e.g. on drawer close). */
-export const flushSettingsToStorage = (state: {
-  lmStudioUrl: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number;
-  maxContextTokens: number;
-  agentUrl: string;
-  plannerModel: string;
-  editorModel: string;
-  enhancerModel: string;
-  enhancerEnabled: boolean;
-  embeddingModel: string;
-  semanticRagEnabled: boolean;
-  autoPolishEnabled: boolean;
-}): void => {
+export const flushSettingsToStorage = (state: PersistedSettings): void => {
   const payload = JSON.stringify({
     state: pickPersistedSettings(state),
     version: SETTINGS_STORAGE_VERSION,

@@ -74,6 +74,8 @@ interface SettingsState {
 
   autoPolishEnabled: boolean;
 
+  polishModel: string;
+
   settingsHydrated: boolean;
 
   errorLogs: ErrorLogEntry[];
@@ -107,6 +109,8 @@ interface SettingsState {
   setSemanticRagEnabled: (enabled: boolean) => void;
 
   setAutoPolishEnabled: (enabled: boolean) => void;
+
+  setPolishModel: (model: string) => void;
 
   addErrorLog: (entry: Omit<ErrorLogEntry, "id" | "timestamp">) => void;
 
@@ -161,6 +165,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSemanticRagEnabled: (semanticRagEnabled) => set({ semanticRagEnabled }),
 
       setAutoPolishEnabled: (autoPolishEnabled) => set({ autoPolishEnabled }),
+
+      setPolishModel: (polishModel) => set({ polishModel }),
 
       addErrorLog: (entry) =>
 
@@ -259,6 +265,7 @@ export const applySettingsDraft = (draft: SettingsDraft): void => {
     embeddingModel: draft.embeddingModel,
     semanticRagEnabled: draft.semanticRagEnabled,
     autoPolishEnabled: draft.autoPolishEnabled,
+    polishModel: draft.polishModel,
   });
   flushSettingsToStorage(draft);
 };

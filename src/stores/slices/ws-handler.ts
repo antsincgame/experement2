@@ -128,6 +128,12 @@ export const createWsHandler = (
       if (!matchesActiveProject(get, msg)) {
         if (statusProject) {
           patchProjectListEntry(set, get, statusProject, { status: msg.status });
+          // Mirror phase transitions into the background project's chat cache so
+          // returning to it shows a complete timeline, not just the final state.
+          const phaseLabel = GENERATION_STATUS_LABELS[msg.status];
+          if (phaseLabel) {
+            store.appendBackgroundMessage(statusProject, createProcessMessage("phase", phaseLabel));
+          }
         } else if (get().projectName) {
           log({ level: "warn", source: "ws", message: `Ignored unscoped status event: ${msg.status}` });
         }
@@ -361,8 +367,9 @@ export const createWsHandler = (
     case "file_complete":
       if (eventProject) {
         store.completeGenerationFile(msg.filepath, eventProject);
+        // Update the existing "Writing..." message to "✓" in-place instead of appending a new one.
+        store.completeFileMessage(msg.filepath, eventProject);
       }
-      emitChat(createProcessMessage("file", `✓ \`${msg.filepath}\``));
       log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
       break;
 
