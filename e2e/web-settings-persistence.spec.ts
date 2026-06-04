@@ -67,19 +67,10 @@ test.beforeAll(() => {
 });
 
 const openSettings = async (page: import("@playwright/test").Page) => {
-  const settingsButton = page.locator('[aria-label*="Settings"], [aria-label*="settings"]').first();
-  const hasDedicatedButton = await settingsButton.isVisible().catch(() => false);
-
-  if (hasDedicatedButton) {
-    await settingsButton.click();
-  } else {
-    const gearIcon = page.locator("svg").filter({ has: page.locator("circle, path") }).first();
-    if (await gearIcon.isVisible()) {
-      await gearIcon.click();
-    }
-  }
-
-  await expect(page.getByText(/LM Studio/i).first()).toBeVisible({ timeout: 5_000 });
+  // The header gear carries accessibilityLabel="Open settings" (→ aria-label on web),
+  // so target it directly instead of guessing at an unlabeled <svg>.
+  await page.getByLabel("Open settings").click();
+  await expect(page.getByText(/LM Studio/i).first()).toBeVisible({ timeout: 10_000 });
 };
 
 const closeSettings = async (page: import("@playwright/test").Page) => {

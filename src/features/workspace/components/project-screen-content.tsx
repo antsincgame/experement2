@@ -132,6 +132,8 @@ export const ProjectScreenContent = ({
           )}
           <Pressable
             onPress={() => setSettingsVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
             className="w-8 h-8 rounded-lg items-center justify-center"
             style={{ backgroundColor: "rgba(255,215,0,0.08)", borderWidth: 1, borderColor: "rgba(255,215,0,0.2)" }}
           >

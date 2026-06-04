@@ -4,6 +4,10 @@ import {
   ensureRuntimeProcess,
   writeRuntimeState,
 } from "./runtime-manager";
+import {
+  ensureExistingProjectFixture,
+  waitForTemplateCacheReady,
+} from "./existing-project-fixture";
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   const started: { name: string; pid: number }[] = [];
@@ -33,4 +37,9 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   });
 
   writeRuntimeState(started);
+
+  // Wait for the agent's template-cache install to finish, then build the existing
+  // project once — so no spec races the warm-up or finds a half-copied node_modules.
+  await waitForTemplateCacheReady();
+  ensureExistingProjectFixture();
 }

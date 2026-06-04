@@ -8,6 +8,12 @@ export default defineConfig({
     timeout: 30_000,
   },
   fullyParallel: false,
+  // One shared agent + Expo + workspace + preview runtime backs every spec, so the
+  // suite MUST run single-threaded. `fullyParallel: false` only serializes WITHIN a
+  // file; without this, Playwright still runs separate spec files across 2 workers,
+  // and they fight over the one backend — Clear All wipes another spec's fixture, two
+  // Metro previews bundle at once and blow the 180s timeout, connections contend.
+  workers: 1,
   retries: 0,
   globalSetup: "./e2e/support/global-setup.ts",
   globalTeardown: "./e2e/support/global-teardown.ts",
