@@ -56,4 +56,38 @@ describe("plan-artifact", () => {
     expect(fs.existsSync(getPlanBriefPath("demo"))).toBe(true);
     expect(loadPlanBrief("demo")).toContain("Demo");
   });
+
+  it("strips auto-generated layouts on load and rewrites blueprint.json", () => {
+    const dirtyPlan: AppPlan = {
+      ...minimalPlan,
+      navigation: {
+        type: "tabs",
+        screens: [{ path: "app/(tabs)/index.tsx", name: "Home", icon: "home-outline" }],
+      },
+      files: [
+        {
+          path: "app/(tabs)/_layout.tsx",
+          type: "screen",
+          description: "tabs layout",
+          dependencies: [],
+        },
+        {
+          path: "app/(tabs)/index.tsx",
+          type: "screen",
+          description: "Home",
+          dependencies: ["app/(tabs)/_layout.tsx"],
+        },
+      ],
+    };
+    savePlanBlueprint("dirty", dirtyPlan);
+
+    const loaded = loadPlanBlueprint("dirty");
+    expect(loaded?.files.map((f) => f.path)).toEqual(["app/(tabs)/index.tsx"]);
+    expect(loaded?.files[0].dependencies).toEqual([]);
+
+    const onDisk = JSON.parse(
+      fs.readFileSync(getPlanBlueprintPath("dirty"), "utf8"),
+    ) as AppPlan;
+    expect(onDisk.files.map((f) => f.path)).toEqual(["app/(tabs)/index.tsx"]);
+  });
 });
