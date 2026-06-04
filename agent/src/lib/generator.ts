@@ -12,6 +12,7 @@ import { SYSTEM_GENERATOR } from "../prompts/system-generator.js";
 import { getGenerationContext } from "./rag-retrieve.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 import { buildGoldenExampleBlock } from "./golden-examples.js";
+import { composeTeachingContext } from "./teaching-context.js";
 import { broadcast } from "./event-bus.js";
 import {
   BOILERPLATE_TEMPLATES,
@@ -480,20 +481,16 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
         embedOptions: { url: lmStudioUrl, model: embeddingModel },
       }
     );
-    const relevantDocs = ragContext.text;
-    broadcast({
-      type: "build_event",
-      eventType: "rag_injected",
-      message: `🧠 ${ragContext.semantic ? "Semantic" : "Keyword"} RAG Context loaded for ${fileSpec.path}`,
-    });
-
-    // Golden few-shot exemplar (win-rate lever #4): inject ONE hand-vetted, perfect
-    // working file the model can mirror. Additive — no match → "" → byte-identical prompt.
-    const goldenExample = buildGoldenExampleBlock({
+    const goldenExampleBlock = buildGoldenExampleBlock({
       type: fileSpec.type,
       description: fileSpec.description,
     });
-    const goldenExampleBlock = goldenExample ? `\n\n${goldenExample}` : "";
+    const teachingContext = composeTeachingContext(ragContext.text, goldenExampleBlock);
+    broadcast({
+      type: "build_event",
+      eventType: "rag_injected",
+      message: `🧠 ${ragContext.semantic ? "Semantic" : "Keyword"} RAG + teaching context for ${fileSpec.path}`,
+    });
 
     const userMessage = `
 ${buildPlanContext(plan, fileSpec)}
@@ -501,7 +498,7 @@ ${buildPlanContext(plan, fileSpec)}
 ## Project Skeleton
 ${skeleton.summary}
 
-${relevantDocs}${goldenExampleBlock}
+${teachingContext}
 
 ## Target File
 Path: ${fileSpec.path}

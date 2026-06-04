@@ -153,6 +153,9 @@ export const SAFE_EXTRA_DEPENDENCIES = new Set([
 export const MAX_DEPENDENCY_CONTEXT_FILES = 12;
 export const MAX_DEPENDENCY_CONTEXT_CHARS = 18000;
 
+/** Combined cap for RAG docs + golden exemplar in the per-file generation prompt. */
+export const MAX_TEACHING_CONTEXT_CHARS = 12_000;
+
 export const isSupportedNavigationType = (
   value: string
 ): value is SupportedNavigationType =>
