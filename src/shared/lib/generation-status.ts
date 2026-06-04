@@ -18,3 +18,18 @@ export const GENERATION_STATUS_LABELS: Partial<Record<ProjectStatus, string>> = 
 
 export const isGenerationActive = (status: ProjectStatus): boolean =>
   !["idle", "ready", "error"].includes(status);
+
+export type GenerationFileActivity = {
+  path: string;
+  status: "streaming" | "done";
+};
+
+export const hasStreamingGenerationFiles = (
+  files: GenerationFileActivity[],
+): boolean => files.some((file) => file.status === "streaming");
+
+/** True while the agent pipeline is running OR the UI still shows an in-flight file. */
+export const isPipelineBusy = (
+  status: ProjectStatus,
+  generationFiles: GenerationFileActivity[],
+): boolean => isGenerationActive(status) || hasStreamingGenerationFiles(generationFiles);

@@ -3,7 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import { createSystemMessage } from "@/features/chat/schemas/message.schema";
 import { useWebSocket } from "@/shared/hooks/use-websocket";
 import { apiClient, type ProjectResumeStatus } from "@/shared/lib/api-client";
-import { isGenerationActive } from "@/shared/lib/generation-status";
+import {
+  hasStreamingGenerationFiles,
+  isGenerationActive,
+  isPipelineBusy,
+} from "@/shared/lib/generation-status";
+import { refreshResumeHint } from "@/stores/resume-hint";
 import {
   isContinueGenerationMessage,
   resolveResumeProjectName,
@@ -13,6 +18,7 @@ import { useProjectStore } from "@/stores/project-store";
 export const useProjectGeneration = (routeProjectName: string | null) => {
   const { resumeGeneration } = useWebSocket();
   const status = useProjectStore((state) => state.status);
+  const generationFiles = useProjectStore((state) => state.generationFiles);
   const storeProjectName = useProjectStore((state) => state.projectName);
   const projectList = useProjectStore((state) => state.projectList);
   const addMessage = useProjectStore((state) => state.addMessage);
@@ -75,10 +81,10 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
     return () => {
       cancelled = true;
     };
-  }, [resumeProjectName, listHint?.canResume, syncResumeStatus]);
+  }, [resumeProjectName, syncResumeStatus]);
 
   useEffect(() => {
-    if (!resumeProjectName || status !== "error") {
+    if (!resumeProjectName || isGenerationActive(status)) {
       return;
     }
 
@@ -99,15 +105,34 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
     };
   }, [resumeProjectName, status, syncResumeStatus]);
 
+  const stalledUi =
+    Boolean(resumeProjectName) &&
+    hasStreamingGenerationFiles(generationFiles) &&
+    !isGenerationActive(status);
+
+  useEffect(() => {
+    if (!resumeProjectName || !stalledUi) {
+      return;
+    }
+    void refreshResumeHint(resumeProjectName).then((fetched) => {
+      if (fetched) {
+        syncResumeStatus(fetched);
+      }
+    });
+  }, [resumeProjectName, stalledUi, syncResumeStatus]);
+
   useEffect(() => {
     if (!isResuming || isGenerationActive(status)) {
       return;
     }
     if (status === "ready") {
       setIsResuming(false);
-      setResumeStatus((prev) =>
-        prev ? { ...prev, canResume: false, missingFileCount: 0 } : prev,
-      );
+      if (resumeProjectName) {
+        void apiClient
+          .getProjectResumeStatus(resumeProjectName)
+          .then(syncResumeStatus)
+          .catch(() => undefined);
+      }
       return;
     }
     if (status === "error") {
@@ -118,10 +143,14 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
     }
   }, [isResuming, resumeProjectName, status, syncResumeStatus]);
 
-  const showResumeBanner = Boolean(
+  const pipelineBusy = isPipelineBusy(status, generationFiles);
+
+  const showContinue = Boolean(
     resumeProjectName &&
-    (resumeStatus?.canResume || listHint?.canResume),
+    (resumeStatus?.canResume || listHint?.canResume || stalledUi),
   );
+
+  const showResumeBanner = showContinue;
 
   const handleResumeGeneration = useCallback(() => {
     if (!resumeProjectName) {
@@ -150,8 +179,10 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
   return {
     handleResumeGeneration,
     isResuming,
+    pipelineBusy,
     resumeProjectName,
     resumeStatus,
+    showContinue,
     showResumeBanner,
     tryContinueFromChat,
   };

@@ -1,11 +1,13 @@
 import { useRef, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
 import { MessageSquare } from "lucide-react-native";
-import { GENERATION_STATUS_LABELS, isGenerationActive } from "@/shared/lib/generation-status";
+import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
+import { useProjectGeneration } from "@/features/workspace/hooks/use-project-generation";
 import { useProjectStore } from "@/stores/project-store";
 import ChatMessage from "./chat-message";
 import ChatInput from "./chat-input";
 import GenerationActivity from "./generation-activity";
+import { GenerationControls } from "./generation-controls";
 
 interface ChatPanelProps {
   onSend: (text: string) => void;
@@ -17,8 +19,16 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
   const messages = useProjectStore((s) => s.messages);
   const status = useProjectStore((s) => s.status);
   const generationFiles = useProjectStore((s) => s.generationFiles);
+  const projectName = useProjectStore((s) => s.projectName);
+  const {
+    handleResumeGeneration,
+    isResuming,
+    pipelineBusy,
+    resumeStatus,
+    showContinue,
+  } = useProjectGeneration(projectName);
 
-  const isGenerating = isGenerationActive(status);
+  const isGenerating = pipelineBusy;
   const visibleMessages = messages.filter((m) => !m.isHidden);
   const hasActivity = isGenerating || generationFiles.length > 0;
   const streamingFile = generationFiles.find((f) => f.status === "streaming");
@@ -102,6 +112,14 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
         <GenerationActivity />
       </ScrollView>
 
+      <GenerationControls
+        showAbort={pipelineBusy}
+        showContinue={showContinue}
+        isResuming={isResuming}
+        missingFileCount={resumeStatus?.missingFileCount ?? undefined}
+        onAbort={onAbort}
+        onContinue={handleResumeGeneration}
+      />
       <ChatInput onSend={onSend} onAbort={onAbort} isGenerating={isGenerating} />
     </View>
   );

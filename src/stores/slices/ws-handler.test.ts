@@ -15,6 +15,11 @@ vi.mock("@/stores/settings-store", () => ({
   },
 }));
 
+vi.mock("@/stores/resume-hint", () => ({
+  refreshResumeHint: vi.fn().mockResolvedValue(null),
+  announceIncompleteGeneration: vi.fn(),
+}));
+
 vi.mock("@/features/chat/schemas/message.schema", () => ({
   createAssistantMessage: (content: string) => ({
     id: `assistant:${content}`,
@@ -281,15 +286,18 @@ const createHarness = () => {
     handleWsMessage: () => undefined,
   };
 
+  const fetchProjectFiles = vi.fn().mockResolvedValue(undefined);
+
   const handler = createWsHandler(
     (updater) => setState(updater as Parameters<typeof setState>[0]),
     () => state,
-    vi.fn().mockResolvedValue(undefined)
+    fetchProjectFiles,
   );
 
   return {
     getState: () => state,
     handle: (message: IncomingWsMessage) => handler(message),
+    fetchProjectFiles,
   };
 };
 
@@ -314,6 +322,69 @@ describe("createWsHandler", () => {
       source: "metro",
       message: "Build success",
     });
+  });
+
+  it("collapses repeated Metro bundle ready into one chat card", () => {
+    const harness = createHarness();
+
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      eventType: "build_success",
+    });
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      eventType: "build_success",
+    });
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      eventType: "build_success",
+    });
+
+    const buildCards = harness
+      .getState()
+      .messages.filter((m) => m.processKind === "build" && m.content.includes("Metro bundle ready"));
+    expect(buildCards).toHaveLength(1);
+  });
+
+  it("marks stalled streaming files done when status becomes ready", () => {
+    const harness = createHarness();
+    harness.getState().setStatus("generating");
+    harness.getState().startGenerationFile("src/Stuck.tsx");
+
+    harness.handle({
+      type: "status",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      status: "ready",
+    });
+
+    const files = harness.getState().generationFiles;
+    expect(files).toHaveLength(1);
+    expect(files[0]?.status).toBe("done");
+  });
+
+  it("refreshes explorer file tree after generation_complete", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    harness.getState().setStatus("generating");
+
+    harness.handle({
+      type: "generation_complete",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      filesCount: 3,
+    });
+
+    expect(harness.fetchProjectFiles).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(harness.fetchProjectFiles).toHaveBeenCalledWith("alpha");
+    vi.useRealTimers();
   });
 
   it("mirrors scoped build_event into chat as a process message", () => {

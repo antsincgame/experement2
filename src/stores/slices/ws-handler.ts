@@ -14,6 +14,7 @@ import {
 import {
   createEmptyChat,
   migrateCreatingChatToProject,
+  saveProjectChatPatch,
 } from "@/stores/project-store.helpers";
 import {
   createAssistantMessage,
@@ -33,7 +34,12 @@ import {
   formatPreviewReadyNarration,
   formatScaffoldReadyNarration,
 } from "@/shared/lib/chat-narration";
-import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
+import { GENERATION_STATUS_LABELS, hasStreamingGenerationFiles } from "@/shared/lib/generation-status";
+import { getStalledStreamingPaths } from "@/shared/lib/generation-stall";
+import {
+  announceIncompleteGeneration,
+  refreshResumeHint,
+} from "@/stores/resume-hint";
 import {
   resolveGenerationPhase,
   type GenerationPhaseSignal,
@@ -49,6 +55,120 @@ import type {
 
 type StoreGet = ProjectStoreGet;
 type StoreSet = ProjectStoreSet;
+
+const METRO_BUNDLE_READY = /Metro bundle ready/i;
+const FILE_TREE_REFRESH_MS = 350;
+const fileTreeRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+const reconcileStalledGenerationFiles = (
+  get: StoreGet,
+  store: ReturnType<StoreGet>,
+  projectName: string,
+): number => {
+  const state = get();
+  const files =
+    projectName === state.projectName
+      ? state.generationFiles
+      : state.projectChats[projectName]?.generationFiles ?? [];
+  const stalledPaths = getStalledStreamingPaths(files);
+  for (const filepath of stalledPaths) {
+    store.completeGenerationFile(filepath, projectName);
+    store.completeFileMessage(filepath, projectName);
+  }
+  return stalledPaths.length;
+};
+
+const syncResumeAfterGenerationStop = (
+  get: StoreGet,
+  store: ReturnType<StoreGet>,
+  projectName: string,
+  isActive: boolean,
+): void => {
+  void refreshResumeHint(projectName).then((fetched) => {
+    if (!fetched?.canResume || !isActive) {
+      return;
+    }
+    const plan = get().plan;
+    const totalPlanFiles = Array.isArray(plan?.files) ? plan.files.length : fetched.totalPlanFiles;
+    announceIncompleteGeneration(
+      projectName,
+      fetched.missingFileCount,
+      totalPlanFiles || fetched.totalPlanFiles,
+    );
+    const existing = store.projectList.find((entry) => entry.name === projectName);
+    if (existing) {
+      store.addProject({
+        ...existing,
+        canResume: fetched.canResume,
+        missingFileCount: fetched.missingFileCount,
+      });
+    }
+  });
+};
+
+const scheduleProjectFileTreeRefresh = (
+  projectName: string,
+  fetchProjectFiles: (name: string) => Promise<unknown>,
+): void => {
+  const pending = fileTreeRefreshTimers.get(projectName);
+  if (pending) {
+    clearTimeout(pending);
+  }
+  fileTreeRefreshTimers.set(
+    projectName,
+    setTimeout(() => {
+      fileTreeRefreshTimers.delete(projectName);
+      void fetchProjectFiles(projectName);
+    }, FILE_TREE_REFRESH_MS),
+  );
+};
+
+const patchBuildSuccessMessages = (
+  messages: ChatMessage[],
+  line: string,
+): ChatMessage[] => {
+  const idx = messages.findLastIndex(
+    (message) =>
+      message.processKind === "build" && METRO_BUNDLE_READY.test(message.content),
+  );
+  if (idx < 0) {
+    return [...messages, createProcessMessage("build", line)];
+  }
+  return messages.map((message, index) =>
+    index === idx
+      ? { ...message, content: line, timestamp: Date.now() }
+      : message,
+  );
+};
+
+const upsertBuildSuccessChat = (
+  set: StoreSet,
+  get: StoreGet,
+  line: string,
+  targetProject: string | null,
+): void => {
+  if (!targetProject) {
+    return;
+  }
+  set((state) => {
+    if (targetProject === state.projectName) {
+      const messages = patchBuildSuccessMessages(state.messages, line);
+      return {
+        messages,
+        projectChats: saveProjectChatPatch(state.projectChats, targetProject, {
+          messages,
+        }),
+      };
+    }
+    const chat = state.projectChats[targetProject];
+    const messages = patchBuildSuccessMessages(chat?.messages ?? [], line);
+    return {
+      projectChats: saveProjectChatPatch(state.projectChats, targetProject, {
+        messages,
+      }),
+    };
+  });
+};
 
 const commitActiveGenerationPhase = (
   get: StoreGet,
@@ -273,6 +393,22 @@ export const createWsHandler = (
           buildId: msg.buildId ?? null,
         });
       }
+      if (
+        isActive &&
+        phaseTarget &&
+        (msg.status === "ready" || msg.status === "error") &&
+        hasStreamingGenerationFiles(get().generationFiles)
+      ) {
+        const stalledCount = reconcileStalledGenerationFiles(get, store, phaseTarget);
+        if (stalledCount > 0) {
+          log({
+            level: "warn",
+            source: "generator",
+            message: `Reconciled ${stalledCount} stalled file(s) after status → ${msg.status}`,
+          });
+          syncResumeAfterGenerationStop(get, store, phaseTarget, true);
+        }
+      }
       log({ level: "info", source: "status", message: `Status → ${msg.status}` });
       break;
     }
@@ -490,6 +626,7 @@ export const createWsHandler = (
         store.completeGenerationFile(msg.filepath, eventProject);
         // Update the existing "Writing..." message to "✓" in-place instead of appending a new one.
         store.completeFileMessage(msg.filepath, eventProject);
+        scheduleProjectFileTreeRefresh(eventProject, fetchProjectFiles);
       }
       log({ level: "info", source: "generator", message: `File: ${msg.filepath}` });
       break;
@@ -497,8 +634,42 @@ export const createWsHandler = (
     case "generation_complete":
       if (isActive) store.clearStreamingContent();
       emitChat(createAssistantMessage(formatGenerationDoneNarration(msg.filesCount)));
+      if (eventProject) {
+        if (isActive && hasStreamingGenerationFiles(get().generationFiles)) {
+          reconcileStalledGenerationFiles(get, store, eventProject);
+        }
+        scheduleProjectFileTreeRefresh(eventProject, fetchProjectFiles);
+        syncResumeAfterGenerationStop(get, store, eventProject, isActive);
+      }
       log({ level: "info", source: "generator", message: `Generated ${msg.filesCount} files` });
       break;
+
+    case "resume_status": {
+      if (!eventProject) {
+        break;
+      }
+      const resumeEntry = store.projectList.find((entry) => entry.name === eventProject);
+      if (resumeEntry) {
+        store.addProject({
+          ...resumeEntry,
+          canResume: msg.canResume,
+          missingFileCount: msg.missingFileCount,
+        });
+      }
+      if (isActive && msg.canResume && msg.missingFileCount > 0) {
+        announceIncompleteGeneration(
+          eventProject,
+          msg.missingFileCount,
+          msg.totalPlanFiles,
+        );
+      }
+      log({
+        level: "info",
+        source: "generator",
+        message: `Resume status: canResume=${msg.canResume} missing=${msg.missingFileCount}`,
+      });
+      break;
+    }
 
     case "build_event": {
       if (!eventProject && get().projectName && !getMessageProjectName(msg)) {
@@ -514,8 +685,14 @@ export const createWsHandler = (
       // (model swaps, self-healing, RAG, and the build verdict) — "quiet success".
       if (eventType !== "build_log") {
         const line = formatBuildEventLine(eventType, msg.message, msg.error);
-        const processKind = eventType === "moe_swap" ? "moe" : "build";
-        emitChat(createProcessMessage(processKind, line));
+        if (eventType === "build_success") {
+          // Metro logs a new "Bundled" line on warm-up, HMR, and autofix rebundles — one chat card.
+          const buildChatProject = eventProject ?? chatProject;
+          upsertBuildSuccessChat(set, get, line, buildChatProject);
+        } else {
+          const processKind = eventType === "moe_swap" ? "moe" : "build";
+          emitChat(createProcessMessage(processKind, line));
+        }
       }
       if (eventType === "build_error") {
         log({ level: "error", source: "metro", message: "Build error", details: msg.error?.slice(0, 500) });
@@ -741,6 +918,11 @@ export const createWsHandler = (
       if (isActive) {
         commitActiveGenerationPhase(get, store, { kind: "generation_aborted" });
         applyPreviewStatus(store, "stopped", { clearPreview: true });
+        const activeProject = get().projectName;
+        if (activeProject && hasStreamingGenerationFiles(get().generationFiles)) {
+          reconcileStalledGenerationFiles(get, store, activeProject);
+          syncResumeAfterGenerationStop(get, store, activeProject, true);
+        }
       }
       log({ level: "warn", source: "pipeline", message: "Generation aborted by user" });
       break;
@@ -784,8 +966,8 @@ export const createWsHandler = (
         status: existing?.status ?? store.status ?? "ready",
         port: msg.port ?? existing?.port ?? null,
         createdAt: existing?.createdAt ?? Date.now(),
-        canResume: false,
-        missingFileCount: 0,
+        canResume: existing?.canResume,
+        missingFileCount: existing?.missingFileCount,
       });
       log({ level: "info", source: "pipeline", message: `Project created: ${pName}`, details: `Port: ${msg.port ?? "none"}` });
       break;

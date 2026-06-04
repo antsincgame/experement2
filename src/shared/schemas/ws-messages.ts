@@ -99,6 +99,14 @@ export const GenerationCompleteMessageSchema = z.object({
   filesCount: z.number(),
 }).merge(ProjectScopedMessageSchema);
 
+export const ResumeStatusMessageSchema = z.object({
+  type: z.literal("resume_status"),
+  canResume: z.boolean(),
+  missingFileCount: z.number(),
+  totalPlanFiles: z.number(),
+  checkpoint: z.string().nullable().optional(),
+}).merge(ProjectScopedMessageSchema);
+
 export const BuildEventMessageSchema = z.object({
   type: z.literal("build_event"),
   eventType: z.string(),
@@ -243,6 +251,7 @@ export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
   CodeChunkMessageSchema,
   FileCompleteMessageSchema,
   GenerationCompleteMessageSchema,
+  ResumeStatusMessageSchema,
   BuildEventMessageSchema,
   PreviewStatusMessageSchema,
   PreviewReadyMessageSchema,
