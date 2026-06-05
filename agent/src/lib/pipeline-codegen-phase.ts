@@ -12,7 +12,7 @@ import { extractExportContracts, type ExportContract } from "./context-builder.j
 import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
 import { formatModelRoleLabel } from "./model-roles.js";
 import { autoFix } from "./auto-fixer.js";
-import { applyAutofixWithGate, countTypeErrors } from "./pipeline-typecheck-gate.js";
+import { applyAutofixWithGate, countTypeErrors, revertRepairPhaseIfWorse } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
 import { recordExemplar } from "./exemplar-store.js";
 import { buildResumeStatusMessage } from "./pipeline-resume-status.js";
@@ -129,6 +129,18 @@ export const runCodegenAndShip = async (
   // the whole project from being used as teaching material (quality-drift guard).
   let didContractFix = false;
   let didTypeFix = false;
+
+  // Anti-regression snapshot for the WHOLE repair phase (3b contract-fix + 3c
+  // type-fix). Capture each plan file's content BEFORE any repair runs; after the
+  // repair phase, if it left the project typechecking WORSE than it started, restore
+  // these snapshots. Repairs can then only help or do nothing — never break working
+  // code. Cheap: in-memory file reads now, and at most two extra `tsc` runs later, only
+  // when a repair actually changed a file.
+  const preRepairContents = new Map<string, string>();
+  for (const fp of files) {
+    const content = readProjectFile(projectSlug, fp);
+    if (content != null) preRepairContents.set(fp, content);
+  }
 
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
@@ -267,6 +279,22 @@ export const runCodegenAndShip = async (
     }
   }
   
+  // ── Repair anti-regression gate ───────────────────────
+  // If the repair phase (3b + 3c) left the project typechecking WORSE than before it
+  // ran, restore every file it changed to its pre-repair snapshot. Repairs can then
+  // only help or do nothing — never convert a passing (or less-broken) generation into
+  // a more-broken one. Fail-safe: a missing/throwing typecheck keeps the repairs.
+  await revertRepairPhaseIfWorse(
+    {
+      runTypecheck,
+      readFile: (fp) => readProjectFile(projectSlug, fp),
+      writeFile: (fp, content) => writeProjectFile(projectSlug, fp, content),
+      emit: emitOperation,
+    },
+    projectPath,
+    preRepairContents,
+  );
+
   // ── Step 4: Git init ──────────────────────────────────
   gitInit(projectPath, runGitCommand);
   

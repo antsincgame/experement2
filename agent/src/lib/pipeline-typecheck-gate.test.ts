@@ -3,8 +3,10 @@ import {
   shouldKeepFix,
   countTypeErrors,
   applyAutofixWithGate,
+  revertRepairPhaseIfWorse,
   type GatedAutofixDeps,
   type GatedAutofixParams,
+  type RepairGateDeps,
 } from "./pipeline-typecheck-gate.js";
 import type { MetroError } from "./auto-fixer.js";
 
@@ -231,5 +233,113 @@ describe("applyAutofixWithGate", () => {
     expect(result.reverted).toBe(true);
     expect(store.get("app/a.tsx")).toBe("A0");
     expect(store.get("app/b.tsx")).toBe("B0");
+  });
+});
+
+describe("revertRepairPhaseIfWorse", () => {
+  // A `tsc` result whose error count = number of "BROKEN" markers in the file(s).
+  // Lets a fake typecheck reflect the ACTUAL on-disk state the gate restores/keeps.
+  const tcForStore = (store: Map<string, string>, files: string[]) => async () => {
+    const lines: string[] = [];
+    for (const fp of files) {
+      const count = (store.get(fp)?.match(/BROKEN/g) ?? []).length;
+      for (let i = 0; i < count; i++) lines.push(tscLine(fp));
+    }
+    return lines.length === 0
+      ? { success: true, combinedOutput: "" }
+      : { success: false, combinedOutput: lines.join("\n") };
+  };
+
+  const repairDeps = (
+    store: Map<string, string>,
+    overrides: Partial<RepairGateDeps> = {},
+  ): RepairGateDeps => ({
+    readFile: (fp) => (store.has(fp) ? (store.get(fp) as string) : null),
+    writeFile: (fp, content) => {
+      store.set(fp, content);
+    },
+    ...overrides,
+  });
+
+  it("REVERTS repairs that broke a previously-clean file (0 → 1 errors)", async () => {
+    const store = new Map<string, string>([["src/a.ts", "export const a = BROKEN"]]);
+    const preRepair = new Map<string, string>([["src/a.ts", "export const a = 1"]]);
+    const result = await revertRepairPhaseIfWorse(
+      repairDeps(store, { runTypecheck: tcForStore(store, ["src/a.ts"]) }),
+      "/tmp/p",
+      preRepair,
+    );
+    expect(result.reverted).toBe(true);
+    expect(store.get("src/a.ts")).toBe("export const a = 1"); // pre-repair restored
+  });
+
+  it("KEEPS repairs that reduced the error count (2 → 1 errors)", async () => {
+    const store = new Map<string, string>([["src/a.ts", "BROKEN one"]]);
+    const preRepair = new Map<string, string>([["src/a.ts", "BROKEN BROKEN two"]]);
+    const result = await revertRepairPhaseIfWorse(
+      repairDeps(store, { runTypecheck: tcForStore(store, ["src/a.ts"]) }),
+      "/tmp/p",
+      preRepair,
+    );
+    expect(result.reverted).toBe(false);
+    expect(store.get("src/a.ts")).toBe("BROKEN one"); // repaired version kept
+  });
+
+  it("KEEPS a clean repaired project without a second typecheck", async () => {
+    const store = new Map<string, string>([["src/a.ts", "export const a = 1"]]);
+    const preRepair = new Map<string, string>([["src/a.ts", "export const a = BROKEN"]]);
+    let calls = 0;
+    const result = await revertRepairPhaseIfWorse(
+      repairDeps(store, {
+        runTypecheck: async () => {
+          calls++;
+          return { success: true, combinedOutput: "" };
+        },
+      }),
+      "/tmp/p",
+      preRepair,
+    );
+    expect(result.reverted).toBe(false);
+    expect(result.afterErrors).toBe(0);
+    expect(calls).toBe(1); // clean → no second typecheck
+  });
+
+  it("does nothing (and runs no typecheck) when no file changed", async () => {
+    const store = new Map<string, string>([["src/a.ts", "same"]]);
+    const preRepair = new Map<string, string>([["src/a.ts", "same"]]);
+    let calls = 0;
+    const result = await revertRepairPhaseIfWorse(
+      repairDeps(store, {
+        runTypecheck: async () => {
+          calls++;
+          return { success: false, combinedOutput: tscLine("src/a.ts") };
+        },
+      }),
+      "/tmp/p",
+      preRepair,
+    );
+    expect(result).toMatchObject({ reverted: false, changed: 0 });
+    expect(calls).toBe(0);
+  });
+
+  it("keeps repairs (fail-safe) when runTypecheck is unavailable or throws", async () => {
+    const store = new Map<string, string>([["src/a.ts", "export const a = BROKEN"]]);
+    const preRepair = new Map<string, string>([["src/a.ts", "export const a = 1"]]);
+
+    const noTc = await revertRepairPhaseIfWorse(repairDeps(store), "/tmp/p", preRepair);
+    expect(noTc.reverted).toBe(false);
+    expect(store.get("src/a.ts")).toBe("export const a = BROKEN"); // repairs kept
+
+    const threwTc = await revertRepairPhaseIfWorse(
+      repairDeps(store, {
+        runTypecheck: async () => {
+          throw new Error("tsc unavailable");
+        },
+      }),
+      "/tmp/p",
+      preRepair,
+    );
+    expect(threwTc.reverted).toBe(false);
+    expect(store.get("src/a.ts")).toBe("export const a = BROKEN"); // still kept
   });
 });

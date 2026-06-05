@@ -194,3 +194,95 @@ export const applyAutofixWithGate = async (
 
   return { applied: false, reverted: true, fixResult, lastAppliedBlock: null, afterErrors };
 };
+
+export interface RepairGateDeps {
+  /** Authoritative typecheck. May be undefined/throw → gate is skipped (keep repairs). */
+  runTypecheck?: (projectPath: string) => Promise<CommandResultLike>;
+  /** Read a project file's content (path) => content|null. */
+  readFile: (filePath: string) => string | null;
+  /** Write a project file (path, content) => void. */
+  writeFile: (filePath: string, content: string) => void;
+  /** Emit a log/build line. */
+  emit?: (message: Record<string, unknown>) => void;
+}
+
+export interface RepairGateResult {
+  /** True if the repair phase was reverted because it regressed the typecheck. */
+  reverted: boolean;
+  /** How many files the repair phase changed. */
+  changed: number;
+  /** Type-error count of the repaired project (null when not measured). */
+  afterErrors: number | null;
+  /** Type-error count of the pre-repair project (null when not measured). */
+  beforeErrors: number | null;
+}
+
+/**
+ * Whole-phase anti-regression gate for the repair stages (3b contract-fix + 3c
+ * type-fix). Given each changed file's pre-repair content, it keeps the repairs only
+ * if they did NOT increase the project's total type-error count; otherwise it restores
+ * the pre-repair versions on disk. This guarantees repairs can only help or do nothing
+ * — never convert a passing (or less-broken) generation into a more-broken one.
+ *
+ * Cost-aware: skips entirely when nothing changed; a clean repaired project is kept
+ * without a second typecheck; at most two typechecks run, and only when a repair both
+ * changed a file AND left errors. Fail-safe: any missing/throwing typecheck keeps the
+ * repairs (identical to pre-gate behavior) and never throws.
+ */
+export const revertRepairPhaseIfWorse = async (
+  deps: RepairGateDeps,
+  projectPath: string,
+  preRepair: Map<string, string>,
+): Promise<RepairGateResult> => {
+  const { runTypecheck, readFile, writeFile, emit } = deps;
+
+  const changed = [...preRepair.keys()].filter((fp) => {
+    const now = readFile(fp);
+    return now != null && now !== preRepair.get(fp);
+  });
+
+  const skipped: RepairGateResult = {
+    reverted: false,
+    changed: changed.length,
+    afterErrors: null,
+    beforeErrors: null,
+  };
+  if (changed.length === 0 || !runTypecheck) return skipped;
+
+  try {
+    const afterTc = await runTypecheck(projectPath);
+    const afterErrors = afterTc.success ? 0 : countTypeErrors(afterTc.combinedOutput);
+
+    // A clean repaired project is always kept (and needs no second typecheck).
+    if (afterErrors === 0) return { ...skipped, afterErrors };
+
+    // Stash the repaired versions, restore the pre-repair versions, measure those.
+    const repaired = new Map<string, string>();
+    for (const fp of changed) {
+      const now = readFile(fp);
+      if (now != null) repaired.set(fp, now);
+      const before = preRepair.get(fp);
+      if (before !== undefined) writeFile(fp, before);
+    }
+
+    const beforeTc = await runTypecheck(projectPath);
+    const beforeErrors = beforeTc.success ? 0 : countTypeErrors(beforeTc.combinedOutput);
+
+    if (shouldKeepFix(beforeErrors, afterErrors)) {
+      // No regression → restore the repaired versions (keep the repairs).
+      for (const [fp, content] of repaired) writeFile(fp, content);
+      return { reverted: false, changed: changed.length, afterErrors, beforeErrors };
+    }
+
+    // Regression → leave the pre-repair versions on disk (already restored).
+    emit?.({
+      type: "build_event",
+      eventType: "self_healing",
+      message: `↩︎ Reverted repair phase: it added ${afterErrors - beforeErrors} type error(s) (${beforeErrors}→${afterErrors}); kept the pre-repair version`,
+    });
+    return { reverted: true, changed: changed.length, afterErrors, beforeErrors };
+  } catch {
+    // Typecheck unavailable/threw → cannot judge regression → keep repairs.
+    return skipped;
+  }
+};
