@@ -16,6 +16,7 @@ import {
   type ExampleSummary,
 } from "./rag-corpus.js";
 import type { EmbeddedChunk, RagChunk } from "./vector-store.js";
+import { warnCaught } from "./catch-log.js";
 
 const MAX_EXAMPLE_FILES = 40;
 const SCAFFOLD_DIRS = ["src/ui/", "src/services/db.ts"];
@@ -54,7 +55,8 @@ const walkFiles = (root: string, base = root): string[] => {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(root, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    warnCaught("rag-index", error, `walk files ${root}`);
     return out;
   }
   for (const entry of entries) {
@@ -79,7 +81,8 @@ export const collectExamples = (
   let projectDirs: fs.Dirent[];
   try {
     projectDirs = fs.readdirSync(workspaceRoot, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    warnCaught("rag-index", error, "list workspace projects for examples");
     return [];
   }
 
@@ -91,7 +94,8 @@ export const collectExamples = (
       let mtime = 0;
       try {
         mtime = fs.statSync(full).mtimeMs;
-      } catch {
+      } catch (error) {
+        warnCaught("rag-index", error, `stat project ${d.name}`);
         mtime = 0;
       }
       return { name: d.name, full, mtime };
@@ -131,8 +135,8 @@ const readCache = (dir: string, model: string): CachedIndex | null => {
     if (parsed && typeof parsed.hash === "string" && Array.isArray(parsed.chunks)) {
       return parsed;
     }
-  } catch {
-    /* no usable cache */
+  } catch (error) {
+    warnCaught("rag-index", error, "read RAG index cache");
   }
   return null;
 };
@@ -141,8 +145,8 @@ const writeCache = (dir: string, index: CachedIndex): void => {
   try {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(cacheFilePath(dir, index.model), JSON.stringify(index), "utf-8");
-  } catch {
-    /* best-effort cache */
+  } catch (error) {
+    warnCaught("rag-index", error, "write RAG index cache");
   }
 };
 

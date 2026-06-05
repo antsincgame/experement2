@@ -2,6 +2,7 @@
 import type { Extension } from "@codemirror/state";
 import type { ComponentType } from "react";
 import { useEffect, useState } from "react";
+import { warnCaught } from "@/shared/lib/catch-log";
 import { Platform } from "react-native";
 
 type CodeMirrorComponent = ComponentType<{
@@ -94,10 +95,11 @@ export const useWebCodeEditor = (filepath: string | null): WebCodeEditorState =>
           theme: themeMod.oneDark,
           languageExtension,
         });
-      } catch {
+      } catch (error) {
         if (!isActive) {
           return;
         }
+        warnCaught("use-web-code-editor", error, "CodeMirror load failed");
         setState({ CodeMirror: null, theme: null, languageExtension: null });
       }
     };

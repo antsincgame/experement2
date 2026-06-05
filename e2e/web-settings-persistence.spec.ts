@@ -2,6 +2,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import {
+  closeSettings,
+  lmStudioUrlInput,
+  openSettings,
+  saveSettings,
+} from "./support/settings-helpers";
 
 const AGENT_URL = "http://127.0.0.1:3100";
 const MOCK_LLM_URL = "http://127.0.0.1:1235";
@@ -66,25 +72,6 @@ test.beforeAll(() => {
   fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2), "utf-8");
 });
 
-const openSettings = async (page: import("@playwright/test").Page) => {
-  // The header gear carries accessibilityLabel="Open settings" (→ aria-label on web),
-  // so target it directly instead of guessing at an unlabeled <svg>.
-  await page.getByLabel("Open settings").click();
-  await expect(page.getByText(/LM Studio/i).first()).toBeVisible({ timeout: 10_000 });
-};
-
-const closeSettings = async (page: import("@playwright/test").Page) => {
-  // The drawer's X carries accessibilityLabel="Close settings" (→ aria-label). The
-  // Modal does not close on Escape, so target the button directly.
-  await page.getByLabel("Close settings").click();
-  await expect(page.getByText(/LM Studio/i).first()).not.toBeVisible({ timeout: 5_000 });
-};
-
-const saveSettings = async (page: import("@playwright/test").Page) => {
-  await page.getByText("Сохранить", { exact: true }).click();
-  await expect(page.getByText(/LM Studio/i).first()).not.toBeVisible({ timeout: 5_000 });
-};
-
 /** Read a specific settings field from localStorage. */
 const readSettingsField = (page: import("@playwright/test").Page, field: string) =>
   page.evaluate((f) => {
@@ -135,21 +122,16 @@ test("URL change persists in localStorage after Save", async ({ page }) => {
   // Find all text inputs inside the settings modal.
   // React Native Web renders TextInput as <input> elements.
   // The first input in the settings drawer is LM Studio URL.
-  const inputs = page.locator("input[type='text'], input:not([type])").filter({ hasNot: page.locator("[hidden]") });
-  const firstInput = inputs.first();
-  const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
+  const lmInput = lmStudioUrlInput(page);
+  await expect(lmInput).toBeVisible({ timeout: 5_000 });
+  await lmInput.click({ clickCount: 3 });
+  await lmInput.fill("http://localhost:9999");
 
-  if (hasInput) {
-    await firstInput.click({ clickCount: 3 });
-    await firstInput.fill("http://localhost:9999");
+  await saveSettings(page);
+  await page.waitForTimeout(300);
 
-    await saveSettings(page);
-    await page.waitForTimeout(300);
-
-    // Verify localStorage was updated
-    const updatedUrl = await readSettingsField(page, "lmStudioUrl");
-    expect(updatedUrl).toBe("http://localhost:9999");
-  }
+  const updatedUrl = await readSettingsField(page, "lmStudioUrl");
+  expect(updatedUrl).toBe("http://localhost:9999");
 });
 
 test("URL change is discarded when drawer closes without Save", async ({ page }) => {
@@ -164,19 +146,15 @@ test("URL change is discarded when drawer closes without Save", async ({ page })
 
   await openSettings(page);
 
-  const inputs = page.locator("input[type='text'], input:not([type])").filter({ hasNot: page.locator("[hidden]") });
-  const firstInput = inputs.first();
-  const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
+  const lmInput = lmStudioUrlInput(page);
+  await expect(lmInput).toBeVisible({ timeout: 5_000 });
+  await lmInput.click({ clickCount: 3 });
+  await lmInput.fill("http://localhost:8888");
+  await closeSettings(page);
+  await page.waitForTimeout(300);
 
-  if (hasInput) {
-    await firstInput.click({ clickCount: 3 });
-    await firstInput.fill("http://localhost:8888");
-    await closeSettings(page);
-    await page.waitForTimeout(300);
-
-    const urlAfterDiscard = await readSettingsField(page, "lmStudioUrl");
-    expect(urlAfterDiscard).toBe(MOCK_LLM_URL);
-  }
+  const urlAfterDiscard = await readSettingsField(page, "lmStudioUrl");
+  expect(urlAfterDiscard).toBe(MOCK_LLM_URL);
 });
 
 test("enhancer toggle persists through Save and reopen", async ({ page }) => {
@@ -197,12 +175,9 @@ test("enhancer toggle persists through Save and reopen", async ({ page }) => {
 
   // Click the OFF toggle to turn it ON
   const offButton = page.getByText("OFF", { exact: true }).first();
-  const hasOffButton = await offButton.isVisible({ timeout: 3_000 }).catch(() => false);
-
-  if (hasOffButton) {
-    await offButton.click();
-    await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
-  }
+  await expect(offButton).toBeVisible({ timeout: 5_000 });
+  await offButton.click();
+  await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
 
   await saveSettings(page);
   await page.waitForTimeout(300);
@@ -213,9 +188,7 @@ test("enhancer toggle persists through Save and reopen", async ({ page }) => {
 
   // Reopen and verify the UI still shows ON
   await openSettings(page);
-  if (hasOffButton) {
-    await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
-  }
+  await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
   await closeSettings(page);
 });
 

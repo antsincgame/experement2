@@ -1,4 +1,5 @@
 // Single chokepoint for validating the LM Studio base URL before it reaches fetch().
+import { warnCaught } from "./catch-log.js";
 //
 // The base URL is client-supplied (WebSocket messages, the /complete and /enhance
 // request bodies, and the /api/llm/models?url= query), so without this guard a
@@ -18,7 +19,8 @@ const extraHosts = (process.env.LM_STUDIO_ALLOWED_HOSTS ?? "")
 const defaultHost = (() => {
   try {
     return new URL(process.env.LM_STUDIO_URL ?? "").hostname.toLowerCase();
-  } catch {
+  } catch (error) {
+    warnCaught("llm-url", error, "parse LM_STUDIO_URL default host");
     return "";
   }
 })();
@@ -53,7 +55,8 @@ export const normalizeLmStudioUrl = (url: string): string => {
   let parsed: URL;
   try {
     parsed = new URL(url);
-  } catch {
+  } catch (error) {
+    warnCaught("llm-url", error, `normalize LM Studio URL ${url}`);
     return url;
   }
 
@@ -74,7 +77,8 @@ export const assertLlmUrl = (url: string): string => {
   let parsed: URL;
   try {
     parsed = new URL(urlForCheck);
-  } catch {
+  } catch (error) {
+    warnCaught("llm-url", error, `assert LLM URL ${url}`);
     throw new Error(`Invalid LLM URL: ${url}`);
   }
 

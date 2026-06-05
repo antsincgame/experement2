@@ -17,6 +17,7 @@ import {
   isPlanFileComplete,
   listMissingPlanFiles,
   loadProjectPlan,
+  saveGenerationState,
   saveProjectPlan,
 } from "./generation-state.js";
 import { getProjectPath } from "../services/file-manager.js";
@@ -56,7 +57,21 @@ describe("project-plan-store", () => {
     saveProjectPlan("demo", minimalPlan);
     const status = getProjectResumeStatus("demo");
     expect(status.canResume).toBe(true);
+    expect(status.resumeMode).toBe("codegen");
     expect(status.missingFileCount).toBe(2);
+  });
+
+  it("reports ship-only resume when all files have EOF but checkpoint is not shipped", () => {
+    saveGenerationState("demo", minimalPlan, "codegen");
+    for (const filePath of ["src/stores/a.ts", "app/(tabs)/index.tsx"]) {
+      const full = path.join(getProjectPath("demo"), filePath);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, "export default function X() {}\n// EOF\n", "utf8");
+    }
+    const status = getProjectResumeStatus("demo");
+    expect(status.canResume).toBe(true);
+    expect(status.resumeMode).toBe("ship");
+    expect(status.missingFileCount).toBe(0);
   });
 
   it("detects complete files via EOF marker", () => {

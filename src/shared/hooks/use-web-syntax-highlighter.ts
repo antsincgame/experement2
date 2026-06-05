@@ -1,6 +1,7 @@
 // Loads the web-only syntax highlighter lazily so native builds stay clean and lint-safe.
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
+import { warnCaught } from "@/shared/lib/catch-log";
 import { Platform } from "react-native";
 
 type PrismHighlighter = typeof import("react-syntax-highlighter").Prism;
@@ -42,11 +43,11 @@ export const useWebSyntaxHighlighter = (
           SyntaxHighlighter: Prism,
           theme: prismThemes[themeName] as Record<string, CSSProperties>,
         });
-      } catch {
+      } catch (error) {
         if (!isActive) {
           return;
         }
-
+        warnCaught("use-web-syntax-highlighter", error, "Prism load failed");
         setState({
           SyntaxHighlighter: null,
           theme: null,

@@ -3,8 +3,13 @@ import fs from "fs";
 import path from "path";
 import { spawn, spawnSync, type ChildProcess } from "child_process";
 import { findFreePort, isPortFree } from "../lib/port-finder.js";
-import { setPreviewPort } from "../lib/event-bus.js";
+import { broadcast, setPreviewPort } from "../lib/event-bus.js";
 import { watchProcess, type LogCallback } from "./log-watcher.js";
+import { warnCaught } from "../lib/catch-log.js";
+import {
+  enqueueProjectOperation,
+  METRO_OPERATION_QUEUE_KEY,
+} from "./project-operation-lock.js";
 
 interface ManagedProcess {
   process: ChildProcess;
@@ -23,7 +28,53 @@ export interface CommandResult {
 
 const activeProcesses = new Map<string, ManagedProcess>();
 
+const PREVIEW_STOPPED_REASON =
+  "Preview stopped — another project started Metro";
+
 // Singleton Metro: only 1 bundler at a time to prevent OOM and browser freezes
+
+const announcePreviewStopped = (
+  projectName: string,
+  reason?: string,
+): void => {
+  setPreviewPort(projectName, null);
+  broadcast({
+    type: "preview_status",
+    previewStatus: "stopped",
+    projectName,
+    ...(reason ? { error: reason } : {}),
+  });
+};
+
+const killManagedEntry = (name: string, managed: ManagedProcess): void => {
+  killProcess(managed.process);
+  managed.cleanup();
+  activeProcesses.delete(name);
+};
+
+/** Kill all bundlers except `keep`; returns evicted project names. */
+const evictOtherBundlers = (keep: string): string[] => {
+  const evicted: string[] = [];
+  for (const [name, managed] of [...activeProcesses.entries()]) {
+    if (name === keep) {
+      continue;
+    }
+    killManagedEntry(name, managed);
+    evicted.push(name);
+  }
+  return evicted;
+};
+
+const prepareSingletonStart = (projectName: string): void => {
+  for (const name of evictOtherBundlers(projectName)) {
+    announcePreviewStopped(name, PREVIEW_STOPPED_REASON);
+  }
+  const own = activeProcesses.get(projectName);
+  if (own) {
+    killManagedEntry(projectName, own);
+    setPreviewPort(projectName, null);
+  }
+};
 
 const isWindows = process.platform === "win32";
 
@@ -54,9 +105,18 @@ const killProcess = (cp: ChildProcess): void => {
     }
 
     // Kill entire process group on Unix (negative PID = process group)
-    try { process.kill(-pid, "SIGTERM"); } catch { cp.kill("SIGTERM"); }
+    try {
+      process.kill(-pid, "SIGTERM");
+    } catch (error) {
+      warnCaught("process-manager", error, `SIGTERM process group -${pid}, killing child directly`);
+      cp.kill("SIGTERM");
+    }
     const forceKillTimer = setTimeout(() => {
-      try { if (!cp.killed) process.kill(-pid, "SIGKILL"); } catch { /* already dead */ }
+      try {
+        if (!cp.killed) process.kill(-pid, "SIGKILL");
+      } catch (error) {
+        warnCaught("process-manager", error, `SIGKILL process group -${pid}`);
+      }
     }, 5000);
     forceKillTimer.unref();
 
@@ -66,19 +126,18 @@ const killProcess = (cp: ChildProcess): void => {
 
     cp.once("exit", clearForceKillTimer);
     cp.once("close", clearForceKillTimer);
-  } catch {
-    // The process may have already exited before cleanup completed.
+  } catch (error) {
+    warnCaught("process-manager", error, "kill preview process");
   }
 };
 
-export const startExpo = async (
+const startExpoInner = async (
   projectName: string,
   projectPath: string,
   onLog: LogCallback,
   clearCache = false,
 ): Promise<{ port: number; process: ChildProcess }> => {
-  // Singleton: kill ALL running bundlers before starting a new one
-  killAll();
+  prepareSingletonStart(projectName);
 
   const port = await findFreePort();
 
@@ -105,7 +164,7 @@ export const startExpo = async (
     // it — a late exit from the old process must not evict the new entry.
     if (activeProcesses.get(projectName) === managed) {
       activeProcesses.delete(projectName);
-      setPreviewPort(projectName, null);
+      announcePreviewStopped(projectName);
     }
     onLog({
       type: "build_log",
@@ -116,14 +175,25 @@ export const startExpo = async (
   return { port, process: child };
 };
 
-export const startExpoClearCache = async (
+export const startExpo = (
+  projectName: string,
+  projectPath: string,
+  onLog: LogCallback,
+  clearCache = false,
+): Promise<{ port: number; process: ChildProcess }> =>
+  enqueueProjectOperation(
+    METRO_OPERATION_QUEUE_KEY,
+    `startExpo:${projectName}`,
+    () => startExpoInner(projectName, projectPath, onLog, clearCache),
+  );
+
+const startExpoClearCacheInner = async (
   projectName: string,
   projectPath: string,
   port: number,
-  onLog: LogCallback
+  onLog: LogCallback,
 ): Promise<{ port: number; process: ChildProcess }> => {
-  // Singleton: kill ALL running bundlers before starting a new one
-  killAll();
+  prepareSingletonStart(projectName);
 
   // The previous bundler for this slug was just killed but may not have released
   // the socket yet; fall back to a fresh port instead of crashing with EADDRINUSE.
@@ -151,7 +221,7 @@ export const startExpoClearCache = async (
     cleanup();
     if (activeProcesses.get(projectName) === managed) {
       activeProcesses.delete(projectName);
-      setPreviewPort(projectName, null);
+      announcePreviewStopped(projectName);
     }
     onLog({
       type: "build_log",
@@ -162,16 +232,24 @@ export const startExpoClearCache = async (
   return { port: boundPort, process: child };
 };
 
+export const startExpoClearCache = (
+  projectName: string,
+  projectPath: string,
+  port: number,
+  onLog: LogCallback,
+): Promise<{ port: number; process: ChildProcess }> =>
+  enqueueProjectOperation(
+    METRO_OPERATION_QUEUE_KEY,
+    `startExpoClearCache:${projectName}`,
+    () => startExpoClearCacheInner(projectName, projectPath, port, onLog),
+  );
+
 export const killExpo = (projectName: string): void => {
   const managed = activeProcesses.get(projectName);
   if (!managed) return;
 
-  killProcess(managed.process);
-  managed.cleanup();
-  activeProcesses.delete(projectName);
-  // Drop the stale proxy/port mapping so /preview/<name>/ 404s instead of
-  // proxying to a dead Metro port (502/503) until restart.
-  setPreviewPort(projectName, null);
+  killManagedEntry(projectName, managed);
+  announcePreviewStopped(projectName);
 };
 
 const NPM_INSTALL_TIMEOUT_MS = 300_000; // 5 minutes (Tamagui is large)
@@ -359,8 +437,8 @@ export const killOrphanedPreviewProcesses = (): void => {
       for (const pid of pids) {
         try {
           runWindowsTaskkill(Number(pid));
-        } catch {
-          // Process may have already exited; ignore.
+        } catch (error) {
+          warnCaught("process-manager", error, `cleanup orphaned preview pid ${pid}`);
         }
       }
       if (pids.length > 0) {

@@ -7,6 +7,7 @@ interface ResumeGenerationBannerProps {
   projectName: string;
   missingFileCount: number;
   totalPlanFiles: number;
+  resumeMode?: "codegen" | "ship" | null;
   isResuming: boolean;
   onResume: () => void;
 }
@@ -15,6 +16,7 @@ export const ResumeGenerationBanner = ({
   projectName,
   missingFileCount,
   totalPlanFiles,
+  resumeMode,
   isResuming,
   onResume,
 }: ResumeGenerationBannerProps) => (
@@ -31,7 +33,9 @@ export const ResumeGenerationBanner = ({
     </Text>
     <Text className="text-ink-light text-[11px] leading-4 mb-2">
       <Text style={{ fontFamily: "monospace", color: "#00E5FF" }}>{projectName}</Text>
-      {" "}stopped mid-build ({missingFileCount} of {totalPlanFiles} files missing). Continue from the saved plan — finished files are skipped.
+      {resumeMode === "ship"
+        ? " has all files written but preview did not ship. Retry gates and Metro."
+        : ` stopped mid-build (${missingFileCount} of ${totalPlanFiles} files missing). Continue from the saved plan — finished files are skipped.`}
     </Text>
     <Pressable
       onPress={onResume}
@@ -44,7 +48,11 @@ export const ResumeGenerationBanner = ({
     >
       <Play size={12} color="#00E5FF" fill="#00E5FF" />
       <Text className="text-[#00E5FF] text-xs font-semibold">
-        {isResuming ? "Resuming…" : "Continue generation"}
+        {isResuming
+          ? "Resuming…"
+          : resumeMode === "ship"
+            ? "Retry preview"
+            : "Continue generation"}
       </Text>
     </Pressable>
   </View>

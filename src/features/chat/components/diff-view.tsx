@@ -1,5 +1,6 @@
 // Collapsible before/after diff for AI file edits; CodeMirror merge on web, line fallback on native.
 import { useEffect, useRef, useState } from "react";
+import { warnCaught } from "@/shared/lib/catch-log";
 import { View, Text, Pressable, ScrollView, Platform } from "react-native";
 import { ChevronDown, ChevronRight, FileCode2 } from "lucide-react-native";
 import { editorLanguageFromPath } from "@/shared/hooks/use-web-code-editor";
@@ -122,8 +123,9 @@ const MergeDiffPanel = ({
           parent: containerRef.current,
           collapseUnchanged: { margin: 3 },
         });
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          warnCaught("diff-view", error, "merge view mount failed");
           setMergeFailed(true);
         }
       }

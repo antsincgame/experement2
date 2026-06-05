@@ -11,6 +11,7 @@ import { loadPlanBrief } from "./plan-artifact.js";
 import { parseStream } from "./stream-parser.js";
 import { EditActionSchema, type EditAction } from "../schemas/edit-action.schema.js";
 import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
+import { warnCaught } from "./catch-log.js";
 import {
   SYSTEM_EDITOR_ANALYZE,
   SYSTEM_EDITOR_GENERATE,
@@ -177,9 +178,14 @@ export const editProject = async (
     if (valid.length > 0) {
       try {
         await npmInstall(getProjectPath(projectName), valid);
-      } catch {
+      } catch (error) {
+        warnCaught("editor", error, `batch npm install for ${valid.join(", ")}`);
         for (const dep of valid) {
-          try { await npmInstall(getProjectPath(projectName), [dep]); } catch { /* skip */ }
+          try {
+            await npmInstall(getProjectPath(projectName), [dep]);
+          } catch (depError) {
+            warnCaught("editor", depError, `npm install ${dep}`);
+          }
         }
       }
     }

@@ -6,6 +6,7 @@ import { KNOWLEDGE_BASE, getRelevantDocs } from "../prompts/knowledge-base.js";
 import { embedText, type EmbedOptions } from "../services/embeddings.js";
 import { buildOrLoadIndex, type BuildIndexOptions } from "./rag-index.js";
 import { searchTopK, type EmbeddedChunk } from "./vector-store.js";
+import { warnCaught } from "./catch-log.js";
 
 const DEFAULT_TOP_K = 5;
 
@@ -67,7 +68,8 @@ export const getGenerationContext = async (
       embedOptions: options.embedOptions,
       cacheDir: options.cacheDir,
     });
-  } catch {
+  } catch (error) {
+    warnCaught("rag-retrieve", error, "load semantic RAG index");
     index = null;
   }
   if (!index || index.length === 0) return fallback();
@@ -75,7 +77,8 @@ export const getGenerationContext = async (
   let queryVector: number[] | null;
   try {
     queryVector = await embedQuery(buildQuery(input), options.embedOptions ?? {});
-  } catch {
+  } catch (error) {
+    warnCaught("rag-retrieve", error, "embed RAG query");
     queryVector = null;
   }
   if (!queryVector) return fallback();

@@ -102,6 +102,7 @@ export const GenerationCompleteMessageSchema = z.object({
 export const ResumeStatusMessageSchema = z.object({
   type: z.literal("resume_status"),
   canResume: z.boolean(),
+  resumeMode: z.enum(["codegen", "ship"]).nullable().optional(),
   missingFileCount: z.number(),
   totalPlanFiles: z.number(),
   checkpoint: z.string().nullable().optional(),
@@ -203,9 +204,20 @@ export const GenerationAbortedMessageSchema = z.object({
   type: z.literal("generation_aborted"),
 }).merge(OperationScopedMessageSchema);
 
+export const MutationDuplicateMessageSchema = z.object({
+  type: z.literal("mutation_duplicate"),
+  originalType: z.enum([
+    "create_project",
+    "resume_generation",
+    "iterate",
+    "revert_version",
+  ]),
+}).merge(OperationScopedMessageSchema);
+
 export const ProjectCreatedMessageSchema = z.object({
   type: z.literal("project_created"),
   port: z.number(),
+  shipped: z.boolean().optional(),
   plan: z.record(z.string(), z.unknown()).optional(),
 }).merge(ProjectScopedMessageSchema);
 
@@ -267,6 +279,7 @@ export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
   ReloadingPreviewMessageSchema,
   SystemErrorMessageSchema,
   GenerationAbortedMessageSchema,
+  MutationDuplicateMessageSchema,
   ProjectCreatedMessageSchema,
   IterationResultMessageSchema,
   AutofixAttemptMessageSchema,

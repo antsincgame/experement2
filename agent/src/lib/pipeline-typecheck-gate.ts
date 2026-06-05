@@ -13,6 +13,7 @@
 import type { MetroError } from "./auto-fixer.js";
 import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
 import { parseTypeErrors } from "./typecheck.js";
+import { warnCaught } from "./catch-log.js";
 
 interface CommandResultLike {
   success: boolean;
@@ -136,7 +137,8 @@ export const applyAutofixWithGate = async (
         let snapshot: string | null = null;
         try {
           snapshot = readFile(block.filepath);
-        } catch {
+        } catch (error) {
+          warnCaught("pipeline-typecheck-gate", error, `read pre-fix snapshot ${block.filepath}`);
           snapshot = null;
         }
         snapshots.set(block.filepath, snapshot);
@@ -162,8 +164,8 @@ export const applyAutofixWithGate = async (
   try {
     const typecheck = await runTypecheck(projectPath);
     afterErrors = typecheck.success ? 0 : countTypeErrors(typecheck.combinedOutput);
-  } catch {
-    // Typecheck threw → cannot judge regression → keep the fix (fallback).
+  } catch (error) {
+    warnCaught("pipeline-typecheck-gate", error, "post-fix typecheck failed, keeping fix");
     return { applied: true, reverted: false, fixResult, lastAppliedBlock, afterErrors: null };
   }
 
@@ -181,8 +183,8 @@ export const applyAutofixWithGate = async (
       if (original !== null) {
         writeFile(filepath, original);
       }
-    } catch {
-      // Best-effort revert; never throw out of the gate.
+    } catch (error) {
+      warnCaught("pipeline-typecheck-gate", error, `revert autofix snapshot ${filepath}`);
     }
   }
 

@@ -1,4 +1,5 @@
 // Repairs lax LLM JSON and returns null instead of throwing when recovery still fails.
+import { warnCaught } from "./catch-log.js";
 /**
  * Extracts and repairs JSON from LLM output that may contain:
  * - Markdown code fences (```json ... ```)
@@ -178,5 +179,7 @@ export const safeJsonParse = (raw: string): unknown | null => {
     }
   } catch { /* give up */ }
 
+  const preview = raw.length > 200 ? `${raw.slice(0, 200)}…` : raw;
+  warnCaught("json-repair", "all parse attempts failed", `safeJsonParse returning null: ${preview}`);
   return null;
 };

@@ -5,6 +5,7 @@
 import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 import { isFiniteVector } from "../lib/vector-store.js";
 import { resolveEmbeddingModel } from "./embedding-model.js";
+import { warnCaught } from "../lib/catch-log.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const EMBEDDING_TIMEOUT_MS = 30_000;
@@ -34,7 +35,8 @@ export const embedTexts = async (
   let baseUrl: string;
   try {
     baseUrl = assertLlmUrl(options.url ?? DEFAULT_LM_STUDIO_URL);
-  } catch {
+  } catch (error) {
+    warnCaught("embeddings", error, "assert LLM URL for embeddings");
     return null;
   }
 
@@ -81,7 +83,8 @@ export const embedTexts = async (
       vectors.push(vector);
     }
     return vectors;
-  } catch {
+  } catch (error) {
+    warnCaught("embeddings", error, "embed texts request failed");
     return null;
   } finally {
     clearTimeout(timeout);

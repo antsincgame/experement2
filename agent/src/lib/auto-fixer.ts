@@ -11,6 +11,7 @@ import { getBareModuleName } from "./generation-contract.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 import { applyDeterministicCodeRepairs } from "./code-style-repairs.js";
 import { toEditableProjectPath } from "./project-file-path.js";
+import { warnCaught } from "./catch-log.js";
 
 export interface MetroError {
   type: string;
@@ -65,7 +66,8 @@ const applyBlock = (
 
     writeFile(projectName, block.filepath, result);
     return true;
-  } catch {
+  } catch (error) {
+    warnCaught("auto-fixer", error, `apply search/replace to ${block.filepath}`);
     return false;
   }
 };

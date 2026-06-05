@@ -15,6 +15,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { warnCaught } from "./catch-log.js";
 
 export interface ExemplarRecord {
   /** The file `type` this exemplar teaches (screen / store / component / ...). */
@@ -62,7 +63,8 @@ export const loadExemplars = (dir: string = defaultDir()): ExemplarRecord[] => {
         typeof (entry as ExemplarRecord).description === "string" &&
         typeof (entry as ExemplarRecord).code === "string"
     );
-  } catch {
+  } catch (error) {
+    warnCaught("exemplar-store", error, "load exemplars");
     return [];
   }
 };
@@ -145,8 +147,8 @@ export const recordExemplar = (
 
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(storePath(dir), JSON.stringify(trimmed, null, 2), "utf-8");
-  } catch {
-    // Best-effort: a failed capture must never break the generation pipeline.
+  } catch (error) {
+    warnCaught("exemplar-store", error, "record exemplar");
   }
 };
 
@@ -191,8 +193,8 @@ export const findBestExemplar = (
     // this type — a learned same-type example is a better teacher than the generic
     // golden fallback even when the description signal is weak.
     return scored[0]?.exemplar.code ?? null;
-  } catch {
-    // Retrieval is advisory only; it must never break generation.
+  } catch (error) {
+    warnCaught("exemplar-store", error, "find best exemplar");
     return null;
   }
 };

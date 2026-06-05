@@ -1,6 +1,7 @@
 ﻿// Resolves workspace paths safely so project file access cannot escape the workspace root.
 import fs from "fs";
 import path from "path";
+import { warnCaught } from "../lib/catch-log.js";
 
 const WORKSPACE_ROOT = path.resolve(process.cwd(), "../workspace");
 
@@ -199,7 +200,8 @@ const hardlinkTree = (src: string, dest: string): void => {
     } else {
       try {
         fs.linkSync(srcPath, destPath);
-      } catch {
+      } catch (error) {
+        warnCaught("file-manager", error, `hardlink ${srcPath} → ${destPath}, copying instead`);
         fs.copyFileSync(srcPath, destPath);
       }
     }

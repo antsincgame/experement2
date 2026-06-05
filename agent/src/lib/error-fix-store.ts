@@ -3,6 +3,7 @@
 // small JSON file under the agent's .rag directory; capped and deduped by signature.
 import fs from "fs";
 import path from "path";
+import { warnCaught } from "./catch-log.js";
 
 export interface RagFixRecord {
   errorSignature: string;
@@ -43,7 +44,8 @@ export const loadFixes = (dir: string = defaultDir()): RagFixRecord[] => {
         typeof (entry as RagFixRecord).errorSignature === "string" &&
         typeof (entry as RagFixRecord).fixSummary === "string"
     );
-  } catch {
+  } catch (error) {
+    warnCaught("error-fix-store", error, "load error-fix records");
     return [];
   }
 };
@@ -118,8 +120,8 @@ export const findSimilarFixes = (
       .sort((a, b) => b.score - a.score || b.fix.timestamp - a.fix.timestamp);
 
     return scored.slice(0, limit).map((s) => s.fix);
-  } catch {
-    // Retrieval is advisory only; it must never break the repair loop.
+  } catch (error) {
+    warnCaught("error-fix-store", error, "find similar fixes");
     return [];
   }
 };
@@ -164,7 +166,7 @@ export const recordFix = (
     const trimmed = existing.slice(-MAX_FIX_RECORDS);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(storePath(dir), JSON.stringify(trimmed, null, 2), "utf-8");
-  } catch {
-    // Best-effort: a failed write must never break the build/autofix loop.
+  } catch (error) {
+    warnCaught("error-fix-store", error, "record fix");
   }
 };

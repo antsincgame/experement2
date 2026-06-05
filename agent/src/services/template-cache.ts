@@ -12,6 +12,7 @@ import {
 import { validateDependencies } from "../lib/dependency-validator.js";
 import { SCAFFOLD_UI_FILES } from "../lib/scaffold-ui.js";
 import { SCAFFOLD_DB_FILES } from "../lib/scaffold-db.js";
+import { warnCaught } from "../lib/catch-log.js";
 
 const TEMPLATE_DIR_NAME = "template_cache";
 
@@ -335,8 +336,8 @@ export const createProjectFromCache = async (
         for (const dep of valid) {
           try {
             await npmInstall(projectPath, [dep]);
-          } catch {
-            console.warn(`[TemplateCache] Failed to install ${dep}, skipping`);
+          } catch (error) {
+            warnCaught("template-cache", error, `npm install ${dep}`);
           }
         }
       }

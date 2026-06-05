@@ -3,6 +3,7 @@ import {
   SAFE_EXTRA_DEPENDENCIES,
   TEMPLATE_PACKAGE_DEPENDENCIES,
 } from "./generation-contract.js";
+import { warnCaught } from "./catch-log.js";
 
 const REGISTRY_TIMEOUT_MS = 5000;
 
@@ -66,8 +67,8 @@ const checkNpmPackageExists = async (packageName: string): Promise<boolean> => {
 
     clearTimeout(timeout);
     return resp.ok;
-  } catch {
-    // Network error or timeout — assume it exists to avoid false negatives
+  } catch (error) {
+    warnCaught("dependency-validator", error, `check npm package ${packageName}`);
     return true;
   }
 };

@@ -4,6 +4,7 @@ import { respondInvalidInput } from "../lib/request-validation.js";
 import { LlmCompleteBodySchema } from "../schemas/runtime-input.schema.js";
 import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 import { clearChatModelCache, resolveChatModel } from "./chat-model.js";
+import { warnCaught } from "../lib/catch-log.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
@@ -208,7 +209,9 @@ export const streamCompletion = async (
           if (retryResp.ok && retryResp.body) {
             response = retryResp;
           }
-        } catch { /* fall through to error */ }
+        } catch (error) {
+          warnCaught("llm-proxy", error, "retry chat completion with fallback model");
+        }
       }
     }
 
@@ -271,8 +274,8 @@ export const streamCompletion = async (
             const parsed = JSON.parse(data);
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) yield content;
-          } catch {
-            // Partial JSON SSE chunks are ignored until a full payload arrives.
+          } catch (error) {
+            warnCaught("llm-proxy", error, "parse SSE JSON chunk");
           }
         }
       }

@@ -2,6 +2,7 @@
 // override (settings) -> EMBEDDING_MODEL env -> auto-pick from /v1/models by name.
 // Cached per base URL so generation does not hammer the models endpoint.
 import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
+import { warnCaught } from "../lib/catch-log.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const ENV_EMBEDDING_MODEL = process.env.EMBEDDING_MODEL?.trim() || "";
@@ -122,7 +123,8 @@ export const resolveEmbeddingModel = async (
   let baseUrl: string;
   try {
     baseUrl = assertLlmUrl(options.url ?? DEFAULT_LM_STUDIO_URL);
-  } catch {
+  } catch (error) {
+    warnCaught("embedding-model", error, "assert LLM URL for embedding model");
     return null;
   }
 
@@ -138,7 +140,8 @@ export const resolveEmbeddingModel = async (
       const resolved = await resolveFromServer(baseUrl, fetchFn);
       setCached(baseUrl, resolved, resolved ? SUCCESS_TTL_MS : FAIL_TTL_MS);
       return resolved;
-    } catch {
+    } catch (error) {
+      warnCaught("embedding-model", error, "resolve embedding model from server");
       setCached(baseUrl, null, FAIL_TTL_MS);
       return null;
     } finally {

@@ -1,4 +1,6 @@
 ﻿// Serializes heavy project operations so overlapping WS actions cannot corrupt shared state.
+import { warnCaught } from "../lib/catch-log.js";
+
 interface QueueEntry {
   tail: Promise<void>;
   pending: number;
@@ -29,6 +31,9 @@ const cleanupQueueEntry = (key: string, entry: QueueEntry): void => {
 
 export const WORKSPACE_OPERATION_QUEUE_KEY = "workspace:create";
 
+/** Serializes Metro singleton starts so two projects cannot race killAll/startExpo. */
+export const METRO_OPERATION_QUEUE_KEY = "metro:singleton";
+
 export const getProjectOperationQueueKey = (projectName: string): string =>
   `project:${projectName}`;
 
@@ -49,7 +54,9 @@ export const enqueueProjectOperation = <T>(
   entry.pending += 1;
 
   const run = entry.tail
-    .catch(() => undefined)
+    .catch((error) => {
+      warnCaught("project-operation-lock", error, `${operationName} queue tail rejected (${key})`);
+    })
     .then(async () => {
       console.log(`[ProjectQueue] ${operationName} started (${key})`);
       let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -73,7 +80,9 @@ export const enqueueProjectOperation = <T>(
 
   entry.tail = run
     .then(() => undefined)
-    .catch(() => undefined)
+    .catch((error) => {
+      warnCaught("project-operation-lock", error, `${operationName} queue run rejected (${key})`);
+    })
     .finally(() => {
       console.log(`[ProjectQueue] ${operationName} finished (${key})`);
       cleanupQueueEntry(key, entry);
@@ -93,10 +102,14 @@ export const attachOperationToQueueKey = (
   console.log(`[ProjectQueue] ${operationName} mirrored (${key})`);
 
   entry.tail = entry.tail
-    .catch(() => undefined)
+    .catch((error) => {
+      warnCaught("project-operation-lock", error, `${operationName} mirror tail rejected (${key})`);
+    })
     .then(() => operation)
     .then(() => undefined)
-    .catch(() => undefined)
+    .catch((error) => {
+      warnCaught("project-operation-lock", error, `${operationName} mirror run rejected (${key})`);
+    })
     .finally(() => {
       console.log(`[ProjectQueue] ${operationName} finished (${key})`);
       cleanupQueueEntry(key, entry);

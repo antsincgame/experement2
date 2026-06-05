@@ -8,6 +8,7 @@ interface GenerationControlsProps {
   showContinue: boolean;
   isResuming: boolean;
   missingFileCount?: number;
+  resumeMode?: "codegen" | "ship" | null;
   onAbort: () => void;
   onContinue: () => void;
 }
@@ -17,6 +18,7 @@ export const GenerationControls = ({
   showContinue,
   isResuming,
   missingFileCount,
+  resumeMode,
   onAbort,
   onContinue,
 }: GenerationControlsProps) => {
@@ -49,9 +51,11 @@ export const GenerationControls = ({
           <Text className="text-[#00E5FF] text-xs font-semibold">
             {isResuming
               ? "Resuming…"
-              : missingFileCount
-                ? `Continue (${missingFileCount} left)`
-                : "Continue generation"}
+              : resumeMode === "ship"
+                ? "Retry preview"
+                : missingFileCount
+                  ? `Continue (${missingFileCount} left)`
+                  : "Continue generation"}
           </Text>
         </Pressable>
       )}

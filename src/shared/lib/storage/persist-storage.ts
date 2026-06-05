@@ -23,7 +23,11 @@ const webStorage: StateStorage = {
       }
 
       return globalThis.localStorage.getItem(name);
-    } catch {
+    } catch (error) {
+      console.warn(
+        `[persist-storage] localStorage.getItem("${name}") failed:`,
+        error instanceof Error ? error.message : String(error),
+      );
       return memoryStorage.getItem(name);
     }
   },
@@ -54,7 +58,11 @@ const webStorage: StateStorage = {
       }
 
       globalThis.localStorage.removeItem(name);
-    } catch {
+    } catch (error) {
+      console.warn(
+        `[persist-storage] localStorage.removeItem("${name}") failed:`,
+        error instanceof Error ? error.message : String(error),
+      );
       memoryStorage.removeItem(name);
     }
   },

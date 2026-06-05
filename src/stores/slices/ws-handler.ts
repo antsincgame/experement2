@@ -38,6 +38,7 @@ import { GENERATION_STATUS_LABELS, hasStreamingGenerationFiles } from "@/shared/
 import { getStalledStreamingPaths } from "@/shared/lib/generation-stall";
 import {
   announceIncompleteGeneration,
+  announceShipRetry,
   refreshResumeHint,
 } from "@/stores/resume-hint";
 import {
@@ -76,6 +77,18 @@ const reconcileStalledGenerationFiles = (
     store.completeFileMessage(filepath, projectName);
   }
   return stalledPaths.length;
+};
+
+/** Reconcile in-flight files, then drop the live file buffer so chat/terminal don't pin a stale block. */
+const finalizeGenerationFileBuffer = (
+  get: StoreGet,
+  store: ReturnType<StoreGet>,
+  projectName: string,
+): void => {
+  if (hasStreamingGenerationFiles(get().generationFiles)) {
+    reconcileStalledGenerationFiles(get, store, projectName);
+  }
+  store.resetGenerationFiles();
 };
 
 const syncResumeAfterGenerationStop = (
@@ -393,18 +406,14 @@ export const createWsHandler = (
           buildId: msg.buildId ?? null,
         });
       }
-      if (
-        isActive &&
-        phaseTarget &&
-        (msg.status === "ready" || msg.status === "error") &&
-        hasStreamingGenerationFiles(get().generationFiles)
-      ) {
-        const stalledCount = reconcileStalledGenerationFiles(get, store, phaseTarget);
-        if (stalledCount > 0) {
+      if (isActive && phaseTarget && (msg.status === "ready" || msg.status === "error")) {
+        const hadStreaming = hasStreamingGenerationFiles(get().generationFiles);
+        finalizeGenerationFileBuffer(get, store, phaseTarget);
+        if (hadStreaming) {
           log({
             level: "warn",
             source: "generator",
-            message: `Reconciled ${stalledCount} stalled file(s) after status → ${msg.status}`,
+            message: `Cleared generation file buffer after status → ${msg.status}`,
           });
           syncResumeAfterGenerationStop(get, store, phaseTarget, true);
         }
@@ -635,8 +644,8 @@ export const createWsHandler = (
       if (isActive) store.clearStreamingContent();
       emitChat(createAssistantMessage(formatGenerationDoneNarration(msg.filesCount)));
       if (eventProject) {
-        if (isActive && hasStreamingGenerationFiles(get().generationFiles)) {
-          reconcileStalledGenerationFiles(get, store, eventProject);
+        if (isActive) {
+          finalizeGenerationFileBuffer(get, store, eventProject);
         }
         scheduleProjectFileTreeRefresh(eventProject, fetchProjectFiles);
         syncResumeAfterGenerationStop(get, store, eventProject, isActive);
@@ -672,6 +681,8 @@ export const createWsHandler = (
           msg.missingFileCount,
           msg.totalPlanFiles,
         );
+      } else if (isActive && msg.canResume && msg.resumeMode === "ship") {
+        announceShipRetry(eventProject);
       }
       log({
         level: "info",
@@ -730,6 +741,11 @@ export const createWsHandler = (
           error: msg.error,
           clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error" || msg.previewStatus === "stopped",
         });
+      } else if (
+        eventProject &&
+        (msg.previewStatus === "stopped" || msg.previewStatus === "error")
+      ) {
+        patchProjectListEntry(set, get, eventProject, { port: null });
       }
       if (msg.previewStatus === "error") {
         emitChat(createErrorMessage("Preview failed to start.", msg.error));
@@ -829,6 +845,8 @@ export const createWsHandler = (
           `Applied ${applied} changes, ${failureCount} errors`,
           errors.join("\n") || undefined
         ));
+      } else if (applied === 0) {
+        emitChat(createSystemMessage("No code changes were applied for this request."));
       }
       break;
     }
@@ -869,6 +887,32 @@ export const createWsHandler = (
             failed: false,
           });
         }
+      } else if (applied === 0 && !hasFailure) {
+        emitChat(createSystemMessage("No code changes were applied for this request."));
+        if (isActive) {
+          commitActiveGenerationPhase(get, store, {
+            kind: "iteration_complete",
+            failed: false,
+          });
+        }
+      }
+      break;
+    }
+
+    case "mutation_duplicate": {
+      const duplicateLabel =
+        msg.originalType === "resume_generation"
+          ? "resume"
+          : msg.originalType === "create_project"
+            ? "project creation"
+            : msg.originalType === "iterate"
+              ? "iteration"
+              : "revert";
+      emitChat(createSystemMessage(
+        `This ${duplicateLabel} request was already processed (duplicate requestId).`
+      ));
+      if (isActive && get().status !== "ready" && get().status !== "idle") {
+        store.setStatus("ready");
       }
       break;
     }
@@ -934,9 +978,12 @@ export const createWsHandler = (
         commitActiveGenerationPhase(get, store, { kind: "generation_aborted" });
         applyPreviewStatus(store, "stopped", { clearPreview: true });
         const activeProject = get().projectName;
-        if (activeProject && hasStreamingGenerationFiles(get().generationFiles)) {
-          reconcileStalledGenerationFiles(get, store, activeProject);
-          syncResumeAfterGenerationStop(get, store, activeProject, true);
+        if (activeProject) {
+          const hadStreaming = hasStreamingGenerationFiles(get().generationFiles);
+          finalizeGenerationFileBuffer(get, store, activeProject);
+          if (hadStreaming) {
+            syncResumeAfterGenerationStop(get, store, activeProject, true);
+          }
         }
       }
       log({ level: "warn", source: "pipeline", message: "Generation aborted by user" });

@@ -298,6 +298,9 @@ const createHarness = () => {
 
   return {
     getState: () => state,
+    setPreviewStatus: (previewStatus: ProjectState["previewStatus"]) => {
+      setState({ previewStatus });
+    },
     handle: (message: IncomingWsMessage) => handler(message),
     fetchProjectFiles,
   };
@@ -354,7 +357,7 @@ describe("createWsHandler", () => {
     expect(buildCards).toHaveLength(1);
   });
 
-  it("marks stalled streaming files done when status becomes ready", () => {
+  it("clears generation file buffer when status becomes ready", () => {
     const harness = createHarness();
     harness.getState().setStatus("generating");
     harness.getState().startGenerationFile("src/Stuck.tsx");
@@ -366,9 +369,7 @@ describe("createWsHandler", () => {
       status: "ready",
     });
 
-    const files = harness.getState().generationFiles;
-    expect(files).toHaveLength(1);
-    expect(files[0]?.status).toBe("done");
+    expect(harness.getState().generationFiles).toEqual([]);
   });
 
   it("refreshes explorer file tree after generation_complete", async () => {
@@ -544,6 +545,29 @@ describe("createWsHandler", () => {
     expect(harness.getState().projectList.find((p) => p.name === "beta")?.status).toBe("ready");
   });
 
+  it("clears background project port when preview_status is stopped", () => {
+    const harness = createHarness();
+    harness.setPreviewStatus("ready");
+    harness.getState().addProject({
+      name: "beta",
+      displayName: "Beta",
+      status: "ready",
+      port: 19001,
+      createdAt: 2,
+    });
+
+    harness.handle({
+      type: "preview_status",
+      requestId: REQUEST_ID,
+      projectName: "beta",
+      previewStatus: "stopped",
+      buildId: "build-beta",
+    });
+
+    expect(harness.getState().projectList.find((p) => p.name === "beta")?.port).toBeNull();
+    expect(harness.getState().previewStatus).toBe("ready");
+  });
+
   it("treats iteration errors as terminal failures and clears preview", () => {
     const harness = createHarness();
     harness.getState().setPreview("http://localhost:3100/preview/alpha/", 8081);
@@ -561,6 +585,38 @@ describe("createWsHandler", () => {
     expect(harness.getState().previewStatus).toBe("error");
     expect(harness.getState().previewUrl).toBeNull();
     expect(harness.getState().previewPort).toBeNull();
+  });
+
+  it("announces iteration no-op when zero blocks were applied", () => {
+    const harness = createHarness();
+    harness.getState().setStatus("generating");
+
+    harness.handle({
+      type: "iteration_complete",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      applied: 0,
+      failed: 0,
+      errors: [],
+    });
+
+    const last = harness.getState().messages.at(-1);
+    expect(last?.content).toContain("No code changes were applied");
+  });
+
+  it("resets optimistic active status on duplicate mutation ack", () => {
+    const harness = createHarness();
+    harness.getState().setStatus("generating");
+
+    harness.handle({
+      type: "mutation_duplicate",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      originalType: "resume_generation",
+    });
+
+    expect(harness.getState().status).toBe("ready");
+    expect(harness.getState().messages.at(-1)?.content).toContain("already processed");
   });
 
   // ── Creation-session scoping (H1) ──

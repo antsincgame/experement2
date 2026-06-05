@@ -1,6 +1,7 @@
 ﻿// Centralizes agent and LM Studio requests so URL building stays consistent across Web, Android, and iOS.
 import {
   AGENT_HTTP_URL,
+  AGENT_LOCAL_TOKEN,
   LM_STUDIO_DEFAULT_URL,
 } from "@/shared/lib/constants";
 import {
@@ -8,6 +9,7 @@ import {
   DELETE_WORKSPACE_CONFIRMATION,
 } from "@/shared/lib/api-contracts";
 import { useSettingsStore } from "@/stores/settings-store";
+import { warnCaught } from "@/shared/lib/catch-log";
 
 export interface ProjectListItem {
   name: string;
@@ -19,6 +21,7 @@ export interface ProjectListItem {
 
 export interface ProjectResumeStatus {
   canResume: boolean;
+  resumeMode?: "codegen" | "ship" | null;
   hasSavedPlan: boolean;
   checkpoint: "planned" | "scaffolded" | "codegen" | "shipped" | null;
   missingFileCount: number;
@@ -85,6 +88,12 @@ export const toWebSocketUrl = (value: string): string =>
 class ApiClient {
   private readonly defaultTimeoutMs = 10_000;
 
+  private applyAgentAuthHeaders(headers: Headers): void {
+    if (AGENT_LOCAL_TOKEN) {
+      headers.set("X-Agent-Token", AGENT_LOCAL_TOKEN);
+    }
+  }
+
   private buildUrl(
     baseUrl: string,
     pathname: string,
@@ -112,6 +121,7 @@ class ApiClient {
   ): Promise<unknown> {
     const { body, headers, timeoutMs = this.defaultTimeoutMs, ...init } = options;
     const finalHeaders = new Headers(headers);
+    this.applyAgentAuthHeaders(finalHeaders);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
@@ -133,7 +143,8 @@ class ApiClient {
 
       try {
         return await response.json();
-      } catch {
+      } catch (error) {
+        warnCaught("api-client", error, `Invalid JSON response from ${url}`);
         throw new Error(`Invalid JSON response from ${url}`);
       }
     } catch (error) {
@@ -216,7 +227,13 @@ class ApiClient {
   }
 
   getWebSocketUrl(): string {
-    return toWebSocketUrl(this.getAgentUrl());
+    const base = toWebSocketUrl(this.getAgentUrl());
+    if (!AGENT_LOCAL_TOKEN) {
+      return base;
+    }
+    const url = new URL(base);
+    url.searchParams.set("token", AGENT_LOCAL_TOKEN);
+    return url.toString();
   }
 
   getPreviewProxyUrl(projectName?: string): string {
@@ -237,7 +254,8 @@ class ApiClient {
       url.port = String(port);
       url.pathname = "/";
       return url.toString();
-    } catch {
+    } catch (error) {
+      warnCaught("api-client", error, `getPreviewDirectUrl fallback for port ${port}`);
       return `http://127.0.0.1:${port}/`;
     }
   }
@@ -323,7 +341,8 @@ class ApiClient {
         { url: this.getLmStudioUrl() }
       );
       return result.models ?? [];
-    } catch {
+    } catch (error) {
+      warnCaught("api-client", error, "listLmStudioModels failed");
       return [];
     }
   }
@@ -335,7 +354,8 @@ class ApiClient {
         { url }
       );
       return result.models ?? [];
-    } catch {
+    } catch (error) {
+      warnCaught("api-client", error, `listModelsFromUrl(${url}) failed`);
       return [];
     }
   }
@@ -359,12 +379,16 @@ class ApiClient {
   async pingAgentHealth(timeoutMs = 3000): Promise<boolean> {
     try {
       const url = this.buildUrl(this.getAgentUrl(), "/health");
+      const headers = new Headers();
+      this.applyAgentAuthHeaders(headers);
       const response = await fetch(url, {
         method: "GET",
+        headers,
         signal: AbortSignal.timeout(timeoutMs),
       });
       return response.ok;
-    } catch {
+    } catch (error) {
+      warnCaught("api-client", error, "pingAgentHealth failed");
       return false;
     }
   }

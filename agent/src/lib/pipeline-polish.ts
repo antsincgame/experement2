@@ -5,6 +5,7 @@ import { stripCodePreamble } from "./generator.js";
 import { runDesignPolish } from "./design-polish.js";
 import { KNOWLEDGE_BASE } from "../prompts/knowledge-base.js";
 import type { PipelineContext } from "./pipeline-types.js";
+import { warnCaught } from "./catch-log.js";
 
 const selectPolishScreens = (files: string[]): string[] =>
   files.filter(
@@ -62,7 +63,8 @@ RULES:
     validate: async () => {
       try {
         return (await runTypecheck(projectPath)).success;
-      } catch {
+      } catch (error) {
+        warnCaught("pipeline-polish", error, "polish validation typecheck failed");
         return false;
       }
     },

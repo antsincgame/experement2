@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { closeSettings, openSettings } from "./support/settings-helpers";
 
 const AGENT_URL = "http://127.0.0.1:3100";
 const MOCK_LLM_URL = "http://127.0.0.1:1235";
@@ -121,31 +122,8 @@ test("settings drawer opens and closes without breaking UI state", async ({ page
   await page.goto("/");
   await expect(page.getByText("Connected")).toBeVisible({ timeout: 30_000 });
 
-  const settingsButton = page.locator('[aria-label*="Settings"], [aria-label*="settings"]').first();
-  const hasDedicatedButton = await settingsButton.isVisible().catch(() => false);
-
-  if (hasDedicatedButton) {
-    await settingsButton.click();
-  } else {
-    const gearIcon = page.locator("svg").filter({ has: page.locator("circle, path") }).first();
-    if (await gearIcon.isVisible()) {
-      await gearIcon.click();
-    }
-  }
-
-  const lmStudioLabel = page.getByText(/LM Studio/i).first();
-  const drawerOpened = await lmStudioLabel.isVisible({ timeout: 5_000 }).catch(() => false);
-
-  if (drawerOpened) {
-    await expect(lmStudioLabel).toBeVisible();
-
-    const closeButton = page.locator('[aria-label="Close"], [aria-label="close"]').first();
-    const hasClose = await closeButton.isVisible().catch(() => false);
-    if (hasClose) {
-      await closeButton.click();
-      await expect(lmStudioLabel).not.toBeVisible({ timeout: 5_000 });
-    }
-  }
+  await openSettings(page);
+  await closeSettings(page);
 
   await expect(page.getByText(FIXTURE_PROJECT.name)).toBeVisible({ timeout: 10_000 });
 });

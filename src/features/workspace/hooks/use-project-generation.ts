@@ -9,6 +9,7 @@ import {
   isPipelineBusy,
 } from "@/shared/lib/generation-status";
 import { refreshResumeHint } from "@/stores/resume-hint";
+import { warnCaught } from "@/shared/lib/catch-log";
 import {
   isContinueGenerationMessage,
   resolveResumeProjectName,
@@ -66,8 +67,9 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
           syncResumeStatus(fetched);
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
+          warnCaught("use-project-generation", error, "initial resume status fetch failed");
           setResumeStatus(null);
         }
       });
@@ -90,8 +92,8 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
           syncResumeStatus(fetched);
         }
       })
-      .catch(() => {
-        /* keep last known status */
+      .catch((error) => {
+        warnCaught("use-project-generation", error, "resume status refresh failed");
       });
 
     return () => {
@@ -125,14 +127,21 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
         void apiClient
           .getProjectResumeStatus(resumeProjectName)
           .then(syncResumeStatus)
-          .catch(() => undefined);
+          .catch((error) => {
+            warnCaught("use-project-generation", error, "resume status after ready failed");
+          });
       }
       return;
     }
     if (status === "error") {
       setIsResuming(false);
       if (resumeProjectName) {
-        void apiClient.getProjectResumeStatus(resumeProjectName).then(syncResumeStatus).catch(() => undefined);
+        void apiClient
+          .getProjectResumeStatus(resumeProjectName)
+          .then(syncResumeStatus)
+          .catch((error) => {
+            warnCaught("use-project-generation", error, "resume status after error failed");
+          });
       }
     }
   }, [isResuming, resumeProjectName, status, syncResumeStatus]);
@@ -141,20 +150,21 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
 
   const showContinue = Boolean(
     resumeProjectName &&
+    !pipelineBusy &&
     (resumeStatus?.canResume || listHint?.canResume || stalledUi),
   );
 
   const showResumeBanner = showContinue;
 
   const handleResumeGeneration = useCallback(() => {
-    if (!resumeProjectName) {
+    if (!resumeProjectName || pipelineBusy) {
       return;
     }
     setIsResuming(true);
     setStatus("generating");
     addMessage(createSystemMessage("↻ Resuming generation from saved plan…", false));
     resumeGeneration(resumeProjectName);
-  }, [addMessage, resumeGeneration, resumeProjectName, setStatus]);
+  }, [addMessage, pipelineBusy, resumeGeneration, resumeProjectName, setStatus]);
 
   const tryContinueFromChat = useCallback(
     (text: string): boolean => {
@@ -176,6 +186,7 @@ export const useProjectGeneration = (routeProjectName: string | null) => {
     pipelineBusy,
     resumeProjectName,
     resumeStatus,
+    resumeMode: resumeStatus?.resumeMode ?? null,
     showContinue,
     showResumeBanner,
     tryContinueFromChat,

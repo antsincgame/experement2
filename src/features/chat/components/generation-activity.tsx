@@ -1,10 +1,7 @@
-// Live "watch it build" panel: streams pipeline phases and a human-readable meaning for each
-// file as the agent generates an app. Raw code is intentionally NOT shown here — it lives only
-// in the code generator (CodeViewer). Meaning comes from the model's own plan descriptions.
+// Compact live pipeline header in chat — phase timeline only while the agent is running.
+// Per-file progress lives in chronological process messages, not in a monolithic bottom block.
 import { View, Text, ActivityIndicator } from "react-native";
-import { Check, FileCode2 } from "lucide-react-native";
 import { useProjectStore } from "@/stores/project-store";
-import { buildFileMeanings, type FileMeaning } from "@/shared/lib/generation-narration";
 import { GENERATION_PHASE_RANK, isGenerationActive } from "@/shared/lib/generation-status";
 import {
   getGenerationActivityHeader,
@@ -24,56 +21,6 @@ const PHASES: { key: ProjectStatus; label: string }[] = [
   { key: "ready", label: "Ready" },
 ];
 
-interface FileCardProps {
-  file: FileMeaning;
-}
-
-const FileCard = ({ file }: FileCardProps) => {
-  const isStreaming = file.status === "streaming";
-
-  return (
-    <View
-      className="rounded-xl overflow-hidden mb-2"
-      style={{
-        backgroundColor: "rgba(10,10,18,0.6)",
-        borderWidth: 1,
-        borderColor: isStreaming
-          ? "rgba(0,229,255,0.35)"
-          : "rgba(255,255,255,0.08)",
-      }}
-    >
-      <View className="flex-row items-center gap-2 px-3 py-2">
-        <FileCode2
-          size={13}
-          color={isStreaming ? "#00E5FF" : "#7C4DFF"}
-          strokeWidth={1.75}
-        />
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{ fontSize: 12, color: "#D8D8EC", fontFamily: "monospace" }}
-            numberOfLines={1}
-          >
-            {file.path}
-          </Text>
-          <Text style={{ fontSize: 11, color: "#9AA0BC", lineHeight: 15 }} numberOfLines={2}>
-            {file.meaning}
-          </Text>
-        </View>
-        {isStreaming ? (
-          <ActivityIndicator size="small" color="#00E5FF" />
-        ) : (
-          <View
-            className="w-4 h-4 rounded-full items-center justify-center"
-            style={{ backgroundColor: "rgba(0,255,136,0.15)" }}
-          >
-            <Check size={11} color="#00FF88" strokeWidth={3} />
-          </View>
-        )}
-      </View>
-    </View>
-  );
-};
-
 const PhaseTimeline = ({
   status,
   checkpoint,
@@ -84,7 +31,7 @@ const PhaseTimeline = ({
   const currentRank = resolveTimelineRank(status, checkpoint);
   const fullyShipped = isPipelineFullyShipped(checkpoint);
   return (
-    <View className="flex-row items-center gap-1 mb-3 flex-wrap">
+    <View className="flex-row items-center gap-1 flex-wrap">
       {PHASES.map((phase, index) => {
         const rank = GENERATION_PHASE_RANK[phase.key] ?? 0;
         const isDone = fullyShipped ? rank <= GENERATION_PHASE_RANK.ready : rank < currentRank;
@@ -119,22 +66,23 @@ const PhaseTimeline = ({
 const GenerationActivity = () => {
   const status = useProjectStore((s) => s.status);
   const checkpoint = useProjectStore((s) => s.generationCheckpoint);
-  const files = useProjectStore((s) => s.generationFiles);
   const progress = useProjectStore((s) => s.generationProgress);
-  const plan = useProjectStore((s) => s.plan);
+  const files = useProjectStore((s) => s.generationFiles);
 
-  const active = isGenerationActive(status);
-  if (!active && files.length === 0) {
+  // Chat iterate uses "analyzing" too — keep that phase in the message timeline only.
+  const showCompactPanel =
+    isGenerationActive(status) &&
+    status !== "analyzing";
+  if (!showCompactPanel) {
     return null;
   }
 
-  const fileMeanings = buildFileMeanings(files, plan);
   const doneCount = files.filter((f) => f.status === "done").length;
 
   return (
-    <View className="px-4 py-3 animate-fade-in">
+    <View className="px-4 py-2 animate-fade-in">
       <View
-        className="rounded-2xl px-3 py-3"
+        className="rounded-xl px-3 py-2.5"
         style={{
           backgroundColor: "rgba(124,77,255,0.06)",
           borderWidth: 1,
@@ -142,12 +90,12 @@ const GenerationActivity = () => {
         }}
       >
         <View className="flex-row items-center gap-2 mb-2">
-          {active && <ActivityIndicator size="small" color="#7C4DFF" />}
-          <Text style={{ fontSize: 13, fontWeight: "700", color: "#E8E8F4", flex: 1 }}>
+          <ActivityIndicator size="small" color="#7C4DFF" />
+          <Text style={{ fontSize: 12, fontWeight: "700", color: "#E8E8F4", flex: 1 }}>
             {getGenerationActivityHeader(status, checkpoint)}
           </Text>
           {files.length > 0 && (
-            <Text style={{ fontSize: 11, color: "#A0A8C0", fontWeight: "600" }}>
+            <Text style={{ fontSize: 10, color: "#A0A8C0", fontWeight: "600" }}>
               {doneCount}/{files.length}
             </Text>
           )}
@@ -155,9 +103,9 @@ const GenerationActivity = () => {
 
         <PhaseTimeline status={status} checkpoint={checkpoint} />
 
-        {active && progress > 0 && progress < 1 && (
+        {progress > 0 && progress < 1 && (
           <View
-            className="rounded-full overflow-hidden mb-3"
+            className="rounded-full overflow-hidden mt-2"
             style={{ height: 3, backgroundColor: "rgba(255,255,255,0.06)" }}
           >
             <View
@@ -170,10 +118,6 @@ const GenerationActivity = () => {
             />
           </View>
         )}
-
-        {fileMeanings.map((file) => (
-          <FileCard key={file.path} file={file} />
-        ))}
       </View>
     </View>
   );

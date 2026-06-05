@@ -15,6 +15,7 @@ import { buildGoldenExampleBlock } from "./golden-examples.js";
 import { composeTeachingContext } from "./teaching-context.js";
 import { applyDeterministicCodeRepairs } from "./code-style-repairs.js";
 import { broadcast } from "./event-bus.js";
+import { warnCaught } from "./catch-log.js";
 import {
   BOILERPLATE_TEMPLATES,
   getIndexRedirect,
@@ -146,7 +147,8 @@ export const normalizeImportDeclarations = (code: string): string => {
     }
 
     return sourceFile.getFullText();
-  } catch {
+  } catch (error) {
+    warnCaught("generator", error, "normalize vector icon imports");
     return code;
   }
 };

@@ -5,6 +5,7 @@ import { LlmEnhanceBodySchema } from "../schemas/runtime-input.schema.js";
 import { handleLLMProxyRoute, completeNonStreaming, getActiveRequestCount } from "../services/llm-proxy.js";
 import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
 import { stripThinkingFromText } from "../lib/strip-thinking.js";
+import { warnCaught } from "../lib/catch-log.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 
@@ -99,7 +100,8 @@ llmRouter.get("/health", async (_req, res) => {
     } else {
       res.json({ status: "error", message: "LM Studio returned error" });
     }
-  } catch {
+  } catch (error) {
+    warnCaught("llm-route", error, "LLM health check");
     res.json({ status: "disconnected", message: "LM Studio not reachable" });
   }
 });

@@ -8,6 +8,7 @@ import type { ChatMessage as Msg } from "../schemas/message.schema";
 import MarkdownRenderer from "./markdown-renderer";
 import DiffView from "./diff-view";
 import ProcessMessage from "./process-message";
+import { warnCaught } from "@/shared/lib/catch-log";
 
 interface ChatMessageProps {
   message: Msg;
@@ -278,7 +279,9 @@ const ChatMessage = ({ message, onFixError }: ChatMessageProps) => {
 
 const copyToClipboard = (text: string): void => {
   if (typeof navigator !== "undefined" && navigator.clipboard) {
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).catch((error) => {
+      warnCaught("chat-message", error, "clipboard copy failed");
+    });
   }
 };
 

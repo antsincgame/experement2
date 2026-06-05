@@ -1,4 +1,5 @@
 // Pure, dependency-injected orchestration for the opt-in "Auto-polish" design loop.
+import { warnCaught } from "./catch-log.js";
 // After a project builds, this asks the model to improve each screen's visual design
 // over a few bounded passes, accepting a change ONLY if the project still validates
 // (typecheck) — otherwise the file is reverted (anti-regression). The side effects
@@ -78,8 +79,8 @@ export const runDesignPolish = async (
           // Anti-regression: the change broke validation — restore the original.
           writeFile(path, current);
         }
-      } catch {
-        // One screen failing must not abort the pass or the loop.
+      } catch (error) {
+        warnCaught("design-polish", error, `polish screen ${path}`);
       }
     }
 

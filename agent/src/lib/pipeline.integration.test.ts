@@ -86,6 +86,7 @@ describe("createProject (integration, injected PipelineContext)", () => {
     expect(result.projectName).toBe(slug);
     expect(result.port).toBe(8081);
     expect(result.plan.name).toBe(slug);
+    expect(result.shipped).toBe(true);
 
     const types = events.map((e) => e.type);
     expect(types).toContain("preview_ready");

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { Project, ScriptKind, SyntaxKind, type InterfaceDeclaration } from "ts-morph";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
+import { warnCaught } from "./catch-log.js";
 import {
   AUTO_GENERATED_PLAN_FILES,
   getBareModuleName,
@@ -262,8 +263,8 @@ const readPackageNames = (projectPath: string): Set<string> => {
   let parsed: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
   try {
     parsed = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-  } catch {
-    // package.json mid-write (e.g. during npm install) or malformed — treat as no deps
+  } catch (error) {
+    warnCaught("project-validator", error, "read package.json dependencies");
     return new Set<string>();
   }
 
@@ -282,8 +283,8 @@ const validateSourceFileImports = (
   let content: string;
   try {
     content = fs.readFileSync(fullPath, "utf-8");
-  } catch {
-    // File vanished between listing and validation — skip silently
+  } catch (error) {
+    warnCaught("project-validator", error, `read source file ${filePath}`);
     return [];
   }
   const issues: ValidationIssue[] = [];
@@ -434,7 +435,8 @@ const extractStoreKeysFromSource = (
 
     const fallback = sourceFile.getInterfaces().find((iface) => iface.getProperties().length >= 3);
     return fallback ? collectTopLevelInterfaceKeys(fallback) : [];
-  } catch {
+  } catch (error) {
+    warnCaught("project-validator", error, "extract store interface keys");
     return [];
   }
 };

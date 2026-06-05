@@ -2,6 +2,7 @@
 import { Project, Node, SyntaxKind, type SourceFile, type Type } from "ts-morph";
 import path from "path";
 import fs from "fs";
+import { warnCaught } from "./catch-log.js";
 
 // ── JSON Export Contracts ──
 
@@ -262,7 +263,8 @@ export const buildProjectSkeleton = (projectPath: string): ProjectSkeleton => {
       tsConfigFilePath: tsconfigPath,
       skipAddingFilesFromTsConfig: true,
     });
-  } catch {
+  } catch (error) {
+    warnCaught("context-builder", error, "parse tsconfig for project skeleton");
     return { entries: [], summary: "Failed to parse tsconfig.json" };
   }
 

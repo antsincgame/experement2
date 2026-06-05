@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { WebSocket } from "ws";
 import { createPreviewProxy } from "../services/preview-proxy.js";
+import { warnCaught } from "./catch-log.js";
 
 // ── WebSocket clients ──
 const clients = new Map<string, WebSocket>();
@@ -46,6 +47,11 @@ const sendScopedToClient = (
 ): void => {
   const ws = clients.get(clientId);
   if (!ws || ws.readyState !== WebSocket.OPEN) {
+    warnCaught(
+      "event-bus",
+      new Error(`client ${clientId.slice(0, 8)} socket not open (state=${ws?.readyState ?? "missing"})`),
+      `dropped ${String(message.type ?? "message")}`
+    );
     return;
   }
 
@@ -70,12 +76,13 @@ export const unregisterClient = (clientId: string): void => {
 const safeSend = (clientId: string, ws: WebSocket, data: string): void => {
   try {
     ws.send(data);
-  } catch {
+  } catch (error) {
+    warnCaught("event-bus", error, "ws.send failed");
     unregisterClient(clientId);
     try {
       ws.close();
-    } catch {
-      // Socket is already closing/closed.
+    } catch (closeError) {
+      warnCaught("event-bus", closeError, "ws.close after send failure");
     }
   }
 };
@@ -171,7 +178,8 @@ export const handlePreviewRequest = (
 
   try {
     projectName = segments[0] ? decodeURIComponent(segments[0]) : undefined;
-  } catch {
+  } catch (error) {
+    warnCaught("event-bus", error, "decode preview project name");
     res.status(400).send("Preview project name is not valid URL encoding.");
     return;
   }

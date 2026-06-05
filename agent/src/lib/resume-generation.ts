@@ -44,7 +44,7 @@ export const resumeProjectGeneration = async (
   if (!resume.canResume) {
     throw new ResumeGenerationError(
       "NOT_RESUMABLE",
-      `"${projectName}" has no missing planned files (checkpoint: ${resume.checkpoint ?? "none"}).`,
+      `"${projectName}" is not resumable (checkpoint: ${resume.checkpoint ?? "none"}).`,
     );
   }
 

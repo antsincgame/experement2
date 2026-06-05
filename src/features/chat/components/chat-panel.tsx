@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
 import { MessageSquare } from "lucide-react-native";
-import { GENERATION_STATUS_LABELS } from "@/shared/lib/generation-status";
+import { GENERATION_STATUS_LABELS, isGenerationActive } from "@/shared/lib/generation-status";
 import { useProjectGeneration } from "@/features/workspace/hooks/use-project-generation";
 import { useProjectStore } from "@/stores/project-store";
 import ChatMessage from "./chat-message";
@@ -24,17 +24,18 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
     handleResumeGeneration,
     isResuming,
     pipelineBusy,
+    resumeMode,
     resumeStatus,
     showContinue,
   } = useProjectGeneration(projectName);
 
   const isGenerating = pipelineBusy;
   const visibleMessages = messages.filter((m) => !m.isHidden);
-  const hasActivity = isGenerating || generationFiles.length > 0;
+  const showPipelinePanel = isGenerationActive(status) && status !== "analyzing";
   const streamingFile = generationFiles.find((f) => f.status === "streaming");
   const activitySignature = streamingFile
     ? `${streamingFile.path}:${streamingFile.code.length}`
-    : `${status}:${generationFiles.length}`;
+    : `${status}:${showPipelinePanel}`;
   const lastVisibleMessage = visibleMessages.at(-1);
   const lastVisibleSignature = lastVisibleMessage
     ? `${lastVisibleMessage.id}:${lastVisibleMessage.content.length}:${lastVisibleMessage.status}`
@@ -89,7 +90,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
         className="flex-1"
         contentContainerStyle={{ paddingTop: 8, paddingBottom: 8 }}
       >
-        {visibleMessages.length === 0 && !hasActivity && (
+        {visibleMessages.length === 0 && !showPipelinePanel && (
           <View className="items-center justify-center py-20 px-6">
             <View
               className="w-12 h-12 rounded-2xl items-center justify-center mb-3"
@@ -108,8 +109,8 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
           <ChatMessage key={msg.id} message={msg} onFixError={handleFixError} />
         ))}
 
-        {/* Live "watch it build" panel — phases + per-file streaming code */}
-        <GenerationActivity />
+        {/* Compact phase header while pipeline runs; file rows stay in message timeline */}
+        {showPipelinePanel && <GenerationActivity />}
       </ScrollView>
 
       <GenerationControls
@@ -117,6 +118,7 @@ const ChatPanel = ({ onSend, onAbort }: ChatPanelProps) => {
         showContinue={showContinue}
         isResuming={isResuming}
         missingFileCount={resumeStatus?.missingFileCount ?? undefined}
+        resumeMode={resumeMode}
         onAbort={onAbort}
         onContinue={handleResumeGeneration}
       />

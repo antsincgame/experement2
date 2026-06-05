@@ -1,4 +1,5 @@
 // Confirms Metro is serving AND that the web bundle is compiled, so previews render
+import { warnCaught } from "./catch-log.js";
 // immediately instead of showing a blank iframe while the first (large) bundle builds.
 //
 // fetch is injectable so the pipeline can drive readiness with a test seam; the
@@ -23,8 +24,8 @@ const warmMetroBundle = async (
     await fetchFn(`http://127.0.0.1:${port}${match[1]}`, {
       signal: AbortSignal.timeout(90_000),
     });
-  } catch {
-    // Best-effort: the iframe will retrigger compilation if warming did not finish.
+  } catch (error) {
+    warnCaught("metro-ready", error, `warm Metro bundle on port ${port}`);
   }
 };
 
@@ -47,8 +48,8 @@ export const waitForMetroReady = async (
         await warmMetroBundle(port, resp, fetchFn);
       }
       return true;
-    } catch {
-      // Metro not accepting connections yet.
+    } catch (error) {
+      warnCaught("metro-ready", error, `wait for Metro on port ${port} (attempt ${i + 1})`);
     }
     await new Promise((r) => setTimeout(r, 750));
   }

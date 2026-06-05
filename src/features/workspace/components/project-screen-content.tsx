@@ -30,6 +30,7 @@ interface ProjectScreenContentProps {
   handleResumeGeneration: () => void;
   handleSelectProject: (name: string) => void;
   isResuming: boolean;
+  resumeMode: "codegen" | "ship" | null;
   resumeStatus: ProjectResumeStatus | null;
   showResumeBanner: boolean;
   resumeProjectName: string | null;
@@ -63,6 +64,7 @@ export const ProjectScreenContent = ({
   handleResumeGeneration,
   handleSelectProject,
   isResuming,
+  resumeMode,
   resumeStatus,
   showResumeBanner,
   resumeProjectName,
@@ -174,6 +176,7 @@ export const ProjectScreenContent = ({
           projectName={resumeProjectName}
           missingFileCount={resumeStatus.missingFileCount}
           totalPlanFiles={resumeStatus.totalPlanFiles}
+          resumeMode={resumeMode ?? resumeStatus.resumeMode ?? null}
           isResuming={isResuming || isGenerationActive(status)}
           onResume={handleResumeGeneration}
         />

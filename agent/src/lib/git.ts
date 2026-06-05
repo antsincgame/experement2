@@ -5,6 +5,7 @@
 // module mocking.
 import { spawnSync } from "child_process";
 import path from "path";
+import { warnCaught } from "./catch-log.js";
 
 export const GIT_HASH_PATTERN = /^[a-f0-9]{7,64}$/i;
 
@@ -51,7 +52,8 @@ const isOwnGitRepo = (projectPath: string, run: GitRunner): boolean => {
     }
     const normalize = (p: string): string => path.resolve(p).replace(/\\/g, "/").toLowerCase();
     return normalize(top) === normalize(projectPath);
-  } catch {
+  } catch (error) {
+    warnCaught("git", error, "check own git repo");
     return false;
   }
 };
@@ -70,7 +72,8 @@ export const gitCommit = (
     run(projectPath, ["add", "-A"]);
     run(projectPath, ["commit", "-m", message, "--allow-empty"]);
     return run(projectPath, ["rev-parse", "--short", "HEAD"]);
-  } catch {
+  } catch (error) {
+    warnCaught("git", error, `git commit ${message}`);
     return null;
   }
 };
@@ -98,7 +101,8 @@ export const getVersionNumber = (
   try {
     const log = run(projectPath, ["log", "--oneline"], { allowFailure: true });
     return log ? log.split("\n").length + 1 : 1;
-  } catch {
+  } catch (error) {
+    warnCaught("git", error, "get version number from git log");
     return 1;
   }
 };

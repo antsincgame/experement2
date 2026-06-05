@@ -16,8 +16,10 @@ import {
 import { formatZodError } from "./lib/request-validation.js";
 import { assertLlmUrl, llmFetch } from "./lib/llm-url.js";
 import { getAllowedOrigins, isOriginAllowed } from "./lib/origin-allowlist.js";
+import { isLocalAuthEnabled, verifyHttpToken, verifyWsToken } from "./lib/local-auth.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { resumeProjectGeneration } from "./lib/resume-generation.js";
+import type { CodegenShipResult } from "./lib/pipeline-codegen-phase.js";
 import { isErrorReported } from "./lib/reported-error.js";
 import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
 import { resolveFixModel } from "./lib/model-roles.js";
@@ -37,6 +39,7 @@ import {
 } from "./services/file-manager.js";
 import { abortAll, clearModelCache } from "./services/llm-proxy.js";
 import { parseMetroError } from "./services/log-watcher.js";
+import { warnCaught } from "./lib/catch-log.js";
 import {
   attachOperationToQueueKey,
   enqueueProjectOperation,
@@ -67,11 +70,15 @@ const wss = new WebSocketServer({
   // WS, so a malicious page could otherwise drive create/iterate/revert. The Origin
   // header (always sent by browsers) is checked against the same allowlist as CORS.
   verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => {
-    if (isOriginAllowed(info.origin, ALLOWED_ORIGINS)) {
-      return true;
+    if (!isOriginAllowed(info.origin, ALLOWED_ORIGINS)) {
+      console.warn(`[WS] Rejected upgrade from disallowed origin: ${info.origin}`);
+      return false;
     }
-    console.warn(`[WS] Rejected upgrade from disallowed origin: ${info.origin}`);
-    return false;
+    if (!verifyWsToken(info.req)) {
+      console.warn("[WS] Rejected upgrade: missing or invalid AGENT_LOCAL_TOKEN");
+      return false;
+    }
+    return true;
   },
 });
 let lmStudioInterval: NodeJS.Timeout | null = null;
@@ -80,7 +87,7 @@ let currentLlmServerUrl = DEFAULT_LM_STUDIO_URL;
 
 app.use(express.json({ limit: "10mb" }));
 
-const ALLOWED_HEADERS = ["Content-Type", "X-App-Factory-Confirm"];
+const ALLOWED_HEADERS = ["Content-Type", "X-App-Factory-Confirm", "X-Agent-Token", "Authorization"];
 type ArchiverFactory = (
   format: string,
   options?: { zlib?: { level?: number } }
@@ -100,7 +107,8 @@ const importModule = new Function(
 const loadArchiver = async (): Promise<{ default: ArchiverFactory } | null> => {
   try {
     return await importModule("archiver") as { default: ArchiverFactory };
-  } catch {
+  } catch (error) {
+    warnCaught("server", error, "load archiver module");
     return null;
   }
 };
@@ -114,6 +122,18 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Headers", ALLOWED_HEADERS.join(", "));
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
+app.use((req, res, next) => {
+  if (!isLocalAuthEnabled() || req.path === "/health") {
+    next();
+    return;
+  }
+  if (!verifyHttpToken(req)) {
+    res.status(401).json({ error: "Unauthorized", code: "AUTH_REQUIRED" });
     return;
   }
   next();
@@ -220,6 +240,22 @@ const CREATE_PROJECT_QUEUE_TIMEOUT_MS = Number(
 const CREATE_PROJECT_STILL_RUNNING_NOTICE =
   "Queue time limit reached — generation is still running on the agent. Watch file progress and preview; ignore the red timeout card.";
 
+/** Only announce project_created when preview actually shipped — avoids false "ready". */
+const sendProjectCreatedIfShipped = (
+  clientId: string,
+  result: CodegenShipResult,
+  scope?: Record<string, unknown>,
+): void => {
+  if (result.shipped) {
+    sendToClient(clientId, { type: "project_created", ...result }, scope);
+    return;
+  }
+  console.log(
+    `[WS] Pipeline finished without ship for ${result.projectName}` +
+      (result.failureStage ? ` (${result.failureStage})` : ""),
+  );
+};
+
 const isOperationQueueTimeout = (error: unknown): boolean =>
   error instanceof Error && /^Operation .+ timed out after \d+s$/i.test(error.message);
 
@@ -290,7 +326,8 @@ wss.on("connection", (ws: WebSocket) => {
 
     try {
       rawMessage = JSON.parse(data.toString());
-    } catch {
+    } catch (error) {
+      warnCaught("server", error, "parse WebSocket message JSON");
       sendSystemErrorToClient(clientId, "Invalid JSON message", "validation");
       return;
     }
@@ -356,7 +393,15 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
   }
 
   if (isDuplicateMutation(message)) {
+    const requestId = "requestId" in message ? message.requestId : undefined;
     console.log(`[WS] Ignoring duplicate ${message.type} (requestId already processed)`);
+    if (requestId) {
+      sendToClient(clientId, {
+        type: "mutation_duplicate",
+        requestId,
+        originalType: message.type,
+      });
+    }
     return;
   }
 
@@ -384,7 +429,11 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
         runWithEventScope(
           { clientId, projectName: result.projectName, requestId: message.requestId },
           () => {
-            sendToClient(clientId, { type: "project_created", ...result });
+            sendProjectCreatedIfShipped(clientId, result, {
+              clientId,
+              projectName: result.projectName,
+              requestId: message.requestId,
+            });
           },
         );
       };
@@ -505,7 +554,11 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
             requestId: message.requestId,
           }),
         (result) => {
-          sendToClient(clientId, { type: "project_created", ...result });
+          sendProjectCreatedIfShipped(clientId, result, {
+            clientId,
+            projectName: message.projectName,
+            requestId: message.requestId,
+          });
         },
         { projectName: message.projectName, requestId: message.requestId },
       );
@@ -683,7 +736,9 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
 
           // Expo web bundles lazily; fire the first request so compilation starts
           // instead of waiting for a request that never comes.
-          void triggerMetroBuild(port).catch(() => {});
+          void triggerMetroBuild(port).catch((error) => {
+            warnCaught("server", error, "triggerMetroBuild after preview start");
+          });
 
           // Wait for Metro to actually accept requests before announcing preview.
           // First Expo + Tamagui bundle can take well over 30s on a cold start.
@@ -746,7 +801,8 @@ const checkLlmServer = async (): Promise<void> => {
       clearModelCache(currentLlmServerUrl);
       broadcast({ type: "llm_server_status", status: "disconnected" });
     }
-  } catch {
+  } catch (error) {
+    warnCaught("server", error, "check LLM server status");
     clearModelCache(currentLlmServerUrl);
     broadcast({ type: "llm_server_status", status: "disconnected" });
   }

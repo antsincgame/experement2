@@ -43,14 +43,26 @@ const resumeThinking = (
   missing: number,
   total: number,
   checkpoint: string | null,
-): string =>
-  [
+  resumeMode: "codegen" | "ship" | null,
+): string => {
+  if (resumeMode === "ship") {
+    return [
+      "**↻ Retrying build & preview.**",
+      "",
+      `All **${total}** planned files are on disk for **${displayName}** (\`${projectName}\`) at checkpoint \`${checkpoint ?? "codegen"}\`.`,
+      "",
+      "Skipping codegen — rerunning quality gates and Metro preview boot.",
+    ].join("\n");
+  }
+
+  return [
     "**↻ Resuming generation.**",
     "",
     `Picking up **${displayName}** (\`${projectName}\`) at checkpoint \`${checkpoint ?? "unknown"}\` — **${missing}** of **${total}** planned files still need code.`,
     "",
     "Finished files are skipped; the pipeline then runs the same gates and preview boot as a fresh create.",
   ].join("\n");
+};
 
 export const executeCodegenRun = async (
   params: ExecuteCodegenRunParams,
@@ -84,8 +96,10 @@ export const executeCodegenRun = async (
   const fixModel = resolveFixModel(editorModel, model);
   const emitter = createPipelineEmitter(projectName, ctx.broadcast, requestId);
 
-  if (mode === "resume") {
-    const resume = getProjectResumeStatus(projectName);
+  const resume = mode === "resume" ? getProjectResumeStatus(projectName) : null;
+  const skipCodegen = resume?.resumeMode === "ship";
+
+  if (mode === "resume" && resume) {
     emitter.emit({
       type: "plan_complete",
       plan: { ...plan, name: projectName },
@@ -101,11 +115,15 @@ export const executeCodegenRun = async (
         resume.missingFileCount,
         resume.totalPlanFiles,
         resume.checkpoint,
+        resume.resumeMode,
       ),
     });
   }
 
-  emitter.emit({ type: "status", status: "generating" });
+  emitter.emit({
+    type: "status",
+    status: skipCodegen ? "validating" : "generating",
+  });
   emitter.emit({
     type: "build_event",
     eventType: "moe_swap",
@@ -137,6 +155,7 @@ export const executeCodegenRun = async (
     emitOperation: emitter.emit,
     emitBuildScoped: emitter.emitBuildScoped,
     skipExistingFiles,
+    skipCodegen,
     gitCommitMessage,
   });
 };

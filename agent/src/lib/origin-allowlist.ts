@@ -1,4 +1,5 @@
 // Shared origin allowlist for HTTP CORS and the WebSocket verifyClient gate.
+import { warnCaught } from "./catch-log.js";
 //
 // Browsers do NOT apply same-origin to WebSocket, so a malicious page the victim
 // has open could otherwise `new WebSocket("ws://127.0.0.1:3100")` and drive
@@ -20,7 +21,8 @@ export const isLoopbackHttpOrigin = (origin: string): boolean => {
       url.protocol === "http:" &&
       (url.hostname === "localhost" || url.hostname === "127.0.0.1")
     );
-  } catch {
+  } catch (error) {
+    warnCaught("origin-allowlist", error, `parse origin ${origin}`);
     return false;
   }
 };

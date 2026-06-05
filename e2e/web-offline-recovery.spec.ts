@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { openSettings } from "./support/settings-helpers";
 
 const AGENT_URL = "http://127.0.0.1:3100";
 const MOCK_LLM_URL = "http://127.0.0.1:1235";
@@ -82,16 +83,8 @@ test("shows Disconnected status when agent is unreachable", async ({ page }) => 
   // Wait a reasonable time for the connection attempt to fail
   await page.waitForTimeout(5_000);
 
-  // The UI should NOT show "Connected" when agent is unreachable
-  const connectedVisible = await page
-    .getByText("Connected", { exact: true })
-    .isVisible({ timeout: 3_000 })
-    .catch(() => false);
-
-  // Either "Disconnected" text appears, or "Connected" does not
-  if (!connectedVisible) {
-    expect(connectedVisible).toBe(false);
-  }
+  await expect(page.getByText("Offline", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("Connected", { exact: true })).not.toBeVisible();
 
   // At minimum, the app should load without crashing
   await expect(page.getByText("App Factory")).toBeVisible({ timeout: 5_000 });
@@ -143,10 +136,5 @@ test("home screen remains functional during disconnected state", async ({ page }
   await expect(page.getByText("App Factory")).toBeVisible({ timeout: 5_000 });
 
   // Settings should still be accessible
-  const settingsButton = page.locator('[aria-label*="Settings"], [aria-label*="settings"]').first();
-  const hasDedicatedButton = await settingsButton.isVisible().catch(() => false);
-  if (hasDedicatedButton) {
-    await settingsButton.click();
-    await expect(page.getByText(/LM Studio/i).first()).toBeVisible({ timeout: 5_000 });
-  }
+  await openSettings(page);
 });

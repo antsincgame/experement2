@@ -92,26 +92,18 @@ test("Clear All removes projects from the list", async ({ page }) => {
   await expect(page.getByText(FIXTURE_PROJECT.name)).toBeVisible({ timeout: 10_000 });
 
   // Find and click Clear All button
-  const clearAllButton = page.getByText("Clear All", { exact: false }).first();
-  const hasClearAll = await clearAllButton.isVisible({ timeout: 5_000 }).catch(() => false);
+  const clearAllButton = page.getByText("Clear All", { exact: true });
+  await expect(clearAllButton).toBeVisible({ timeout: 5_000 });
+  await clearAllButton.click();
 
-  if (hasClearAll) {
-    await clearAllButton.click();
+  await page.waitForTimeout(3_000);
 
-    // Wait for deletion to process
-    await page.waitForTimeout(3_000);
+  const storeState = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("app-factory-projects");
+    return raw ? JSON.parse(raw) : null;
+  });
 
-    // After clear, the project list in the store is reset
-    const storeState = await page.evaluate(() => {
-      const raw = window.localStorage.getItem("app-factory-projects");
-      return raw ? JSON.parse(raw) : null;
-    });
-
-    // Store should be cleared or have no projects
-    if (storeState?.state?.projectList) {
-      expect(storeState.state.projectList.length).toBe(0);
-    }
-  }
+  expect(storeState?.state?.projectList?.length ?? 0).toBe(0);
 });
 
 test("filesystem project is deleted after Clear All", async ({ page }) => {
@@ -140,27 +132,10 @@ test("filesystem project is deleted after Clear All", async ({ page }) => {
   await expect(page.getByText("Connected")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(FIXTURE_PROJECT.name)).toBeVisible({ timeout: 10_000 });
 
-  const clearAllButton = page.getByText("Clear All", { exact: false }).first();
-  const hasClearAll = await clearAllButton.isVisible({ timeout: 5_000 }).catch(() => false);
+  const clearAllButton = page.getByText("Clear All", { exact: true });
+  await expect(clearAllButton).toBeVisible({ timeout: 5_000 });
+  await clearAllButton.click();
 
-  if (hasClearAll) {
-    await clearAllButton.click();
-
-    // Wait for the agent to process the delete request
-    await page.waitForTimeout(5_000);
-
-    // Check if the fixture directory was removed from disk
-    // Note: the agent's deleteAllProjects endpoint handles filesystem cleanup
-    const fixtureExists = fs.existsSync(fixturePath);
-
-    // The workspace directory should still exist, but project folders should be removed
-    // template_cache is preserved by the agent
-    expect(fs.existsSync(templateCachePath)).toBe(true);
-
-    // If the agent correctly deleted the project, the fixture path should be gone
-    // This is a soft assertion — depends on agent implementation
-    if (!fixtureExists) {
-      expect(fixtureExists).toBe(false);
-    }
-  }
+  await expect.poll(() => fs.existsSync(fixturePath), { timeout: 10_000 }).toBe(false);
+  expect(fs.existsSync(templateCachePath)).toBe(true);
 });

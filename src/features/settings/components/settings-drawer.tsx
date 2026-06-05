@@ -11,6 +11,7 @@ import {
   useSettingsStore,
 } from "@/stores/settings-store";
 import { LM_STUDIO_DEFAULT_URL } from "@/shared/lib/constants";
+import { warnCaught } from "@/shared/lib/catch-log";
 import { defaultPersistedSettings } from "@/stores/settings-persist";
 import { useProjectStore } from "@/stores/project-store";
 
@@ -131,7 +132,11 @@ const SettingsDrawer = ({ visible, onClose }: SettingsDrawerProps) => {
   }, [draft.lmStudioUrl]);
 
   useEffect(() => {
-    if (visible) void fetchModels().catch(() => {});
+    if (visible) {
+      void fetchModels().catch((error) => {
+        warnCaught("settings-drawer", error, "fetchModels failed");
+      });
+    }
   }, [visible, debouncedUrl, fetchModels]);
 
   const chatModels = useMemo(
@@ -718,14 +723,18 @@ const ErrorLogPanel = () => {
         return `[${time}] [${l.level.toUpperCase()}] [${l.source}] ${l.message}${l.details ? `\n  ${l.details}` : ""}`;
       })
       .join("\n");
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).catch((error) => {
+      warnCaught("settings-drawer", error, "copy logs failed");
+    });
   }, []);
 
   const copySingleLog = useCallback((log: typeof errorLogs[number]) => {
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
     const time = new Date(log.timestamp).toLocaleTimeString();
     const text = `[${time}] [${log.level.toUpperCase()}] [${log.source}] ${log.message}${log.details ? `\n${log.details}` : ""}`;
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard.writeText(text).catch((error) => {
+      warnCaught("settings-drawer", error, "copy log failed");
+    });
   }, []);
 
   const headerColor = errorCount > 0 ? "#FF3366" : errorLogs.length > 0 ? "#00E5FF" : "#8888AA";

@@ -1,6 +1,6 @@
 ﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL and scoped request metadata.
 import { useCallback, useEffect } from "react";
-import type { ChatMessage } from "@/features/chat/schemas/message.schema";
+import { createProcessMessage, type ChatMessage } from "@/features/chat/schemas/message.schema";
 import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
 import {
   parseIncomingWsMessage,
@@ -43,7 +43,7 @@ const STALE_ACTIVE_STATUSES = new Set([
   "generating",
   "analyzing",
   "building",
-  "iterating",
+  "validating",
 ]);
 
 /** After reconnect, nudge preview for projects stuck in non-terminal UI states. */
@@ -376,10 +376,14 @@ export const useWebSocket = () => {
   }, [send]);
 
   const iterate = useCallback((userRequest: string) => {
-    const { projectName, messages } = useProjectStore.getState();
+    const store = useProjectStore.getState();
+    const { projectName, messages } = store;
     if (!projectName) {
       return;
     }
+
+    store.resetGenerationFiles();
+    store.addMessage(createProcessMessage("phase", "Applying your changes…"));
 
     const chatHistory = buildIterateChatHistory(messages);
 

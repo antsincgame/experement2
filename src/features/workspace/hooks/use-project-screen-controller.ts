@@ -41,6 +41,7 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [showLotusToast, setShowLotusToast] = useState(false);
   const {
+    resumeMode,
     resumeStatus,
     isResuming,
     handleResumeGeneration,
@@ -175,6 +176,7 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
     handleResumeGeneration,
     handleSelectProject,
     isResuming,
+    resumeMode,
     resumeStatus,
     showResumeBanner,
     resumeProjectName,

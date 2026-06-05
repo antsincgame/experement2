@@ -2,6 +2,7 @@
 import { isCreatingRoute } from "@/shared/lib/creation-flow";
 import type { ProjectListItem } from "@/shared/lib/api-client";
 import type { AppStatus } from "@/stores/project-store.types";
+import { warnCaught } from "@/shared/lib/catch-log";
 
 interface HydrateStoredProjectsOptions {
   projects: ProjectListItem[];
@@ -72,7 +73,8 @@ export const openProjectWorkspace = async ({
     }
 
     startPreview(projectName);
-  } catch {
+  } catch (error) {
+    warnCaught("workspace-flow", error, `warmPreview(${projectName}) failed`);
     onMissingProject();
   }
 };

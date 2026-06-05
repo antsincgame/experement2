@@ -291,10 +291,29 @@ async function enhance(prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, lmStudioUrl: LM_URL, model: ENHANCER_MODEL }),
     });
+    if (!resp.ok) {
+      return {
+        text: prompt,
+        status: "fallback",
+        error: `HTTP ${resp.status}`,
+      };
+    }
     const data = await resp.json();
-    return data.data || prompt;
-  } catch {
-    return prompt;
+    const enhanced = typeof data.data === "string" ? data.data.trim() : "";
+    if (!enhanced) {
+      return {
+        text: prompt,
+        status: "fallback",
+        error: data.error ?? "empty enhance response",
+      };
+    }
+    return { text: enhanced, status: "ok" };
+  } catch (error) {
+    return {
+      text: prompt,
+      status: "fallback",
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -305,6 +324,8 @@ function runTest(index, name, description) {
       name,
       originalPrompt: name,
       enhancedPrompt: description,
+      enhanceStatus: null,
+      enhanceError: null,
       status: null,
       filesGenerated: 0,
       filesCompleted: [],
@@ -388,14 +409,24 @@ async function main() {
     const useEnhance = true; // ALL tests use Enhance via Gemma
 
     let description = prompt;
+    let enhanceMeta = null;
     if (useEnhance) {
       process.stdout.write(`[${absoluteIndex + 1}/${Math.min(PROMPTS.length, LIMIT)}] Enhancing: ${prompt}...`);
-      description = await enhance(prompt);
-      console.log(" OK");
+      enhanceMeta = await enhance(prompt);
+      description = enhanceMeta.text;
+      if (enhanceMeta.status === "ok") {
+        console.log(" OK");
+      } else {
+        console.log(` FALLBACK (${enhanceMeta.error ?? "unknown"})`);
+      }
     }
 
     process.stdout.write(`[${absoluteIndex + 1}/${Math.min(PROMPTS.length, LIMIT)}] Generating: ${prompt}... `);
     const result = await runTest(absoluteIndex, prompt, description);
+    if (enhanceMeta) {
+      result.enhanceStatus = enhanceMeta.status;
+      result.enhanceError = enhanceMeta.error ?? null;
+    }
     const icon = result.status === "ready" ? "✅" : result.status === "error" ? "❌" : "⏰";
     console.log(`${icon} ${result.status} (${result.timeSeconds}s, ${result.filesCompleted.length} files, ${result.errors.length} err)`);
 

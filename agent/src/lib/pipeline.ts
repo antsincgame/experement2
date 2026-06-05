@@ -63,6 +63,8 @@ interface CreateResult {
   projectName: string;
   port: number;
   plan: AppPlan;
+  shipped: boolean;
+  failureStage?: "gates" | "metro" | "preview";
 }
 
 interface IterateOptions {

@@ -1,6 +1,7 @@
 // Picks a chat/completion model from LM Studio /v1/models, skipping embedding-only ids.
 // Used by llm-proxy when no explicit model is set (enhance, auto generation, etc.).
 import { assertLlmUrl, llmFetch } from "../lib/llm-url.js";
+import { warnCaught } from "../lib/catch-log.js";
 
 const DEFAULT_LM_STUDIO_URL = process.env.LM_STUDIO_URL?.trim() || "http://localhost:1234";
 const ENV_CHAT_MODEL = process.env.CHAT_MODEL?.trim() || "";
@@ -113,7 +114,8 @@ export const resolveChatModel = async (
   let baseUrl: string;
   try {
     baseUrl = assertLlmUrl(options.url ?? DEFAULT_LM_STUDIO_URL);
-  } catch {
+  } catch (error) {
+    warnCaught("chat-model", error, "assert LLM URL for chat model");
     return null;
   }
 
@@ -137,7 +139,8 @@ export const resolveChatModel = async (
         expiresAt: Date.now() + (resolved ? SUCCESS_TTL_MS : FAIL_TTL_MS),
       });
       return resolved;
-    } catch {
+    } catch (error) {
+      warnCaught("chat-model", error, "resolve chat model from server");
       cache.set(baseUrl, { modelId: null, expiresAt: Date.now() + FAIL_TTL_MS });
       return null;
     } finally {

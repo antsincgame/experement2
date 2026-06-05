@@ -8,6 +8,7 @@ export const buildResumeStatusMessage = (
   return {
     type: "resume_status",
     canResume: status.canResume,
+    resumeMode: status.resumeMode,
     missingFileCount: status.missingFileCount,
     totalPlanFiles: status.totalPlanFiles,
     checkpoint: status.checkpoint,
