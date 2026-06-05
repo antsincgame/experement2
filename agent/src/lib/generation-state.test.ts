@@ -11,6 +11,8 @@ vi.mock("../services/file-manager.js", () => ({
 }));
 
 import {
+  isPlanFileComplete,
+  isStructurallyComplete,
   loadGenerationState,
   saveGenerationState,
 } from "./generation-state.js";
@@ -70,5 +72,49 @@ describe("loadGenerationState", () => {
       fs.readFileSync(getPlanBlueprintPath("buddy"), "utf8"),
     ) as AppPlan;
     expect(blueprint.files.map((f) => f.path)).toEqual(["app/(tabs)/index.tsx"]);
+  });
+});
+
+describe("isStructurallyComplete / isPlanFileComplete", () => {
+  const completeScreen = [
+    'import { YStack, Text } from "@/ui";',
+    "export default function Home() {",
+    "  return <YStack><Text>Hi</Text></YStack>;",
+    "}",
+  ].join("\n");
+
+  it("treats a complete file WITHOUT an // EOF marker as complete", () => {
+    expect(completeScreen.includes("// EOF")).toBe(false);
+    expect(isStructurallyComplete(completeScreen)).toBe(true);
+    expect(isPlanFileComplete(completeScreen)).toBe(true);
+  });
+
+  it("still treats a genuinely truncated file (unbalanced braces) as incomplete", () => {
+    const truncated = [
+      'import { YStack, Text } from "@/ui";',
+      "export default function Home() {",
+      "  return <YStack><Text>Hi</Te", // cut off mid-construct
+    ].join("\n");
+    expect(isStructurallyComplete(truncated)).toBe(false);
+    expect(isPlanFileComplete(truncated)).toBe(false);
+  });
+
+  it("does not let braces inside strings/comments skew the balance", () => {
+    const tricky = [
+      'export const msg = "a } b { c";',
+      "// a stray } in a comment",
+      "export const ok = true;",
+    ].join("\n");
+    expect(isStructurallyComplete(tricky)).toBe(true);
+  });
+
+  it("requires an export (a stray fragment is not complete)", () => {
+    expect(isStructurallyComplete("const x = 1; const y = 2; doStuff();")).toBe(false);
+  });
+
+  it("keeps honoring the // EOF marker", () => {
+    expect(isPlanFileComplete("export const x = 1;\n// EOF")).toBe(true);
+    expect(isPlanFileComplete("")).toBe(false);
+    expect(isPlanFileComplete(null)).toBe(false);
   });
 });

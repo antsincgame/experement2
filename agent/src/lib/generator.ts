@@ -30,7 +30,7 @@ import {
   VECTOR_ICON_IMPORT_PATHS,
 } from "./generation-contract.js";
 import { validateAppPlan } from "./project-validator.js";
-import { isPlanFileComplete } from "./generation-state.js";
+import { isPlanFileComplete, isStructurallyComplete } from "./generation-state.js";
 import { collectStream } from "./stream-collect.js";
 
 interface GeneratorOptions {
@@ -649,7 +649,15 @@ Generate the complete code for: ${fileSpec.path}`;
       if (!content) continue;
       if (content.includes(EMPTY_FILE_PLACEHOLDER)) {
         empty.push(fp);
-      } else if (!content.includes("// EOF") && content.length > 20) {
+      } else if (
+        !content.includes("// EOF") &&
+        !isStructurallyComplete(content) &&
+        content.length > 20
+      ) {
+        // Only "continue" a file that is BOTH missing its // EOF marker AND
+        // structurally incomplete (unbalanced braces = genuinely cut off). A complete
+        // file that merely dropped the marker is left alone instead of having garbage
+        // appended onto already-working code.
         truncated.push(fp);
       }
     }
