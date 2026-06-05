@@ -114,7 +114,7 @@ export const editProject = async (
   const parseAnalyzeAction = (
     raw: string,
   ): { action: EditAction | null; rawSnippet: string } => {
-    const cleaned = stripThinkingFromText(raw);
+    const cleaned = stripThinkingFromText(raw, { preferJson: true });
     const snippet = cleaned.trim().slice(0, 400);
     const parsed = safeJsonParse(cleaned);
     if (parsed === null) {

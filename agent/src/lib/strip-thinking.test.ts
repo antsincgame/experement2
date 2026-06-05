@@ -37,4 +37,25 @@ describe("stripThinkingFromText", () => {
     const raw = "```markdown\nA sleek Tamagui notes app.\n```";
     expect(stripThinkingFromText(raw)).toBe("A sleek Tamagui notes app.");
   });
+
+  it("recovers JSON after an UNCLOSED think when it follows reasoning with a single newline (preferJson)", () => {
+    const raw = `${thinkOpen}reasoning about the plan\n{"name":"demo","files":[]}`;
+    // Without preferJson the old paragraph heuristic emptied this; with it we recover the plan.
+    expect(stripThinkingFromText(raw, { preferJson: true })).toBe(
+      '{"name":"demo","files":[]}'
+    );
+  });
+
+  it("keeps the leading brace of pretty-printed JSON after an unclosed think (preferJson)", () => {
+    const raw = `${thinkOpen}brief reason\n{\n  "name": "demo",\n\n  "files": []\n}`;
+    const out = stripThinkingFromText(raw, { preferJson: true });
+    expect(out.startsWith("{")).toBe(true);
+    expect(out).toContain('"name"');
+    expect(out).toContain('"files"');
+  });
+
+  it("leaves non-JSON unclosed-think handling unchanged without preferJson", () => {
+    const raw = `${thinkOpen}still reasoning\n\nFinal enhanced prompt here.`;
+    expect(stripThinkingFromText(raw)).toBe("Final enhanced prompt here.");
+  });
 });

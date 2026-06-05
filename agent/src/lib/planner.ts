@@ -138,7 +138,7 @@ const runPlannerOnce = async (
 
   // Strip reasoning-model blocks (<think>, <thinking>, redacted_thinking) and
   // markdown fences via the shared utility so planner/editor behave identically.
-  const trimmed = stripThinkingFromText(fullJson);
+  const trimmed = stripThinkingFromText(fullJson, { preferJson: true });
 
   const parsed = safeJsonParse(trimmed);
   if (parsed === null) {
