@@ -20,6 +20,13 @@ const stripCodeFences = (text: string): string =>
     .replace(/\n?```$/, "")
     .trim();
 
+// Models sometimes wrap the path in markdown — `**filepath:** \`app/x.tsx\`` — leaving
+// stray *, `, or quote characters around the value. Strip them so the path resolves
+// instead of targeting a non-existent "** app/x.tsx" file (which then fails as
+// "File not found" or, worse, is dropped).
+const cleanFilepath = (raw: string): string =>
+  raw.trim().replace(/^[*`'"\s]+/, "").replace(/[*`'"\s]+$/, "").trim();
+
 interface ParserState {
   mode:
     | "idle"
@@ -188,9 +195,9 @@ const processBuffer = (buffer: string, state: ParserState): number => {
   const deleteIdx = buffer.indexOf(DELETE_MARKER);
   if (deleteIdx === 0) {
     const lineEnd = buffer.indexOf("\n", DELETE_MARKER.length);
-    const filepath = buffer
-      .slice(DELETE_MARKER.length, lineEnd > 0 ? lineEnd : undefined)
-      .trim();
+    const filepath = cleanFilepath(
+      buffer.slice(DELETE_MARKER.length, lineEnd > 0 ? lineEnd : undefined),
+    );
     state.pendingDelete = filepath;
     // delete block is yielded by parseStream once this returns to idle
     return (lineEnd > 0 ? lineEnd + 1 : buffer.length);
@@ -200,7 +207,7 @@ const processBuffer = (buffer: string, state: ParserState): number => {
   if (filepathIdx === 0) {
     const lineEnd = buffer.indexOf("\n", FILEPATH_MARKER.length);
     if (lineEnd === -1) return 0; // wait for more data
-    state.currentFilepath = buffer.slice(FILEPATH_MARKER.length, lineEnd).trim();
+    state.currentFilepath = cleanFilepath(buffer.slice(FILEPATH_MARKER.length, lineEnd));
     return lineEnd + 1;
   }
 

@@ -315,5 +315,18 @@ export const editProject = async (
     }
   }
 
+  // Silent no-op guard: we only reach the generate step when edits WERE expected
+  // (action.files.length > 0). If it produced nothing at all — no applied block, no
+  // failure — the model's output didn't parse as filepath:/SEARCH-REPLACE (it returned
+  // prose, a unified diff, or a fenced block with no filepath). Surface a clear,
+  // actionable error instead of returning a silent "0 changes" that the UI renders as
+  // nothing (the symptom: you ask for an edit and get total silence).
+  if (appliedBlocks === 0 && failedBlocks === 0 && errors.length === 0) {
+    failedBlocks = 1;
+    errors.push(
+      "Could not apply any changes: the model did not return a parseable edit (expected a `filepath:` line followed by a SEARCH/REPLACE block, or a fenced new file). Try rephrasing your request more specifically.",
+    );
+  }
+
   return { action, appliedBlocks, failedBlocks, errors };
 };
