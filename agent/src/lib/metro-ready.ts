@@ -62,6 +62,15 @@ export const waitForMetroReady = async (
 // false "Metro build timed out". This fires the initial page request to kick off
 // that compilation. It tolerates the long first-bundle wait (90s) and connection
 // refusals while Metro is still booting, returning once a request has landed.
+/** After on-disk code changes, force Metro to serve a fresh web bundle (HMR is flaky on Windows). */
+export const refreshPreviewBundle = async (
+  port: number,
+  fetchFn: FetchFn = defaultFetch
+): Promise<boolean> => {
+  await triggerMetroBuild(port, 30, fetchFn);
+  return waitForMetroReady(port, 30, fetchFn);
+};
+
 export const triggerMetroBuild = async (
   port: number,
   maxRetries = 60,

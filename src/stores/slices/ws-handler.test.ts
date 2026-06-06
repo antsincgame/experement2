@@ -357,6 +357,25 @@ describe("createWsHandler", () => {
     expect(buildCards).toHaveLength(1);
   });
 
+  it("bumps preview revision on build_success when the preview is already live", () => {
+    const harness = createHarness();
+    harness.getState().setPreview("http://localhost:3100/preview/alpha/", 8081);
+    harness.setPreviewStatus("ready");
+    const revisionBefore = harness.getState().previewRevision;
+
+    harness.handle({
+      type: "build_event",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      eventType: "build_success",
+      message: "Metro bundle ready",
+    });
+
+    expect(harness.getState().previewRevision).toBe(revisionBefore + 1);
+    expect(harness.getState().previewStatus).toBe("ready");
+    expect(harness.getState().previewPort).toBe(8081);
+  });
+
   it("clears generation file buffer when status becomes ready", () => {
     const harness = createHarness();
     harness.getState().setStatus("generating");

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { FullConfig } from "@playwright/test";
 import {
   ensureRuntimeProcess,
+  stopStartedRuntimeProcesses,
   writeRuntimeState,
 } from "./runtime-manager";
 import {
@@ -33,6 +34,10 @@ const cleanStaleWorkspaceProjects = (): void => {
 };
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
+  // Reap any runtime left by an interrupted prior run so ensureRuntimeProcess does
+  // not attach to a stale agent/Expo that predates the current code under test.
+  stopStartedRuntimeProcesses();
+
   cleanStaleWorkspaceProjects();
 
   const started: { name: string; pid: number }[] = [];

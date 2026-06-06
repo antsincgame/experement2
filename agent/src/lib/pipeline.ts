@@ -23,6 +23,7 @@ import { formatPlanBriefForChat } from "./plan-brief.js";
 import { saveGenerationState } from "./generation-state.js";
 import { createPipelineEmitter } from "./pipeline-emitter.js";
 import { executeCodegenRun } from "./generation-run.js";
+import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { createDefaultContext } from "./pipeline-types.js";
 import { runProjectQualityGates } from "./pipeline-gates.js";
@@ -329,6 +330,57 @@ const _iterateProjectInner = async (
         hash: commitHash,
         description: userRequest,
       });
+    }
+
+    // HMR + warm-fetch is unreliable on Windows (Metro may serve a stale bundle while
+    // on-disk files are already updated). Restart with a cleared cache — same pattern as
+    // revertVersion — so the preview iframe always reflects the committed iteration.
+    const previewPort = getActivePort(projectName);
+    if (previewPort) {
+      const buildId = crypto.randomUUID();
+      emitProject({ type: "reloading_preview" });
+      killExpo(projectName);
+      emitProject({ type: "preview_status", previewStatus: "starting", buildId });
+
+      const { port: restartedPort } = await startExpoClearCache(
+        projectName,
+        projectPath,
+        previewPort,
+        (event) => {
+          emitProject({
+            type: "build_event",
+            buildId,
+            eventType: event.type,
+            message: event.message,
+            error: event.error,
+          });
+        }
+      );
+      setPreviewPort(projectName, restartedPort);
+
+      void triggerMetroBuild(restartedPort).catch((error) => {
+        console.warn(
+          `[Pipeline] triggerMetroBuild after iteration failed (ignored): ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      });
+
+      if (await waitForMetroReady(restartedPort, 60)) {
+        emitProject({
+          type: "preview_ready",
+          buildId,
+          port: restartedPort,
+          proxyUrl: `/preview/${encodeURIComponent(projectName)}/`,
+        });
+        emitProject({ type: "preview_status", previewStatus: "ready", buildId });
+        emitProject({
+          type: "build_event",
+          eventType: "build_success",
+          message: "Metro bundle ready",
+          buildId,
+        });
+      }
     }
   }
 

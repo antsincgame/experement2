@@ -728,6 +728,12 @@ export const createWsHandler = (
         advanceProjectPhase(set, get, store, buildTarget, { kind: "build_success" }, {
           syncActive: isActive,
         });
+        // A live preview iframe does not auto-reload when Metro rebundles in-place (same
+        // port). Bump the cache-busting revision so the iframe re-fetches the bundle AFTER
+        // build_success — not on iteration_complete, which races Metro's 2s debounce.
+        if (isActive && get().previewStatus === "ready") {
+          store.bumpPreviewRevision();
+        }
       } else {
         log({ level: "info", source: "metro", message: msg.message || eventType });
       }
