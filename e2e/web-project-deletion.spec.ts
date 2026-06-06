@@ -94,9 +94,17 @@ test("Clear All removes projects from the list", async ({ page }) => {
   // Find and click Clear All button
   const clearAllButton = page.getByText("Clear All", { exact: true });
   await expect(clearAllButton).toBeVisible({ timeout: 5_000 });
-  await clearAllButton.click();
 
-  await page.waitForTimeout(3_000);
+  // Await the real DELETE response so the agent's synchronous dir removal fully completes
+  // here and never leaks into the next test's fixture re-creation.
+  const deleteResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/projects/all") &&
+      response.request().method() === "DELETE",
+    { timeout: 120_000 }
+  );
+  await clearAllButton.click();
+  await deleteResponse;
 
   const storeState = await page.evaluate(() => {
     const raw = window.localStorage.getItem("app-factory-projects");
@@ -134,8 +142,20 @@ test("filesystem project is deleted after Clear All", async ({ page }) => {
 
   const clearAllButton = page.getByText("Clear All", { exact: true });
   await expect(clearAllButton).toBeVisible({ timeout: 5_000 });
-  await clearAllButton.click();
 
-  await expect.poll(() => fs.existsSync(fixturePath), { timeout: 10_000 }).toBe(false);
+  // The UI empties its list optimistically (handleClearAll calls setDiskProjects([])
+  // before awaiting the network), so polling the disk races the agent. Wait for the real
+  // DELETE /api/projects/all response — it rmSyncs every project dir synchronously — then
+  // assert the fixture is gone from disk.
+  const deleteResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/projects/all") &&
+      response.request().method() === "DELETE",
+    { timeout: 120_000 }
+  );
+  await clearAllButton.click();
+  await deleteResponse;
+
+  expect(fs.existsSync(fixturePath)).toBe(false);
   expect(fs.existsSync(templateCachePath)).toBe(true);
 });

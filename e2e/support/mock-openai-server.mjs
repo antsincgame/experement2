@@ -3,14 +3,31 @@ import http from "node:http";
 
 const PORT = Number(process.env.E2E_MOCK_LLM_PORT ?? 1235);
 
-const ITERATION_RESPONSE = [
-  "filepath: app/index.tsx\n",
-  "<<<<<<< SEARCH\n",
-  '      <Text testID="fixture-title">Hello from fixture</Text>\n',
-  "=======\n",
-  '      <Text testID="fixture-title">Hello from iteration</Text>\n',
-  ">>>>>>> REPLACE\n",
-];
+const ITERATION_TITLE = "Hello from iteration";
+
+// The edit step embeds the live file under "Target files:" (agent editor.ts). Anchor the
+// SEARCH on whatever title the file currently holds so repeated iterations keep applying:
+// a fixed "Hello from fixture" SEARCH fails ("Search block not found") once the first edit
+// already renamed it. REPLACE stays constant so the post-iteration title other specs assert
+// ("Hello from iteration") never changes.
+const buildIterationChunks = (messages) => {
+  const userText = (messages ?? [])
+    .filter((message) => message && message.role === "user")
+    .map((message) => (typeof message.content === "string" ? message.content : ""))
+    .join("\n");
+  const markerIndex = userText.lastIndexOf("Target files:");
+  const fileSection = markerIndex >= 0 ? userText.slice(markerIndex) : userText;
+  const match = fileSection.match(/<Text testID="fixture-title">([^<]*)<\/Text>/);
+  const currentTitle = match ? match[1] : "Hello from fixture";
+  return [
+    "filepath: app/index.tsx\n",
+    "<<<<<<< SEARCH\n",
+    `      <Text testID="fixture-title">${currentTitle}</Text>\n`,
+    "=======\n",
+    `      <Text testID="fixture-title">${ITERATION_TITLE}</Text>\n`,
+    ">>>>>>> REPLACE\n",
+  ];
+};
 
 const ANALYZE_RESPONSE = [
   "{",
@@ -97,11 +114,13 @@ const server = http.createServer(async (request, response) => {
       const body = await readJsonBody(request);
       if (body.stream) {
         const systemPrompt = body.messages?.[0]?.content ?? "";
-        let chunks = ITERATION_RESPONSE;
+        let chunks;
         if (systemPrompt.includes("application architect")) {
           chunks = PLAN_RESPONSE;
         } else if (systemPrompt.includes("expert code analyzer")) {
           chunks = ANALYZE_RESPONSE;
+        } else {
+          chunks = buildIterationChunks(body.messages);
         }
         await writeSse(response, chunks);
         return;

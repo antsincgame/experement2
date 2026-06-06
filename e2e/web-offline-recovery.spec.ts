@@ -91,23 +91,28 @@ test("shows Disconnected status when agent is unreachable", async ({ page }) => 
 });
 
 test("recovers connection when switching from dead to live agent URL", async ({ page }) => {
-  // Start with dead agent
+  // Start with dead agent. addInitScript re-runs on EVERY navigation (incl. reload), so it
+  // must only seed settings when absent — otherwise the post-switch reload would clobber the
+  // live URL back to the dead one and the app would stay Offline.
   const deadSettings = makeSettings(DEAD_AGENT_URL);
 
   await page.addInitScript((settings) => {
-    window.localStorage.clear();
-    window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
+    if (!window.localStorage.getItem("app-factory-settings")) {
+      window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
+    }
     window.localStorage.removeItem("app-factory-projects");
   }, deadSettings);
 
   await page.goto("/");
-  await page.waitForTimeout(5_000);
+  await expect(page.getByText("Offline", { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  // Now switch to live agent via localStorage update and reload
-  const liveSettings = makeSettings(AGENT_URL);
-  await page.evaluate((settings) => {
+  // Switch to the live agent. A page.evaluate write would race the dead page's persist
+  // middleware, which re-writes agentUrl=DEAD on every reconnect-failure log. Instead
+  // register an init script that runs on the upcoming reload — in the fresh context, after
+  // the dead page (and its persist writes) are gone — so the live URL deterministically wins.
+  await page.addInitScript((settings) => {
     window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
-  }, liveSettings);
+  }, makeSettings(AGENT_URL));
 
   await page.reload();
 

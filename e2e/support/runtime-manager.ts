@@ -73,7 +73,9 @@ const spawnDetachedProcess = (
   const spawned = spawn(resolveCommand(command), args, {
     cwd: process.cwd(),
     env: COMMON_ENV,
-    shell: false,
+    // Windows + Node >=20.12 rejects spawning .cmd/.bat (npm.cmd, npx.cmd) without a
+    // shell (CVE-2024-27980 → EINVAL). taskkill /T in killPid still reaps the tree.
+    shell: isWindows,
     detached: !isWindows,
     stdio: "ignore",
   });

@@ -587,6 +587,30 @@ describe("createWsHandler", () => {
     expect(harness.getState().previewPort).toBeNull();
   });
 
+  it("keeps a live preview when a failed iteration applied zero blocks", () => {
+    const harness = createHarness();
+    harness.getState().setPreview("http://localhost:3100/preview/alpha/", 8081);
+    harness.setPreviewStatus("ready");
+    harness.getState().setStatus("analyzing");
+
+    harness.handle({
+      type: "iteration_complete",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      applied: 0,
+      failed: 1,
+      errors: ["app/index.tsx: Search block not found in file. Content may have changed."],
+    });
+
+    // The edit changed nothing on disk, so the running preview must survive untouched...
+    expect(harness.getState().previewStatus).toBe("ready");
+    expect(harness.getState().previewUrl).toBe("http://localhost:3100/preview/alpha/");
+    expect(harness.getState().previewPort).toBe(8081);
+    // ...while the failure is still surfaced as an errored run plus a chat error message.
+    expect(harness.getState().status).toBe("error");
+    expect(harness.getState().messages.at(-1)?.content).toContain("Applied 0 changes");
+  });
+
   it("announces iteration no-op when zero blocks were applied", () => {
     const harness = createHarness();
     harness.getState().setStatus("generating");

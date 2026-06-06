@@ -866,9 +866,20 @@ export const createWsHandler = (
         emitChat(createErrorMessage(`Applied ${applied} changes, ${failureCount} errors`, errors.join("\n") || undefined));
         log({ level: "error", source: "iteration", message: `${failureCount} blocks failed`, details: errors.join("\n") });
         if (isActive) {
-          applyErrorState(store, get().status, {
-            error: errors.join("\n") || "Iteration failed",
-          });
+          // A failed iteration that applied zero blocks left the on-disk app — and the
+          // already-running Metro bundle — untouched, so a live ("ready") preview is still
+          // valid. Surface the failure and end the run as errored, but keep the working
+          // preview instead of clearing the iframe (a no-op edit must not kill the preview).
+          if (applied === 0 && get().previewStatus === "ready") {
+            const next = resolveGenerationPhase(get().status, { kind: "fatal_error" });
+            if (next) {
+              store.setStatus(next);
+            }
+          } else {
+            applyErrorState(store, get().status, {
+              error: errors.join("\n") || "Iteration failed",
+            });
+          }
         }
       } else if (isActive) {
         commitActiveGenerationPhase(get, store, {

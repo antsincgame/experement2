@@ -1,4 +1,6 @@
 // Starts the LM Studio-only browser E2E runtime on a dedicated mock port while reusing healthy local agent and Expo sessions.
+import fs from "node:fs";
+import path from "node:path";
 import type { FullConfig } from "@playwright/test";
 import {
   ensureRuntimeProcess,
@@ -9,7 +11,30 @@ import {
   waitForTemplateCacheReady,
 } from "./existing-project-fixture";
 
+// Generated projects (all gitignored except template_cache) accumulate across runs;
+// left over, they bloat the agent's synchronous Clear-All and slow every spec via
+// contention. Wipe them BEFORE the agent/Expo start so no file watcher holds a lock.
+const cleanStaleWorkspaceProjects = (): void => {
+  const workspaceRoot = path.join(process.cwd(), "workspace");
+  if (!fs.existsSync(workspaceRoot)) {
+    return;
+  }
+  for (const entry of fs.readdirSync(workspaceRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === "template_cache" || entry.name.startsWith(".")) {
+      continue;
+    }
+    fs.rmSync(path.join(workspaceRoot, entry.name), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
+  }
+};
+
 export default async function globalSetup(_config: FullConfig): Promise<void> {
+  cleanStaleWorkspaceProjects();
+
   const started: { name: string; pid: number }[] = [];
 
   await ensureRuntimeProcess(started, {

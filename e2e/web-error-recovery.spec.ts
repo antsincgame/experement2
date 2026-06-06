@@ -1,5 +1,7 @@
 // Validates error handling when the LLM server is unreachable during project creation.
-// KNOWN BUG: the home screen shows NO feedback when project creation fails before scaffolding.
+// Planning calls the LLM (pipeline.ts _createProjectInner) BEFORE any project dir is
+// scaffolded, so a dead LLM must surface an explicit error in chat and never leave a
+// ghost project on disk.
 import { expect, test } from "@playwright/test";
 
 const AGENT_URL = "http://127.0.0.1:3100";
@@ -19,7 +21,7 @@ const SETTINGS_SNAPSHOT = {
   version: 0,
 };
 
-test("no ghost project created when LLM is unreachable", async ({ page }) => {
+test("LLM unreachable surfaces an explicit error instead of failing silently", async ({ page }) => {
   await page.addInitScript((settings) => {
     window.localStorage.clear();
     window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
@@ -35,15 +37,12 @@ test("no ghost project created when LLM is unreachable", async ({ page }) => {
   const generateButton = page.getByText("Generate", { exact: true });
   await generateButton.click();
 
-  // Wait long enough for the pipeline to attempt the LLM call and fail
-  await page.waitForTimeout(15_000);
-
-  // CRITICAL ASSERTION: no project named "error" should appear in the sidebar or project list
-  const ghostProject = page.getByText("error", { exact: true });
-  await expect(ghostProject).not.toBeVisible({ timeout: 5_000 });
-
-  // The home screen should still be visible (navigation didn't happen due to projectName=null)
-  await expect(page.getByText("App Factory")).toBeVisible({ timeout: 5_000 });
+  // CRITICAL ASSERTION: the dead-LLM failure must be reported with its real reason in
+  // chat (anti-silent-failure), not swallowed. planApp throws before scaffolding, so the
+  // createProject catch broadcasts system_error → "AI server disconnected: LLM_SERVER_DOWN".
+  await expect(
+    page.getByText(/LLM_SERVER_DOWN|AI server disconnected/i).first()
+  ).toBeVisible({ timeout: 30_000 });
 });
 
 test("LM Studio status badge reflects dead server", async ({ page }) => {
