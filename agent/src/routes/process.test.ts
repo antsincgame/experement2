@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   isRunning: vi.fn(),
   killExpo: vi.fn(),
   projectExists: vi.fn(),
+  resolveTrackedPreviewPort: vi.fn(),
+  killOrphanedListenerOnPort: vi.fn(),
+  setPreviewPort: vi.fn(),
 }));
 
 vi.mock("../services/process-manager.js", () => ({
@@ -16,6 +19,16 @@ vi.mock("../services/process-manager.js", () => ({
 
 vi.mock("../services/file-manager.js", () => ({
   projectExists: mocks.projectExists,
+}));
+
+vi.mock("../lib/preview-restart.js", () => ({
+  resolveTrackedPreviewPort: mocks.resolveTrackedPreviewPort,
+  killOrphanedListenerOnPort: mocks.killOrphanedListenerOnPort,
+}));
+
+vi.mock("../lib/event-bus.js", () => ({
+  getPreviewPort: vi.fn(),
+  setPreviewPort: mocks.setPreviewPort,
 }));
 
 const getRouteHandler = async (method: "get" | "post", routePath: string) => {
@@ -45,6 +58,7 @@ beforeEach(() => {
   mocks.projectExists.mockReturnValue(true);
   mocks.isRunning.mockReturnValue(true);
   mocks.getActivePort.mockReturnValue(8081);
+  mocks.resolveTrackedPreviewPort.mockReturnValue(8081);
 });
 
 describe("processRouter", () => {
@@ -75,5 +89,25 @@ describe("processRouter", () => {
       code: "CONFIRMATION_REQUIRED",
     });
     expect(mocks.killExpo).not.toHaveBeenCalled();
+  });
+
+  it("kills the tracked Metro process and clears the preview port registry", async () => {
+    const handler = await getRouteHandler("post", "/:name/kill");
+    const res = createResponse();
+
+    handler(
+      {
+        headers: { "x-app-factory-confirm": "kill-preview-process" },
+        params: { name: "demo-app" },
+      },
+      res
+    );
+
+    expect(mocks.killExpo).toHaveBeenCalledWith("demo-app");
+    expect(mocks.killOrphanedListenerOnPort).toHaveBeenCalledWith(8081);
+    expect(mocks.setPreviewPort).toHaveBeenCalledWith("demo-app", null);
+    expect(res.json).toHaveBeenCalledWith({
+      data: { message: "Process killed", port: 8081 },
+    });
   });
 });

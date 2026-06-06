@@ -2,12 +2,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import { broadcast } from "./event-bus.js";
-import {
-  startExpoClearCache,
-  killExpo,
-  getActivePort,
-} from "../services/process-manager.js";
-import { setPreviewPort } from "./event-bus.js";
+import { killExpo } from "../services/process-manager.js";
 import { getProjectPath } from "../services/file-manager.js";
 import { planApp } from "./planner.js";
 import { editProject } from "./editor.js";
@@ -23,7 +18,10 @@ import { formatPlanBriefForChat } from "./plan-brief.js";
 import { saveGenerationState } from "./generation-state.js";
 import { createPipelineEmitter } from "./pipeline-emitter.js";
 import { executeCodegenRun } from "./generation-run.js";
-import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
+import {
+  resolveTrackedPreviewPort,
+  restartProjectPreview,
+} from "./preview-restart.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { createDefaultContext } from "./pipeline-types.js";
 import { runProjectQualityGates } from "./pipeline-gates.js";
@@ -332,56 +330,7 @@ const _iterateProjectInner = async (
       });
     }
 
-    // HMR + warm-fetch is unreliable on Windows (Metro may serve a stale bundle while
-    // on-disk files are already updated). Restart with a cleared cache — same pattern as
-    // revertVersion — so the preview iframe always reflects the committed iteration.
-    const previewPort = getActivePort(projectName);
-    if (previewPort) {
-      const buildId = crypto.randomUUID();
-      emitProject({ type: "reloading_preview" });
-      killExpo(projectName);
-      emitProject({ type: "preview_status", previewStatus: "starting", buildId });
-
-      const { port: restartedPort } = await startExpoClearCache(
-        projectName,
-        projectPath,
-        previewPort,
-        (event) => {
-          emitProject({
-            type: "build_event",
-            buildId,
-            eventType: event.type,
-            message: event.message,
-            error: event.error,
-          });
-        }
-      );
-      setPreviewPort(projectName, restartedPort);
-
-      void triggerMetroBuild(restartedPort).catch((error) => {
-        console.warn(
-          `[Pipeline] triggerMetroBuild after iteration failed (ignored): ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-      });
-
-      if (await waitForMetroReady(restartedPort, 60)) {
-        emitProject({
-          type: "preview_ready",
-          buildId,
-          port: restartedPort,
-          proxyUrl: `/preview/${encodeURIComponent(projectName)}/`,
-        });
-        emitProject({ type: "preview_status", previewStatus: "ready", buildId });
-        emitProject({
-          type: "build_event",
-          eventType: "build_success",
-          message: "Metro bundle ready",
-          buildId,
-        });
-      }
-    }
+    await restartProjectPreview(projectName, projectPath, emitProject);
   }
 
   emitProject({
@@ -405,7 +354,6 @@ export const revertVersion = async (
   requestId?: string
 ): Promise<void> => {
   const projectPath = getProjectPath(projectName);
-  const port = getActivePort(projectName);
   const emitProject = (message: Record<string, unknown>): void => {
     broadcast({
       ...message,
@@ -414,10 +362,6 @@ export const revertVersion = async (
     });
   };
 
-  emitProject({ type: "reloading_preview" });
-
-  killExpo(projectName);
-
   if (!GIT_HASH_PATTERN.test(commitHash)) {
     emitProject({
       type: "system_error",
@@ -425,6 +369,12 @@ export const revertVersion = async (
     });
     return;
   }
+
+  // Capture port before killExpo — announcePreviewStopped clears the registry.
+  const portBeforeKill = resolveTrackedPreviewPort(projectName);
+
+  // Release file locks before git mutates the tree (Metro on Windows).
+  killExpo(projectName);
 
   try {
     runGitCommand(projectPath, ["clean", "-fd"]);
@@ -437,49 +387,15 @@ export const revertVersion = async (
     return;
   }
 
-  if (port) {
-    const buildId = crypto.randomUUID();
-    emitProject({
-      type: "preview_status",
-      previewStatus: "starting",
-      buildId,
-    });
-    // startExpoClearCache may bind a fresh port if the old one is still releasing,
-    // so announce the actual port it bound, not the stale captured one.
-    const { port: restartedPort } = await startExpoClearCache(
-      projectName,
-      projectPath,
-      port,
-      (event) => {
-        emitProject({
-          type: "build_event",
-          buildId,
-          eventType: event.type,
-          message: event.message,
-          error: event.error,
-          previewStatus: "starting",
-        });
-      }
-    );
-    setPreviewPort(projectName, restartedPort);
-    emitProject({
-      type: "preview_ready",
-      buildId,
-      port: restartedPort,
-      proxyUrl: `/preview/${encodeURIComponent(projectName)}/`,
-    });
-    emitProject({
-      type: "preview_status",
-      previewStatus: "ready",
-      buildId,
-    });
-    emitProject({
-      type: "status",
-      status: "ready",
-      previewStatus: "ready",
-      buildId,
-    });
-  } else {
+  const restart = await restartProjectPreview(
+    projectName,
+    projectPath,
+    emitProject,
+    portBeforeKill
+  );
+  if (restart.restarted) {
+    emitProject({ type: "status", status: "ready", previewStatus: "ready" });
+  } else if (!restart.port) {
     emitProject({ type: "preview_status", previewStatus: "stopped", buildId: crypto.randomUUID() });
     emitProject({ type: "status", status: "ready" });
   }

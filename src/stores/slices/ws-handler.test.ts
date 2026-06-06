@@ -498,6 +498,25 @@ describe("createWsHandler", () => {
     expect(harness.getState().previewPort).toBe(8081);
   });
 
+  it("bumps preview revision on preview_ready so the iframe reloads after restart", () => {
+    const harness = createHarness();
+    harness.getState().setPreview("/preview/alpha/", 8081);
+    harness.setPreviewStatus("starting");
+    const revisionBefore = harness.getState().previewRevision;
+
+    harness.handle({
+      type: "preview_ready",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      buildId: BUILD_ID,
+      port: 8081,
+      proxyUrl: "/preview/alpha/",
+    });
+
+    expect(harness.getState().previewRevision).toBe(revisionBefore + 1);
+    expect(harness.getState().previewStatus).toBe("ready");
+  });
+
   it("mirrors a background project's chat events into its cache without touching the active chat", () => {
     const harness = createHarness();
 

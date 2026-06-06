@@ -794,6 +794,9 @@ export const createWsHandler = (
         if (currentProject) {
           void fetchProjectFiles(currentProject);
         }
+        // After iteration/revert restart previewStatus may still be "starting" when
+        // build_success arrives — bump here so the iframe reloads once Metro is ready.
+        store.bumpPreviewRevision();
       }
       log({ level: "info", source: "preview", message: `Preview: ${msg.projectName} → port ${msg.port}` });
       break;
@@ -975,7 +978,7 @@ export const createWsHandler = (
       break;
 
     case "reloading_preview":
-      emitChat(createSystemMessage("Reverting version, reloading preview...", false));
+      emitChat(createSystemMessage("Reloading preview after code change...", false));
       break;
 
     case "system_error":

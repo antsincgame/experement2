@@ -1,11 +1,16 @@
 ﻿// Validates process routes and protects preview process control with explicit confirmation.
 import { Router } from "express";
+import { setPreviewPort } from "../lib/event-bus.js";
 import {
   KILL_PROCESS_CONFIRMATION,
   requireDangerousAction,
 } from "../lib/route-guards.js";
 import { parseOrRespond } from "../lib/request-validation.js";
 import { ProjectParamsSchema } from "../schemas/runtime-input.schema.js";
+import {
+  killOrphanedListenerOnPort,
+  resolveTrackedPreviewPort,
+} from "../lib/preview-restart.js";
 import {
   isRunning,
   getActivePort,
@@ -53,6 +58,11 @@ processRouter.post("/:name/kill", (req, res) => {
     return;
   }
 
+  const trackedPort = resolveTrackedPreviewPort(params.name);
   killExpo(params.name);
-  res.json({ data: { message: "Process killed" } });
+  if (trackedPort) {
+    killOrphanedListenerOnPort(trackedPort);
+  }
+  setPreviewPort(params.name, null);
+  res.json({ data: { message: "Process killed", port: trackedPort } });
 });
