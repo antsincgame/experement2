@@ -1,5 +1,5 @@
 // Extracts the project list sidebar so workspace selection stops recreating inline UI trees.
-import { memo, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -39,6 +39,9 @@ const ProjectSidebar = ({
       hoverTimer.current = null;
     }
   };
+  // Cancel any armed prewarm timer on unmount so it can't fire startPreview for a
+  // project the user has already navigated away from.
+  useEffect(() => clearHover, []);
 
   return (
     <View

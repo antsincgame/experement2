@@ -760,10 +760,13 @@ export const createWsHandler = (
       ) {
         patchProjectListEntry(set, get, eventProject, { port: null });
       }
-      if (eventProject && msg.previewStatus === "stopped") {
-        // Paused/evicted (LRU or idle backstop) → show the "sleeping" badge on the
-        // tab; opening the project wakes it (openProjectWorkspace -> startPreview).
-        patchProjectListEntry(set, get, eventProject, { previewSleeping: true });
+      if (eventProject) {
+        // Paused/evicted (LRU or idle backstop) → show the "sleeping" badge. Clear it
+        // the moment the preview wakes (starting), recovers (ready), or errors, so a
+        // woken-then-failed preview can't keep a stale badge that re-fires prewarm.
+        patchProjectListEntry(set, get, eventProject, {
+          previewSleeping: msg.previewStatus === "stopped",
+        });
       }
       if (msg.previewStatus === "error") {
         emitChat(createErrorMessage("Preview failed to start.", msg.error));

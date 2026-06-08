@@ -632,6 +632,52 @@ describe("createWsHandler", () => {
     expect(beta?.port).toBe(19002);
   });
 
+  it("clears the sleeping badge when a woken preview errors instead of leaving it stuck", () => {
+    const harness = createHarness();
+    harness.getState().addProject({
+      name: "beta",
+      displayName: "Beta",
+      status: "ready",
+      port: null,
+      createdAt: 2,
+      previewSleeping: true,
+    });
+
+    // Sleeping project is woken and then fails its build → must not keep the badge.
+    harness.handle({
+      type: "preview_status",
+      requestId: REQUEST_ID,
+      projectName: "beta",
+      previewStatus: "error",
+      buildId: "build-beta",
+      error: "Metro build failed",
+    });
+
+    expect(harness.getState().projectList.find((p) => p.name === "beta")?.previewSleeping).toBe(false);
+  });
+
+  it("clears the sleeping badge as soon as a paused preview starts waking", () => {
+    const harness = createHarness();
+    harness.getState().addProject({
+      name: "beta",
+      displayName: "Beta",
+      status: "ready",
+      port: null,
+      createdAt: 2,
+      previewSleeping: true,
+    });
+
+    harness.handle({
+      type: "preview_status",
+      requestId: REQUEST_ID,
+      projectName: "beta",
+      previewStatus: "starting",
+      buildId: "build-beta",
+    });
+
+    expect(harness.getState().projectList.find((p) => p.name === "beta")?.previewSleeping).toBe(false);
+  });
+
   it("treats iteration errors as terminal failures and clears preview", () => {
     const harness = createHarness();
     harness.getState().setPreview("http://localhost:3100/preview/alpha/", 8081);
