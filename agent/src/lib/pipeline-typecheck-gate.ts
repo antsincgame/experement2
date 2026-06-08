@@ -34,6 +34,7 @@ type AutoFixFn = (options: {
   complete?: import("../services/llm-proxy.js").CompleteFn;
   maxAttempts?: number;
   onAttempt?: (attempt: number, maxAttempts: number) => void;
+  onBeforeApply?: (block: SearchReplaceBlock) => void;
   onFix?: (block: SearchReplaceBlock) => void;
 }) => Promise<AutoFixResultLike>;
 
@@ -133,7 +134,9 @@ export const applyAutofixWithGate = async (
       complete,
       maxAttempts: 1,
       onAttempt,
-      onFix: (block) => {
+      onBeforeApply: (block) => {
+        // Snapshot the pre-write content of every PROPOSED block so a revert restores
+        // exactly what existed before this attempt (runs before applyBlock writes).
         if (block.filepath && !snapshots.has(block.filepath)) {
           let snapshot: string | null = null;
           try {
@@ -143,6 +146,9 @@ export const applyAutofixWithGate = async (
           }
           snapshots.set(block.filepath, snapshot);
         }
+      },
+      onFix: (block) => {
+        // Fires only for APPLIED blocks → lastAppliedBlock/recordFix never store a no-op.
         lastAppliedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
         onFix?.(block);
       },

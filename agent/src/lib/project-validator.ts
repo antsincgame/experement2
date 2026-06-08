@@ -394,7 +394,6 @@ export interface ContractViolation {
   actual: string;
 }
 
-const IMPORT_SHAPE_REGEX = /import\s+(?:type\s+)?(?:(\w+)\s*,?\s*)?(?:\{([^}]+)\})?\s+from\s+["']([^"']+)["']/g;
 const DESTRUCTURE_HOOK_REGEX = /const\s+\{\s*([^}]+)\s*\}\s*=\s*(use[A-Za-z0-9_]+)\s*\(/g;
 
 const collectTopLevelInterfaceKeys = (iface: InterfaceDeclaration): string[] =>
@@ -520,15 +519,15 @@ export const validateFileContracts = (
   projectPath = "",
 ): ContractViolation[] => {
   const violations: ContractViolation[] = [];
-  const allContracts = Object.values(contracts).flat();
 
   let match: RegExpExecArray | null;
-  IMPORT_SHAPE_REGEX.lastIndex = 0;
+  IMPORT_STATEMENT_REGEX.lastIndex = 0;
 
-  while ((match = IMPORT_SHAPE_REGEX.exec(fileContent)) !== null) {
-    const defaultImport = match[1];
-    const namedImports = match[2];
-    const modulePath = match[3];
+  while ((match = IMPORT_STATEMENT_REGEX.exec(fileContent)) !== null) {
+    if (match[1]) continue; // `import type {...}` — erased at runtime, no shape to validate
+    const defaultImport = match[2];
+    const namedImports = match[3];
+    const modulePath = match[4];
 
     // PATH-SCOPED: only compare against the contract of the module ACTUALLY imported,
     // so a local symbol never gets flagged because a same-named export lives elsewhere.
@@ -568,37 +567,35 @@ export const validateFileContracts = (
   while ((match = DESTRUCTURE_HOOK_REGEX.exec(fileContent)) !== null) {
     const keys = match[1];
     const hookName = match[2];
-    let contract = allContracts.find((c) => c.name === hookName);
-
-    // Fallback chain for Zustand store hooks
-    let validKeys = contract?.returnObjectKeys ?? [];
-
-    if (validKeys.length === 0) {
-      // Try 1: find store contract by hook name
-      const storeImportMatch = fileContent.match(
-        new RegExp(`import.*${hookName}.*from\\s+["']([^"']+)["']`)
-      );
-      if (storeImportMatch) {
-        const importPath = storeImportMatch[1].replace("@/", "src/").replace(/^\.\//, "");
-        const allFiles = Object.keys(contracts);
-        const storeFile = allFiles.find((f) =>
-          f.includes(importPath.split("/").pop()?.replace(/\.ts$/, "") ?? "")
-        );
+    // PATH-SCOPED: resolve the hook's OWNING module via its import specifier (not a
+    // name-only lookup across ALL contracts), so two stores/hooks that share a name —
+    // or a library hook (useWindowDimensions) whose name collides with a store — no
+    // longer produce a false invalid_destructured_key.
+    let validKeys: string[] = [];
+    const hookImport = fileContent.match(
+      new RegExp(`import\\s+(?:\\{[^}]*\\b${hookName}\\b[^}]*\\}|${hookName})\\s+from\\s+["']([^"']+)["']`)
+    );
+    if (hookImport) {
+      const moduleContracts = contractsForSpecifier(contracts, filePath, hookImport[1]);
+      const hookContract = moduleContracts.find((c) => c.name === hookName);
+      if (hookContract && hookContract.returnObjectKeys.length > 0) {
+        validKeys = hookContract.returnObjectKeys;
+      } else {
+        // A contract exists but its keys weren't extracted (e.g. a split
+        // create<State & Actions> store) → read the RESOLVED store file directly.
+        const resolved = resolveImportPath(filePath, hookImport[1]);
+        const storeFile = resolved
+          ? candidatePaths(resolved).find((candidate) => contracts[candidate])
+          : undefined;
         if (storeFile) {
-          for (const sc of (contracts[storeFile] ?? [])) {
-            if (sc.returnObjectKeys.length > 0) {
-              validKeys = sc.returnObjectKeys;
-              break;
-            }
-          }
-        }
-
-        // Try 2: read store source file and extract interface keys via regex
-        if (validKeys.length === 0 && storeFile) {
           const storeKeys = extractStoreKeysFromSource(projectPath, storeFile);
           if (storeKeys.length > 0) validKeys = storeKeys;
         }
       }
+    } else {
+      // Hook is not imported (defined locally in this file) → only a local contract counts.
+      const localContract = (contracts[filePath] ?? []).find((c) => c.name === hookName);
+      validKeys = localContract?.returnObjectKeys ?? [];
     }
 
     if (validKeys.length > 0) {

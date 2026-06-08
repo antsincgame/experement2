@@ -112,6 +112,14 @@ describe("isStructurallyComplete / isPlanFileComplete", () => {
     expect(isStructurallyComplete("const x = 1; const y = 2; doStuff();")).toBe(false);
   });
 
+  it("does not let braces inside a regex char-class skew the balance (L6)", () => {
+    const withRegex = [
+      'export const clean = (s: string) => s.replace(/[{}]/g, "");',
+      "export default function X() { return null; }",
+    ].join("\n");
+    expect(isStructurallyComplete(withRegex)).toBe(true);
+  });
+
   it("keeps honoring the // EOF marker", () => {
     expect(isPlanFileComplete("export const x = 1;\n// EOF")).toBe(true);
     expect(isPlanFileComplete("")).toBe(false);

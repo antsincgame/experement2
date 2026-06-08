@@ -136,7 +136,8 @@ export const isStructurallyComplete = (content: string | null | undefined): bool
     .replace(/\/\/[^\n]*/g, "")            // line comments
     .replace(/"(?:[^"\\]|\\.)*"/g, '""')   // double-quoted strings
     .replace(/'(?:[^'\\]|\\.)*'/g, "''")   // single-quoted strings
-    .replace(/`(?:[^`\\]|\\.)*`/g, "``");  // template literals (naive)
+    .replace(/`(?:[^`\\]|\\.)*`/g, "``")   // template literals (naive)
+    .replace(/\/(?:\\.|\[(?:\\.|[^\]\n\\])*\]|[^/\n\\])+\/[gimsuy]*/g, "//"); // regex literals (so /[}{]/ braces don't skew the count)
 
   if (!/\bexport\b/.test(stripped)) return false;
 

@@ -549,6 +549,7 @@ Generate the complete code for: ${fileSpec.path}`;
 
     let responseBuffer = "";
     let lastReasoningLen = 0;
+    let reasoningClosed = false;
 
     const generator = await complete(messages, {
       temperature: temperature ?? 0.4,
@@ -565,11 +566,16 @@ Generate the complete code for: ${fileSpec.path}`;
     for await (const chunk of generator) {
       responseBuffer += chunk;
       chunkBuffer += chunk;
-      if (onThinking) {
+      if (onThinking && !reasoningClosed) {
         const reasoning = extractReasoning(responseBuffer);
         if (reasoning.length > lastReasoningLen) {
           onThinking(fileSpec.path, reasoning);
           lastReasoningLen = reasoning.length;
+        }
+        // Once the think block is closed the reasoning is final — stop re-scanning the
+        // growing buffer (which now contains all the file code) on every chunk (was O(n²)).
+        if (/<\/(?:think|thinking|redacted_thinking)>/i.test(responseBuffer)) {
+          reasoningClosed = true;
         }
       }
       if (Date.now() - lastSendTime > 100) {

@@ -31,15 +31,17 @@ const makeFakeAutoFix = (
   store: Map<string, string>,
   opts: { apply: boolean; writes: Record<string, string> },
 ): GatedAutofixDeps["autoFix"] => {
-  return async ({ onFix }) => {
+  return async ({ onBeforeApply, onFix }) => {
     if (!opts.apply) {
       return { success: false, attempts: 1, lastError: "no blocks applied" };
     }
     for (const [filepath, replace] of Object.entries(opts.writes)) {
-      // onFix fires BEFORE the write (matches production), so the gate snapshots
-      // pre-fix content here.
-      onFix?.({ type: "search_replace", filepath, search: "x", replace } as never);
+      const block = { type: "search_replace", filepath, search: "x", replace } as never;
+      // onBeforeApply fires BEFORE the write (gate snapshots pre-fix content here);
+      // onFix fires only AFTER a successful apply (matches the real applyBlock order).
+      onBeforeApply?.(block);
       store.set(filepath, replace);
+      onFix?.(block);
     }
     return { success: true, attempts: 1 };
   };
