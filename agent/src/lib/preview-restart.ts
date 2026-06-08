@@ -10,6 +10,7 @@ import {
   startExpoClearCache,
 } from "../services/process-manager.js";
 import type { LogCallback } from "../services/log-watcher.js";
+import type { OutboundMessage } from "./ws-contract.js";
 
 const isWindows = process.platform === "win32";
 
@@ -80,7 +81,7 @@ export interface RestartProjectPreviewResult {
 export const restartProjectPreview = async (
   projectName: string,
   projectPath: string,
-  emit: (message: Record<string, unknown>) => void,
+  emit: (message: OutboundMessage) => void,
   knownPortHint?: number | null
 ): Promise<RestartProjectPreviewResult> => {
   const knownPort = knownPortHint ?? resolveTrackedPreviewPort(projectName);

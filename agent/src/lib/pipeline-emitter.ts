@@ -1,11 +1,12 @@
 // Scoped WS event emitter — one factory for create, resume, and iterate flows.
 import type { broadcast as broadcastFn } from "./event-bus.js";
+import type { OutboundMessage } from "./ws-contract.js";
 
 export interface PipelineEmitter {
   projectName: string;
   requestId?: string;
-  emit: (message: Record<string, unknown>) => void;
-  emitBuildScoped: (buildId: string, message: Record<string, unknown>) => void;
+  emit: (message: OutboundMessage) => void;
+  emitBuildScoped: (buildId: string, message: OutboundMessage) => void;
 }
 
 export const createPipelineEmitter = (
@@ -13,18 +14,20 @@ export const createPipelineEmitter = (
   broadcast: typeof broadcastFn,
   requestId?: string,
 ): PipelineEmitter => {
-  const emit = (message: Record<string, unknown>): void => {
+  const emit = (message: OutboundMessage): void => {
+    // projectName/requestId are routing fields (optional in OutboundMessage); the
+    // spread only attaches them, so the asserted shape is the validated input.
     broadcast({
       ...message,
       ...(requestId ? { requestId } : {}),
       projectName,
-    });
+    } as OutboundMessage);
   };
 
   return {
     projectName,
     requestId,
     emit,
-    emitBuildScoped: (buildId, message) => emit({ ...message, buildId }),
+    emitBuildScoped: (buildId, message) => emit({ ...message, buildId } as OutboundMessage),
   };
 };

@@ -21,6 +21,10 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "../src/shared/lib/plan-brief.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../src/shared/lib/plan-brief.ts",
+    "../src/shared/schemas/ws-messages.ts"
+  ],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }

@@ -14,6 +14,7 @@ import type { MetroError } from "./auto-fixer.js";
 import type { SearchReplaceBlock } from "../schemas/search-replace.schema.js";
 import { parseTypeErrors } from "./typecheck.js";
 import { warnCaught } from "./catch-log.js";
+import type { OutboundMessage } from "./ws-contract.js";
 
 interface CommandResultLike {
   success: boolean;
@@ -63,7 +64,7 @@ export interface GatedAutofixDeps {
   /** file-manager writeFile bound to the project (path, content) => void. */
   writeFile: (filePath: string, content: string) => void;
   /** Emit a log/build line (same broadcast/emit the loop already uses). */
-  emit?: (message: Record<string, unknown>) => void;
+  emit?: (message: OutboundMessage) => void;
 }
 
 export interface GatedAutofixParams {
@@ -229,7 +230,7 @@ export interface RepairGateDeps {
   /** Write a project file (path, content) => void. */
   writeFile: (filePath: string, content: string) => void;
   /** Emit a log/build line. */
-  emit?: (message: Record<string, unknown>) => void;
+  emit?: (message: OutboundMessage) => void;
 }
 
 export interface RepairGateResult {

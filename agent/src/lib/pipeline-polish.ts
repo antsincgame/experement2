@@ -6,6 +6,7 @@ import { runDesignPolish } from "./design-polish.js";
 import { KNOWLEDGE_BASE } from "../prompts/knowledge-base.js";
 import type { PipelineContext } from "./pipeline-types.js";
 import { warnCaught } from "./catch-log.js";
+import type { OutboundMessage } from "./ws-contract.js";
 
 const selectPolishScreens = (files: string[]): string[] =>
   files.filter(
@@ -23,7 +24,7 @@ export const runPolishStage = async (
   maxPasses: number,
   options: { lmStudioUrl?: string; model?: string; maxTokens?: number },
   ctx: PipelineContext,
-  emitOperation: (message: Record<string, unknown>) => void,
+  emitOperation: (message: OutboundMessage) => void,
 ): Promise<void> => {
   const screens = selectPolishScreens(files);
   if (screens.length === 0) return;

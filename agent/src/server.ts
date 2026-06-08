@@ -21,6 +21,7 @@ import { isLocalAuthEnabled, verifyHttpToken, verifyWsToken } from "./lib/local-
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { resumeProjectGeneration } from "./lib/resume-generation.js";
 import type { CodegenShipResult } from "./lib/pipeline-codegen-phase.js";
+import type { OutboundMessage } from "./lib/ws-contract.js";
 import { isErrorReported } from "./lib/reported-error.js";
 import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
 import { resolveFixModel } from "./lib/model-roles.js";
@@ -366,15 +367,22 @@ wss.on("connection", (ws: WebSocket) => {
 // Guards against duplicate mutating requests (reconnect flushes, double clicks)
 // that would otherwise enqueue several identical create/iterate operations.
 const processedMutationRequests = new Set<string>();
-const MUTATION_DEDUPE_TYPES = new Set([
+// The four mutating commands that carry a requestId and are deduped. This union is
+// also the exact domain of mutation_duplicate.originalType in the outbound contract,
+// so isMutationType lets the compiler prove the echoed type is valid.
+type MutationType = "create_project" | "resume_generation" | "iterate" | "revert_version";
+const MUTATION_DEDUPE_TYPES = new Set<MutationType>([
   "create_project",
   "resume_generation",
   "iterate",
   "revert_version",
 ]);
 
+const isMutationType = (type: string): type is MutationType =>
+  MUTATION_DEDUPE_TYPES.has(type as MutationType);
+
 const isDuplicateMutation = (message: WsMessage): boolean => {
-  if (!MUTATION_DEDUPE_TYPES.has(message.type)) {
+  if (!isMutationType(message.type)) {
     return false;
   }
   const requestId = "requestId" in message ? message.requestId : undefined;
@@ -404,7 +412,7 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
   if (isDuplicateMutation(message)) {
     const requestId = "requestId" in message ? message.requestId : undefined;
     console.log(`[WS] Ignoring duplicate ${message.type} (requestId already processed)`);
-    if (requestId) {
+    if (requestId && isMutationType(message.type)) {
       sendToClient(clientId, {
         type: "mutation_duplicate",
         requestId,
@@ -608,15 +616,15 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
         projectName: message.projectName,
         requestId: message.requestId,
       };
-      const emitPreviewEvent = (payload: Record<string, unknown>): void => {
+      const emitPreviewEvent = (payload: OutboundMessage): void => {
         broadcast({
           ...payload,
           projectName: message.projectName,
           requestId: message.requestId,
-        }, previewEventScope);
+        } as OutboundMessage, previewEventScope);
       };
-      const emitBuildScopedEvent = (payload: Record<string, unknown>): void => {
-        emitPreviewEvent({ ...payload, buildId });
+      const emitBuildScopedEvent = (payload: OutboundMessage): void => {
+        emitPreviewEvent({ ...payload, buildId } as OutboundMessage);
       };
 
       const pName = message.projectName as string;

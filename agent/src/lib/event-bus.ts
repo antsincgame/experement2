@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { WebSocket } from "ws";
 import { createPreviewProxy } from "../services/preview-proxy.js";
 import { warnCaught } from "./catch-log.js";
+import type { OutboundMessage } from "./ws-contract.js";
 
 // ── WebSocket clients ──
 const clients = new Map<string, WebSocket>();
@@ -96,7 +97,7 @@ const fanOutToOpenClients = (data: string): void => {
 };
 
 export const broadcast = (
-  message: Record<string, unknown>,
+  message: OutboundMessage,
   scope?: EventScope
 ): void => {
   const effectiveScope = getEffectiveScope(scope);
@@ -121,7 +122,7 @@ export const broadcast = (
 
 export const sendToClient = (
   clientId: string,
-  message: Record<string, unknown>,
+  message: OutboundMessage,
   scope?: EventScope
 ): void => {
   sendScopedToClient(clientId, message, scope);
