@@ -43,7 +43,6 @@ const STALE_ACTIVE_STATUSES = new Set([
   "generating",
   "analyzing",
   "building",
-  "iterating",
 ]);
 
 /** After reconnect, nudge preview for projects stuck in non-terminal UI states. */
