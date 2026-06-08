@@ -342,13 +342,23 @@ const regenerateEmptyFile = async (
     },
   ];
 
-  const stream = await complete(messages, {
-    temperature: options.temperature ?? 0.4,
-    maxTokens: options.maxTokens ?? 65536,
-    lmStudioUrl: options.lmStudioUrl,
-    model: options.model,
-  });
-  const raw = await collectStream(stream);
+  let raw: string;
+  try {
+    const stream = await complete(messages, {
+      temperature: options.temperature ?? 0.4,
+      maxTokens: options.maxTokens ?? 65536,
+      lmStudioUrl: options.lmStudioUrl,
+      model: options.model,
+    });
+    raw = await collectStream(stream);
+  } catch (err) {
+    // Idle-stall/network abort during a heal must not kill the whole generation —
+    // leave the placeholder and let the build/gates report honestly.
+    console.warn(
+      `[Generator] Empty-file heal failed for ${ctx.fileSpec.path} (${err instanceof Error ? err.message : String(err)})`,
+    );
+    return null;
+  }
   const extracted = extractCodeFromResponse(raw);
   if (extracted) return extracted.code;
   return raw
@@ -696,24 +706,32 @@ Generate the complete code for: ${fileSpec.path}`;
         },
       ];
 
-      const retryGen = await complete(retryMessages, {
-        temperature: temperature ?? 0.3,
-        maxTokens: maxTokens ?? 65536,
-        lmStudioUrl,
-        model,
-      });
+      try {
+        const retryGen = await complete(retryMessages, {
+          temperature: temperature ?? 0.3,
+          maxTokens: maxTokens ?? 65536,
+          lmStudioUrl,
+          model,
+        });
 
-      let retryCode = await collectStream(retryGen);
+        let retryCode = await collectStream(retryGen);
 
-      // Strip markdown fences from continuation
-      retryCode = retryCode
-        .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
-        .replace(/\n?```\s*$/, "")
-        .trim();
+        // Strip markdown fences from continuation
+        retryCode = retryCode
+          .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
+          .replace(/\n?```\s*$/, "")
+          .trim();
 
-      if (retryCode.length > 5) {
-        currentContent += "\n" + retryCode;
-        writeFile(projectName, fp, sanitizeGeneratedCode(currentContent, fp));
+        if (retryCode.length > 5) {
+          currentContent += "\n" + retryCode;
+          writeFile(projectName, fp, sanitizeGeneratedCode(currentContent, fp));
+        }
+      } catch (err) {
+        // Idle-stall/network abort during a continuation must not abort the whole
+        // generation — keep whatever partial content exists for this file.
+        console.warn(
+          `[Generator] Truncation continuation failed for ${fp} (${err instanceof Error ? err.message : String(err)}); keeping partial`,
+        );
       }
     }
   }
@@ -762,14 +780,24 @@ RULES:
     },
   ];
 
-  const generator = await (options.complete ?? streamCompletion)(messages, {
-    temperature: 0.2,
-    maxTokens: options.maxTokens ?? 65536,
-    lmStudioUrl: options.lmStudioUrl,
-    model: options.model,
-  });
-
-  let fixedCode = await collectStream(generator);
+  let fixedCode: string;
+  try {
+    const generator = await (options.complete ?? streamCompletion)(messages, {
+      temperature: 0.2,
+      maxTokens: options.maxTokens ?? 65536,
+      lmStudioUrl: options.lmStudioUrl,
+      model: options.model,
+    });
+    fixedCode = await collectStream(generator);
+  } catch (err) {
+    // A network error or an idle-stall abort (LLM_STREAM_IDLE) must NOT abort the
+    // whole generation here — contract-fix is best-effort. Return null so the caller
+    // proceeds with the original file (matches the short-output path below).
+    console.warn(
+      `[Generator] Contract regen failed for ${filePath} (${err instanceof Error ? err.message : String(err)}); keeping original`,
+    );
+    return null;
+  }
 
   fixedCode = stripCodePreamble(fixedCode);
 

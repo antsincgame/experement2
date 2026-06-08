@@ -123,28 +123,46 @@ export const applyAutofixWithGate = async (
   const snapshots = new Map<string, string | null>();
   let lastAppliedBlock: { filepath: string; replace: string } | null = null;
 
-  const fixResult = await autoFix({
-    projectName,
-    error,
-    lmStudioUrl,
-    model,
-    complete,
-    maxAttempts: 1,
-    onAttempt,
-    onFix: (block) => {
-      if (block.filepath && !snapshots.has(block.filepath)) {
-        let snapshot: string | null = null;
-        try {
-          snapshot = readFile(block.filepath);
-        } catch {
-          snapshot = null;
+  let fixResult: AutoFixResultLike;
+  try {
+    fixResult = await autoFix({
+      projectName,
+      error,
+      lmStudioUrl,
+      model,
+      complete,
+      maxAttempts: 1,
+      onAttempt,
+      onFix: (block) => {
+        if (block.filepath && !snapshots.has(block.filepath)) {
+          let snapshot: string | null = null;
+          try {
+            snapshot = readFile(block.filepath);
+          } catch {
+            snapshot = null;
+          }
+          snapshots.set(block.filepath, snapshot);
         }
-        snapshots.set(block.filepath, snapshot);
-      }
-      lastAppliedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
-      onFix?.(block);
-    },
-  });
+        lastAppliedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
+        onFix?.(block);
+      },
+    });
+  } catch (err) {
+    // autoFix threw (e.g. the LLM stream stalled and aborted with LLM_STREAM_IDLE, or a
+    // network error). Treat it as "no fix applied" so the build loop surfaces the honest
+    // build error rather than aborting the whole generation. Fail-safe by design.
+    return {
+      applied: false,
+      reverted: false,
+      fixResult: {
+        success: false,
+        attempts: 0,
+        lastError: err instanceof Error ? err.message : String(err),
+      },
+      lastAppliedBlock: null,
+      afterErrors: null,
+    };
+  }
 
   const applied = fixResult.success;
 

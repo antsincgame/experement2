@@ -234,6 +234,24 @@ describe("applyAutofixWithGate", () => {
     expect(store.get("app/a.tsx")).toBe("A0");
     expect(store.get("app/b.tsx")).toBe("B0");
   });
+
+  it("does NOT throw when autoFix throws (idle-stall/network) — treats it as no fix applied", async () => {
+    const store = new Map<string, string>([["app/index.tsx", "before"]]);
+    const deps = makeDeps(store, {
+      autoFix: async () => {
+        throw new Error("LLM_STREAM_IDLE: model produced no output");
+      },
+      runTypecheck: async () => ({ success: false, combinedOutput: tscLine("app/index.tsx") }),
+    });
+
+    const result = await applyAutofixWithGate(deps, baseParams(1));
+
+    expect(result.applied).toBe(false);
+    expect(result.reverted).toBe(false);
+    expect(result.fixResult.success).toBe(false);
+    expect(result.fixResult.lastError).toContain("LLM_STREAM_IDLE");
+    expect(store.get("app/index.tsx")).toBe("before"); // untouched
+  });
 });
 
 describe("revertRepairPhaseIfWorse", () => {
