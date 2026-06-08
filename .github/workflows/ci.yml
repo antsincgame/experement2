@@ -45,6 +45,9 @@ jobs:
       - name: Agent runtime smoke (tsx plan-brief load order)
         run: npm --prefix agent run smoke:runtime
 
+      - name: Agent emit build (verify tsc -p tsconfig.build.json stays runnable)
+        run: npm --prefix agent run build
+
   web-e2e:
     runs-on: ubuntu-latest
     needs: quality
