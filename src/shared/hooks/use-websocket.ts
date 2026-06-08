@@ -397,6 +397,11 @@ export const useWebSocket = () => {
       maxTokens,
       topP,
     });
+    // An iterate re-runs the pipeline from a TERMINAL state (ready/error). The monotonic
+    // phase machine would otherwise block the agent's "analyzing"/"validating" events
+    // (lower rank than "ready"), leaving the UI with no progress, no Stop button, and a
+    // re-enabled Send (double-submit). Reset the live status into the active band now.
+    useProjectStore.getState().setStatus("analyzing");
   }, [send]);
 
   const startPreview = useCallback((projectName: string) => {

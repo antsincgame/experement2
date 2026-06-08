@@ -340,7 +340,8 @@ export const OutgoingWsMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("revert_version"),
     projectName: ProjectNameSchema,
-    commitHash: z.string().min(7),
+    commitHash: z.string().regex(/^[a-f0-9]{7,64}$/i), // match the agent's hex check (runtime-input.schema)
+
     lmStudioUrl: z.string().optional(),
     model: z.string().optional(),
   }).merge(OutgoingScopedMessageSchema),
