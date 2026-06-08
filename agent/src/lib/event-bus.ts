@@ -136,6 +136,14 @@ interface ProxyEntry {
 const projectPorts = new Map<string, number>();
 const proxyCache = new Map<string, ProxyEntry>();
 
+// Optional hook: process-manager registers its `touchPreview` here so an actively
+// viewed preview is marked recently-used and is never chosen as the LRU eviction
+// victim. A plain hook avoids an event-bus → process-manager import cycle.
+let onPreviewAccess: ((projectName: string) => void) | null = null;
+export const setPreviewAccessHook = (fn: (projectName: string) => void): void => {
+  onPreviewAccess = fn;
+};
+
 export const setPreviewPort = (projectName: string, port: number | null): void => {
   if (port === null) {
     projectPorts.delete(projectName);
@@ -194,6 +202,10 @@ export const handlePreviewRequest = (
     res.status(503).send(`Preview for "${projectName}" is not running.`);
     return;
   }
+
+  // Mark this preview as recently used so the project the user is actively viewing
+  // is protected from LRU eviction when another project starts its bundler.
+  onPreviewAccess?.(projectName);
 
   // Strip /:projectName from the forwarded path
   req.url = "/" + segments.slice(1).join("/") + (req.url.includes("?") ? "?" + req.url.split("?")[1] : "");

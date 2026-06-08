@@ -10,6 +10,7 @@ import {
   registerClient,
   runWithEventScope,
   sendToClient,
+  setPreviewAccessHook,
   setPreviewPort,
   unregisterClient,
 } from "./lib/event-bus.js";
@@ -51,6 +52,7 @@ import {
   killOrphanedPreviewProcesses,
   startExpo,
   getActivePort,
+  touchPreview,
 } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 
@@ -216,6 +218,9 @@ app.get("/api/projects/:name/export", async (req, res) => {
   }
 });
 
+// Wire LRU protection: a preview being actively viewed (proxied) is kept hot so a
+// new project's bundler evicts a truly idle one instead of the one on screen.
+setPreviewAccessHook(touchPreview);
 app.use("/preview", handlePreviewRequest);
 
 // Last-resort JSON error handler: catches synchronous throws in route handlers

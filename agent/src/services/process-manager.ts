@@ -16,6 +16,8 @@ interface ManagedProcess {
   port: number;
   projectName: string;
   cleanup: () => void;
+  /** Recency for LRU eviction — bumped on start and on each preview access. */
+  lastUsedAt: number;
 }
 
 export interface CommandResult {
@@ -28,10 +30,20 @@ export interface CommandResult {
 
 const activeProcesses = new Map<string, ManagedProcess>();
 
-const PREVIEW_STOPPED_REASON =
-  "Preview stopped — another project started Metro";
+// Multiple project previews stay live at once so switching project tabs keeps each
+// preview running. Bounded by a memory budget — each Metro/Expo web dev server is
+// hundreds of MB — so only the MAX_LIVE_PREVIEWS most-recently-used are kept; the
+// least-recently-used is evicted (and announced as paused) when a new start would
+// exceed the budget. Override with the MAX_LIVE_PREVIEWS env var.
+const MAX_LIVE_PREVIEWS = Math.max(1, Number(process.env.MAX_LIVE_PREVIEWS) || 3);
 
-// Singleton Metro: only 1 bundler at a time to prevent OOM and browser freezes
+// Monotonic recency tick (NOT wall-clock): guarantees a strict LRU order even when
+// several previews are started or touched within the same millisecond.
+let previewRecencyClock = 0;
+const nextRecency = (): number => (previewRecencyClock += 1);
+
+const PREVIEW_EVICTED_REASON =
+  "Preview paused to free resources — reopen this project to resume it.";
 
 const announcePreviewStopped = (
   projectName: string,
@@ -52,28 +64,36 @@ const killManagedEntry = (name: string, managed: ManagedProcess): void => {
   activeProcesses.delete(name);
 };
 
-/** Kill all bundlers except `keep`; returns evicted project names. */
-const evictOtherBundlers = (keep: string): string[] => {
-  const evicted: string[] = [];
-  for (const [name, managed] of [...activeProcesses.entries()]) {
-    if (name === keep) {
-      continue;
-    }
-    killManagedEntry(name, managed);
-    evicted.push(name);
+/** Bump a live preview's recency so the actively-viewed one is never the LRU victim. */
+export const touchPreview = (projectName: string): void => {
+  const managed = activeProcesses.get(projectName);
+  if (managed) {
+    managed.lastUsedAt = nextRecency();
   }
-  return evicted;
 };
 
-const prepareSingletonStart = (projectName: string): void => {
-  for (const name of evictOtherBundlers(projectName)) {
-    announcePreviewStopped(name, PREVIEW_STOPPED_REASON);
+/** Evict least-recently-used previews (never `keep`) until under the live budget. */
+const evictToBudget = (keep: string): void => {
+  const others = (): ManagedProcess[] =>
+    [...activeProcesses.values()].filter((m) => m.projectName !== keep);
+  while (others().length >= MAX_LIVE_PREVIEWS) {
+    const lru = others().reduce((oldest, m) =>
+      m.lastUsedAt < oldest.lastUsedAt ? m : oldest,
+    );
+    killManagedEntry(lru.projectName, lru);
+    announcePreviewStopped(lru.projectName, PREVIEW_EVICTED_REASON);
   }
+};
+
+const prepareConcurrentStart = (projectName: string): void => {
+  // Restart this project's OWN bundler cleanly (kill its previous instance, if any)…
   const own = activeProcesses.get(projectName);
   if (own) {
     killManagedEntry(projectName, own);
     setPreviewPort(projectName, null);
   }
+  // …but keep OTHER projects' previews alive, evicting only the LRU when over budget.
+  evictToBudget(projectName);
 };
 
 const isWindows = process.platform === "win32";
@@ -137,7 +157,7 @@ const startExpoInner = async (
   onLog: LogCallback,
   clearCache = false,
 ): Promise<{ port: number; process: ChildProcess }> => {
-  prepareSingletonStart(projectName);
+  prepareConcurrentStart(projectName);
 
   const port = await findFreePort();
 
@@ -155,7 +175,7 @@ const startExpoInner = async (
 
   const cleanup = watchProcess(child, onLog);
 
-  const managed: ManagedProcess = { process: child, port, projectName, cleanup };
+  const managed: ManagedProcess = { process: child, port, projectName, cleanup, lastUsedAt: nextRecency() };
   activeProcesses.set(projectName, managed);
 
   child.on("exit", (code) => {
@@ -193,7 +213,7 @@ const startExpoClearCacheInner = async (
   port: number,
   onLog: LogCallback,
 ): Promise<{ port: number; process: ChildProcess }> => {
-  prepareSingletonStart(projectName);
+  prepareConcurrentStart(projectName);
 
   // The previous bundler for this slug was just killed but may not have released
   // the socket yet; fall back to a fresh port instead of crashing with EADDRINUSE.
@@ -214,7 +234,7 @@ const startExpoClearCacheInner = async (
 
   const cleanup = watchProcess(child, onLog);
 
-  const managed: ManagedProcess = { process: child, port: boundPort, projectName, cleanup };
+  const managed: ManagedProcess = { process: child, port: boundPort, projectName, cleanup, lastUsedAt: nextRecency() };
   activeProcesses.set(projectName, managed);
 
   child.on("exit", (code) => {
