@@ -17,6 +17,7 @@ import { autoFix } from "./auto-fixer.js";
 import { applyAutofixWithGate, countTypeErrors, revertRepairPhaseIfWorse } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
 import { recordExemplar } from "./exemplar-store.js";
+import { recordLedgerEntry } from "./ledger.js";
 import { buildResumeStatusMessage } from "./pipeline-resume-status.js";
 import { gitCommit, gitInit } from "./git.js";
 import type { PipelineContext } from "./pipeline-types.js";
@@ -657,6 +658,17 @@ export const runCodegenAndShip = async (
         `[Pipeline] Quality emit failed (ignored): ${err instanceof Error ? err.message : String(err)}`
       );
     }
+
+    // Self-improvement ledger (Phase 3): persist this generation's quality + repair effort
+    // so cumulative improvement is observable on REAL usage and the Phase-4 export can mine
+    // the high-score history. recordLedgerEntry never throws.
+    recordLedgerEntry({
+      score: quality?.score ?? 0,
+      source: captureSource ?? "scored",
+      repairs: autoFixAttempts + (didContractFix ? 1 : 0) + (didTypeFix ? 1 : 0),
+      bestOfN: Math.max(1, Number(process.env.BEST_OF_N) || 1),
+      buildSuccess: true,
+    });
   }
 
   // ── Step 7 (OPT-IN): Auto-polish design loop ──────────
