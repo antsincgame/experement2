@@ -119,6 +119,8 @@ export const runCodegenAndShip = async (
     onFileComplete: (filepath) =>
       emitOperation({ type: "file_complete", filepath }),
     skipExistingFiles,
+    // Phase 2 test-time compute, flag-gated. Default (unset/1) = today's single-sample path.
+    bestOfN: Math.max(1, Number(process.env.BEST_OF_N) || 1),
   });
   
   emitOperation({ type: "generation_complete", filesCount: files.length });

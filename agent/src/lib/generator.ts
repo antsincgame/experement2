@@ -29,7 +29,9 @@ import {
   normalizeAliasSpecifier,
   VECTOR_ICON_IMPORT_PATHS,
 } from "./generation-contract.js";
-import { validateAppPlan } from "./project-validator.js";
+import { validateAppPlan, validateFileContracts } from "./project-validator.js";
+import { generateBestCandidate } from "./best-of-n.js";
+import { scoreCandidateFile } from "./quality-score.js";
 import { isPlanFileComplete, isStructurallyComplete } from "./generation-state.js";
 import { collectStream } from "./stream-collect.js";
 
@@ -55,6 +57,8 @@ interface GeneratorOptions {
   onFileComplete?: (filepath: string) => void;
   /** When true, skip LLM for files that already exist with a valid // EOF marker. */
   skipExistingFiles?: boolean;
+  /** Test-time compute: draw N candidates per file and keep the verifier-best. 1 = today. */
+  bestOfN?: number;
 }
 
 /**
@@ -385,6 +389,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     onThinking,
     onFileComplete,
     skipExistingFiles = false,
+    bestOfN = 1,
   } = options;
 
   const planIssues = validateAppPlan(plan);
@@ -548,43 +553,80 @@ Generate the complete code for: ${fileSpec.path}`;
     ];
 
     let responseBuffer = "";
-    let lastReasoningLen = 0;
-    let reasoningClosed = false;
 
-    const generator = await complete(messages, {
-      temperature: temperature ?? 0.4,
-      maxTokens: maxTokens ?? 65536,
-      topP,
-      lmStudioUrl,
-      model,
-    });
+    if (bestOfN > 1) {
+      // ── Test-time compute (Phase 2): best-of-N + verifier reranking ──
+      // Draw N candidates and keep the one the deterministic verifier likes best
+      // (fewest contract violations against this file's dependencies + content quality).
+      // No streaming/reasoning here (candidates are drained fully); we replay the winner
+      // through onChunk so the UI still shows the chosen file.
+      broadcast({
+        type: "build_event",
+        eventType: "self_healing",
+        message: `🎲 Best-of-${bestOfN}: sampling ${fileSpec.path}`,
+      });
+      const { winnerText, scores } = await generateBestCandidate({
+        n: bestOfN,
+        messages,
+        options: { temperature: temperature ?? 0.4, maxTokens: maxTokens ?? 65536, topP, lmStudioUrl, model },
+        complete,
+        extract: (text) => extractCodeFromResponse(text)?.code ?? null,
+        scoreCandidate: (code) => {
+          let violations = 0;
+          try {
+            violations = validateFileContracts(code, fileSpec.path, depContracts, projectPath).length;
+          } catch {
+            /* scoring is best-effort */
+          }
+          return scoreCandidateFile(fileSpec.path, code) - 25 * violations;
+        },
+      });
+      responseBuffer = winnerText;
+      onChunk?.(winnerText); // UI parity: show the chosen candidate
+      broadcast({
+        type: "build_event",
+        eventType: "self_healing",
+        message: `🎲 Best-of-${bestOfN} picked best of [${scores.map((s) => Math.round(s)).join(", ")}] for ${fileSpec.path}`,
+      });
+    } else {
+      let lastReasoningLen = 0;
+      let reasoningClosed = false;
 
-    // Buffer chunks — send to frontend max every 100ms to prevent React re-render storm
-    let chunkBuffer = "";
-    let lastSendTime = Date.now();
+      const generator = await complete(messages, {
+        temperature: temperature ?? 0.4,
+        maxTokens: maxTokens ?? 65536,
+        topP,
+        lmStudioUrl,
+        model,
+      });
 
-    for await (const chunk of generator) {
-      responseBuffer += chunk;
-      chunkBuffer += chunk;
-      if (onThinking && !reasoningClosed) {
-        const reasoning = extractReasoning(responseBuffer);
-        if (reasoning.length > lastReasoningLen) {
-          onThinking(fileSpec.path, reasoning);
-          lastReasoningLen = reasoning.length;
+      // Buffer chunks — send to frontend max every 100ms to prevent React re-render storm
+      let chunkBuffer = "";
+      let lastSendTime = Date.now();
+
+      for await (const chunk of generator) {
+        responseBuffer += chunk;
+        chunkBuffer += chunk;
+        if (onThinking && !reasoningClosed) {
+          const reasoning = extractReasoning(responseBuffer);
+          if (reasoning.length > lastReasoningLen) {
+            onThinking(fileSpec.path, reasoning);
+            lastReasoningLen = reasoning.length;
+          }
+          // Once the think block is closed the reasoning is final — stop re-scanning the
+          // growing buffer (which now contains all the file code) on every chunk (was O(n²)).
+          if (/<\/(?:think|thinking|redacted_thinking)>/i.test(responseBuffer)) {
+            reasoningClosed = true;
+          }
         }
-        // Once the think block is closed the reasoning is final — stop re-scanning the
-        // growing buffer (which now contains all the file code) on every chunk (was O(n²)).
-        if (/<\/(?:think|thinking|redacted_thinking)>/i.test(responseBuffer)) {
-          reasoningClosed = true;
+        if (Date.now() - lastSendTime > 100) {
+          onChunk?.(chunkBuffer);
+          chunkBuffer = "";
+          lastSendTime = Date.now();
         }
       }
-      if (Date.now() - lastSendTime > 100) {
-        onChunk?.(chunkBuffer);
-        chunkBuffer = "";
-        lastSendTime = Date.now();
-      }
+      if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
     }
-    if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
 
     const extracted = extractCodeFromResponse(responseBuffer);
     if (extracted) {

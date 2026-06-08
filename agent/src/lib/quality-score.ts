@@ -127,3 +127,30 @@ export const scoreProjectQuality = (input: QualityScoreInput): QualityScore => {
 
   return { score: Math.round(clamp(score)), axes };
 };
+
+/**
+ * Cheap, RELATIVE per-file content score (0..100) for the best-of-N reranker (Phase 2).
+ * Reuses the same idiomatic/states/completeness heuristics as the project score, but on a
+ * single candidate file BEFORE it is written — so candidate selection needs no tsc/build.
+ * Higher = better; meant for ranking N candidates of the SAME file, not absolute grading.
+ */
+export const scoreCandidateFile = (path: string, content: string): number => {
+  if (!content || content.trim().length < 20) return 0;
+  if (content.includes(EMPTY_PLACEHOLDER)) return 0;
+
+  let s = 50;
+  // Idiomatic: penalize raw react-native View/Text/StyleSheet; reward the @/ui kit.
+  if (FORBIDDEN_RN_IMPORT.test(content)) s -= 30;
+  if (USES_UI_KIT.test(content)) s += 10;
+  // Completeness / structural sanity.
+  if (/\bexport\b/.test(content)) s += 15;
+  else s -= 25;
+  if (content.includes("// EOF")) s += 10;
+  if (content.trim().length > 120) s += 5;
+  // Data screens should show empty/loading/error state.
+  if (isScreen(path)) {
+    if (STATE_PATTERNS.test(content)) s += 15;
+    else s -= 10;
+  }
+  return clamp(s);
+};
