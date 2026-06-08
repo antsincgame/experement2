@@ -25,6 +25,7 @@ interface WorkspaceLayoutProps {
   onRemoveProject: (name: string) => void;
   onSelectFile: (path: string | null) => void;
   onSelectProject: (name: string) => void;
+  onPrewarmProject?: (name: string) => void;
   onSendChat: (text: string) => void;
 }
 
@@ -43,6 +44,7 @@ const WorkspaceLayout = ({
   onRemoveProject,
   onSelectFile,
   onSelectProject,
+  onPrewarmProject,
   onSendChat,
 }: WorkspaceLayoutProps) => (
   <View className="flex-1 flex-row">
@@ -53,6 +55,7 @@ const WorkspaceLayout = ({
         onCreateProject={onCreateProject}
         onRemoveProject={onRemoveProject}
         onSelectProject={onSelectProject}
+        onPrewarmProject={onPrewarmProject}
       />
     )}
 

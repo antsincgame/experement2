@@ -603,7 +603,33 @@ describe("createWsHandler", () => {
     });
 
     expect(harness.getState().projectList.find((p) => p.name === "beta")?.port).toBeNull();
+    expect(harness.getState().projectList.find((p) => p.name === "beta")?.previewSleeping).toBe(true);
     expect(harness.getState().previewStatus).toBe("ready");
+  });
+
+  it("clears the sleeping badge when a background preview wakes (preview_ready)", () => {
+    const harness = createHarness();
+    harness.getState().addProject({
+      name: "beta",
+      displayName: "Beta",
+      status: "ready",
+      port: null,
+      createdAt: 2,
+      previewSleeping: true,
+    });
+
+    harness.handle({
+      type: "preview_ready",
+      requestId: REQUEST_ID,
+      projectName: "beta",
+      buildId: "build-beta",
+      port: 19002,
+      proxyUrl: "/preview/beta/",
+    });
+
+    const beta = harness.getState().projectList.find((p) => p.name === "beta");
+    expect(beta?.previewSleeping).toBe(false);
+    expect(beta?.port).toBe(19002);
   });
 
   it("treats iteration errors as terminal failures and clears preview", () => {

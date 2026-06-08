@@ -34,6 +34,8 @@ export interface ProjectEntry {
   /** Disk project has saved plan + missing planned files — show resume affordance. */
   canResume?: boolean;
   missingFileCount?: number;
+  /** Preview was paused/evicted (LRU or idle) — show a sleeping badge; wakes on open. */
+  previewSleeping?: boolean;
 }
 
 export type GenerationFileStatus = "streaming" | "done";

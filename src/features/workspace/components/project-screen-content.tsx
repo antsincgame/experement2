@@ -46,6 +46,7 @@ interface ProjectScreenContentProps {
   settingsVisible: boolean;
   setShowLotusToast: (value: boolean) => void;
   showLotusToast: boolean;
+  startPreview: (name: string) => void;
   status: ProjectStatus;
   terminalVisible: boolean;
 }
@@ -80,6 +81,7 @@ export const ProjectScreenContent = ({
   settingsVisible,
   setShowLotusToast,
   showLotusToast,
+  startPreview,
   status,
   terminalVisible,
 }: ProjectScreenContentProps) => (
@@ -197,6 +199,7 @@ export const ProjectScreenContent = ({
         onRemoveProject={removeProject}
         onSelectFile={setActiveFile}
         onSelectProject={handleSelectProject}
+        onPrewarmProject={startPreview}
         onSendChat={handleChatSend}
       />
 

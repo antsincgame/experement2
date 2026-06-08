@@ -233,7 +233,7 @@ const patchProjectListEntry = (
   set: StoreSet,
   get: StoreGet,
   projectName: string,
-  patch: Partial<Pick<ProjectEntry, "status" | "port">>
+  patch: Partial<Pick<ProjectEntry, "status" | "port" | "previewSleeping">>
 ): void => {
   const state = get();
   if (!state.projectList.some((project) => project.name === projectName)) {
@@ -760,6 +760,11 @@ export const createWsHandler = (
       ) {
         patchProjectListEntry(set, get, eventProject, { port: null });
       }
+      if (eventProject && msg.previewStatus === "stopped") {
+        // Paused/evicted (LRU or idle backstop) → show the "sleeping" badge on the
+        // tab; opening the project wakes it (openProjectWorkspace -> startPreview).
+        patchProjectListEntry(set, get, eventProject, { previewSleeping: true });
+      }
       if (msg.previewStatus === "error") {
         emitChat(createErrorMessage("Preview failed to start.", msg.error));
         log({
@@ -776,10 +781,11 @@ export const createWsHandler = (
     case "preview_ready": {
       if (!matchesActiveProject(get, msg)) {
         advanceProjectListPhase(set, get, msg.projectName, { kind: "preview_ready" });
-        patchProjectListEntry(set, get, msg.projectName, { port: msg.port });
+        patchProjectListEntry(set, get, msg.projectName, { port: msg.port, previewSleeping: false });
         break;
       }
       const currentProject = get().projectName;
+      patchProjectListEntry(set, get, msg.projectName, { previewSleeping: false });
       if (msg.projectName === currentProject) {
         const prevPort = get().previewPort;
         store.setPreview(msg.proxyUrl, msg.port);

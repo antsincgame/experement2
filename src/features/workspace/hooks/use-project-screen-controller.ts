@@ -192,6 +192,7 @@ export const useProjectScreenController = (routeProjectName: string | null) => {
     settingsVisible,
     setShowLotusToast,
     showLotusToast,
+    startPreview,
     status,
     terminalVisible,
   };
