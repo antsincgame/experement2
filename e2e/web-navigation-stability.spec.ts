@@ -121,31 +121,18 @@ test("settings drawer opens and closes without breaking UI state", async ({ page
   await page.goto("/");
   await expect(page.getByText("Connected")).toBeVisible({ timeout: 30_000 });
 
-  const settingsButton = page.locator('[aria-label*="Settings"], [aria-label*="settings"]').first();
-  const hasDedicatedButton = await settingsButton.isVisible().catch(() => false);
-
-  if (hasDedicatedButton) {
-    await settingsButton.click();
-  } else {
-    const gearIcon = page.locator("svg").filter({ has: page.locator("circle, path") }).first();
-    if (await gearIcon.isVisible()) {
-      await gearIcon.click();
-    }
-  }
+  // Open the settings drawer via its accessibility label (the same reliable path the
+  // settings-persistence spec uses), ASSERT it actually opened, then close it via the
+  // real "Close settings" label. The old code chained optional `if (...)` guards (and a
+  // never-matching '[aria-label="Close"]'), so a drawer that failed to open/close passed
+  // silently — a false green for a "navigation stability" test.
+  await page.getByLabel("Open settings").click();
 
   const lmStudioLabel = page.getByText(/LM Studio/i).first();
-  const drawerOpened = await lmStudioLabel.isVisible({ timeout: 5_000 }).catch(() => false);
+  await expect(lmStudioLabel).toBeVisible({ timeout: 5_000 });
 
-  if (drawerOpened) {
-    await expect(lmStudioLabel).toBeVisible();
-
-    const closeButton = page.locator('[aria-label="Close"], [aria-label="close"]').first();
-    const hasClose = await closeButton.isVisible().catch(() => false);
-    if (hasClose) {
-      await closeButton.click();
-      await expect(lmStudioLabel).not.toBeVisible({ timeout: 5_000 });
-    }
-  }
+  await page.getByLabel("Close settings").click();
+  await expect(lmStudioLabel).not.toBeVisible({ timeout: 5_000 });
 
   await expect(page.getByText(FIXTURE_PROJECT.name)).toBeVisible({ timeout: 10_000 });
 });
