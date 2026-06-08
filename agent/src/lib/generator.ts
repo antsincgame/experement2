@@ -30,8 +30,10 @@ import {
   normalizeAliasSpecifier,
   VECTOR_ICON_IMPORT_PATHS,
 } from "./generation-contract.js";
-import { validateAppPlan } from "./project-validator.js";
-import { isPlanFileComplete } from "./generation-state.js";
+import { validateAppPlan, validateFileContracts } from "./project-validator.js";
+import { generateBestCandidate } from "./best-of-n.js";
+import { scoreCandidateFile } from "./quality-score.js";
+import { isPlanFileComplete, isStructurallyComplete } from "./generation-state.js";
 import { collectStream } from "./stream-collect.js";
 
 interface GeneratorOptions {
@@ -56,6 +58,8 @@ interface GeneratorOptions {
   onFileComplete?: (filepath: string) => void;
   /** When true, skip LLM for files that already exist with a valid // EOF marker. */
   skipExistingFiles?: boolean;
+  /** Test-time compute: draw N candidates per file and keep the verifier-best. 1 = today. */
+  bestOfN?: number;
 }
 
 /**
@@ -344,13 +348,23 @@ const regenerateEmptyFile = async (
     },
   ];
 
-  const stream = await complete(messages, {
-    temperature: options.temperature ?? 0.4,
-    maxTokens: options.maxTokens ?? 65536,
-    lmStudioUrl: options.lmStudioUrl,
-    model: options.model,
-  });
-  const raw = await collectStream(stream);
+  let raw: string;
+  try {
+    const stream = await complete(messages, {
+      temperature: options.temperature ?? 0.4,
+      maxTokens: options.maxTokens ?? 65536,
+      lmStudioUrl: options.lmStudioUrl,
+      model: options.model,
+    });
+    raw = await collectStream(stream);
+  } catch (err) {
+    // Idle-stall/network abort during a heal must not kill the whole generation —
+    // leave the placeholder and let the build/gates report honestly.
+    console.warn(
+      `[Generator] Empty-file heal failed for ${ctx.fileSpec.path} (${err instanceof Error ? err.message : String(err)})`,
+    );
+    return null;
+  }
   const extracted = extractCodeFromResponse(raw);
   if (extracted) return extracted.code;
   return raw
@@ -377,6 +391,7 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
     onThinking,
     onFileComplete,
     skipExistingFiles = false,
+    bestOfN = 1,
   } = options;
 
   const planIssues = validateAppPlan(plan);
@@ -540,37 +555,80 @@ Generate the complete code for: ${fileSpec.path}`;
     ];
 
     let responseBuffer = "";
-    let lastReasoningLen = 0;
 
-    const generator = await complete(messages, {
-      temperature: temperature ?? 0.4,
-      maxTokens: maxTokens ?? 65536,
-      topP,
-      lmStudioUrl,
-      model,
-    });
+    if (bestOfN > 1) {
+      // ── Test-time compute (Phase 2): best-of-N + verifier reranking ──
+      // Draw N candidates and keep the one the deterministic verifier likes best
+      // (fewest contract violations against this file's dependencies + content quality).
+      // No streaming/reasoning here (candidates are drained fully); we replay the winner
+      // through onChunk so the UI still shows the chosen file.
+      broadcast({
+        type: "build_event",
+        eventType: "self_healing",
+        message: `🎲 Best-of-${bestOfN}: sampling ${fileSpec.path}`,
+      });
+      const { winnerText, scores } = await generateBestCandidate({
+        n: bestOfN,
+        messages,
+        options: { temperature: temperature ?? 0.4, maxTokens: maxTokens ?? 65536, topP, lmStudioUrl, model },
+        complete,
+        extract: (text) => extractCodeFromResponse(text)?.code ?? null,
+        scoreCandidate: (code) => {
+          let violations = 0;
+          try {
+            violations = validateFileContracts(code, fileSpec.path, depContracts, projectPath).length;
+          } catch {
+            /* scoring is best-effort */
+          }
+          return scoreCandidateFile(fileSpec.path, code) - 25 * violations;
+        },
+      });
+      responseBuffer = winnerText;
+      onChunk?.(winnerText); // UI parity: show the chosen candidate
+      broadcast({
+        type: "build_event",
+        eventType: "self_healing",
+        message: `🎲 Best-of-${bestOfN} picked best of [${scores.map((s) => Math.round(s)).join(", ")}] for ${fileSpec.path}`,
+      });
+    } else {
+      let lastReasoningLen = 0;
+      let reasoningClosed = false;
 
-    // Buffer chunks — send to frontend max every 100ms to prevent React re-render storm
-    let chunkBuffer = "";
-    let lastSendTime = Date.now();
+      const generator = await complete(messages, {
+        temperature: temperature ?? 0.4,
+        maxTokens: maxTokens ?? 65536,
+        topP,
+        lmStudioUrl,
+        model,
+      });
 
-    for await (const chunk of generator) {
-      responseBuffer += chunk;
-      chunkBuffer += chunk;
-      if (onThinking) {
-        const reasoning = extractReasoning(responseBuffer);
-        if (reasoning.length > lastReasoningLen) {
-          onThinking(fileSpec.path, reasoning);
-          lastReasoningLen = reasoning.length;
+      // Buffer chunks — send to frontend max every 100ms to prevent React re-render storm
+      let chunkBuffer = "";
+      let lastSendTime = Date.now();
+
+      for await (const chunk of generator) {
+        responseBuffer += chunk;
+        chunkBuffer += chunk;
+        if (onThinking && !reasoningClosed) {
+          const reasoning = extractReasoning(responseBuffer);
+          if (reasoning.length > lastReasoningLen) {
+            onThinking(fileSpec.path, reasoning);
+            lastReasoningLen = reasoning.length;
+          }
+          // Once the think block is closed the reasoning is final — stop re-scanning the
+          // growing buffer (which now contains all the file code) on every chunk (was O(n²)).
+          if (/<\/(?:think|thinking|redacted_thinking)>/i.test(responseBuffer)) {
+            reasoningClosed = true;
+          }
+        }
+        if (Date.now() - lastSendTime > 100) {
+          onChunk?.(chunkBuffer);
+          chunkBuffer = "";
+          lastSendTime = Date.now();
         }
       }
-      if (Date.now() - lastSendTime > 100) {
-        onChunk?.(chunkBuffer);
-        chunkBuffer = "";
-        lastSendTime = Date.now();
-      }
+      if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
     }
-    if (chunkBuffer) onChunk?.(chunkBuffer); // flush remainder
 
     const extracted = extractCodeFromResponse(responseBuffer);
     if (extracted) {
@@ -651,7 +709,15 @@ Generate the complete code for: ${fileSpec.path}`;
       if (!content) continue;
       if (content.includes(EMPTY_FILE_PLACEHOLDER)) {
         empty.push(fp);
-      } else if (!content.includes("// EOF") && content.length > 20) {
+      } else if (
+        !content.includes("// EOF") &&
+        !isStructurallyComplete(content) &&
+        content.length > 20
+      ) {
+        // Only "continue" a file that is BOTH missing its // EOF marker AND
+        // structurally incomplete (unbalanced braces = genuinely cut off). A complete
+        // file that merely dropped the marker is left alone instead of having garbage
+        // appended onto already-working code.
         truncated.push(fp);
       }
     }
@@ -690,24 +756,32 @@ Generate the complete code for: ${fileSpec.path}`;
         },
       ];
 
-      const retryGen = await complete(retryMessages, {
-        temperature: temperature ?? 0.3,
-        maxTokens: maxTokens ?? 65536,
-        lmStudioUrl,
-        model,
-      });
+      try {
+        const retryGen = await complete(retryMessages, {
+          temperature: temperature ?? 0.3,
+          maxTokens: maxTokens ?? 65536,
+          lmStudioUrl,
+          model,
+        });
 
-      let retryCode = await collectStream(retryGen);
+        let retryCode = await collectStream(retryGen);
 
-      // Strip markdown fences from continuation
-      retryCode = retryCode
-        .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
-        .replace(/\n?```\s*$/, "")
-        .trim();
+        // Strip markdown fences from continuation
+        retryCode = retryCode
+          .replace(/^```(?:tsx?|typescript)?\s*\n?/, "")
+          .replace(/\n?```\s*$/, "")
+          .trim();
 
-      if (retryCode.length > 5) {
-        currentContent += "\n" + retryCode;
-        writeFile(projectName, fp, sanitizeGeneratedCode(currentContent, fp));
+        if (retryCode.length > 5) {
+          currentContent += "\n" + retryCode;
+          writeFile(projectName, fp, sanitizeGeneratedCode(currentContent, fp));
+        }
+      } catch (err) {
+        // Idle-stall/network abort during a continuation must not abort the whole
+        // generation — keep whatever partial content exists for this file.
+        console.warn(
+          `[Generator] Truncation continuation failed for ${fp} (${err instanceof Error ? err.message : String(err)}); keeping partial`,
+        );
       }
     }
   }
@@ -756,14 +830,24 @@ RULES:
     },
   ];
 
-  const generator = await (options.complete ?? streamCompletion)(messages, {
-    temperature: 0.2,
-    maxTokens: options.maxTokens ?? 65536,
-    lmStudioUrl: options.lmStudioUrl,
-    model: options.model,
-  });
-
-  let fixedCode = await collectStream(generator);
+  let fixedCode: string;
+  try {
+    const generator = await (options.complete ?? streamCompletion)(messages, {
+      temperature: 0.2,
+      maxTokens: options.maxTokens ?? 65536,
+      lmStudioUrl: options.lmStudioUrl,
+      model: options.model,
+    });
+    fixedCode = await collectStream(generator);
+  } catch (err) {
+    // A network error or an idle-stall abort (LLM_STREAM_IDLE) must NOT abort the
+    // whole generation here — contract-fix is best-effort. Return null so the caller
+    // proceeds with the original file (matches the short-output path below).
+    console.warn(
+      `[Generator] Contract regen failed for ${filePath} (${err instanceof Error ? err.message : String(err)}); keeping original`,
+    );
+    return null;
+  }
 
   fixedCode = stripCodePreamble(fixedCode);
 

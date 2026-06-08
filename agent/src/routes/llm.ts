@@ -46,9 +46,9 @@ CRITICAL TECH STACK (DO NOT SUGGEST ANYTHING ELSE):
 - Routing: Expo Router (file-based).
 
 THE TAMAGUI DESIGN ARSENAL (1.x APIs — weave 3-5 of these into your specification to make it premium):
-1. Advanced Layouts: YStack/XStack/ZStack with separator={<Separator />}. Use <ThemeInverse> or theme="alt1" for contrasting highlighted sections.
+1. Advanced Layouts: YStack/XStack with separator={<Separator />}. For contrasting highlighted sections wrap them in <Theme name="dark"> or use inline conditional colors.
 2. Tactile Interactivity: Specify the use of pseudo-props like pressStyle={{ scale: 0.97 }}, hoverStyle, and focusStyle for highly responsive buttons and cards.
-3. Rich Components: Propose using advanced inputs like ToggleGroup, Slider, Progress, Select (dropdowns), Tabs, and Accordion.
+3. Rich Components: Propose Slider, Switch toggles, a segmented control built from a Button row, and Sheet-based pickers for "dropdown"/"select" needs (build them from @/ui primitives — there is no Select/Accordion/Progress component).
 4. Overlays & Drawers: Suggest bottom Sheet with snap points for filters/menus, Dialog for modals, and Toast for success/error feedback.
 5. Fluid Motion: Mandate Moti-like declarative animations using animation="bouncy" (or "lazy"/"quick") combined with enterStyle={{ opacity: 0, y: 10 }} and exitStyle for smooth mount/unmount transitions.
 6. Haptics: Combine Tamagui interactions with expo-haptics for physical feedback.

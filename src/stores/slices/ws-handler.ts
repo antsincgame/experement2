@@ -837,7 +837,10 @@ export const createWsHandler = (
       break;
 
     case "iteration_result": {
-      const applied = msg.appliedBlocks ?? 0;
+      // Backend sends BOTH iteration_result (server onSuccess) and iteration_complete
+      // (pipeline) for one iterate. iteration_complete owns the chat summary; here we
+      // ONLY reconcile a background project's list status so we don't emit the
+      // "Applied N changes" / error message twice.
       const failed = msg.failedBlocks ?? 0;
       const errors = msg.errors ?? [];
       const resultProject = getMessageProjectName(msg);
@@ -845,17 +848,6 @@ export const createWsHandler = (
         const terminalStatus: AppStatus =
           failed > 0 || errors.length > 0 ? "error" : "ready";
         patchProjectListEntry(set, get, resultProject, { status: terminalStatus });
-      }
-      if (applied > 0 && failed === 0 && errors.length === 0) {
-        emitChat(createAssistantMessage(`Applied ${applied} changes [ok]`));
-      } else if (failed > 0 || errors.length > 0) {
-        const failureCount = Math.max(failed, errors.length, 1);
-        emitChat(createErrorMessage(
-          `Applied ${applied} changes, ${failureCount} errors`,
-          errors.join("\n") || undefined
-        ));
-      } else if (applied === 0) {
-        emitChat(createSystemMessage("No code changes were applied for this request."));
       }
       break;
     }

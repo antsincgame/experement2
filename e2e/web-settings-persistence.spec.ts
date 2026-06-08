@@ -130,6 +130,7 @@ test("URL change persists in localStorage after Save", async ({ page }) => {
   await saveSettings(page);
   await page.waitForTimeout(300);
 
+  // Verify localStorage was updated
   const updatedUrl = await readSettingsField(page, "lmStudioUrl");
   expect(updatedUrl).toBe("http://localhost:9999");
 });
@@ -173,7 +174,8 @@ test("enhancer toggle persists through Save and reopen", async ({ page }) => {
 
   await openSettings(page);
 
-  // Click the OFF toggle to turn it ON
+  // Click the OFF toggle to turn it ON. The enhancer toggle starts OFF (SETTINGS_SNAPSHOT)
+  // and is the whole subject of this test — assert it is present instead of skipping.
   const offButton = page.getByText("OFF", { exact: true }).first();
   await expect(offButton).toBeVisible({ timeout: 5_000 });
   await offButton.click();

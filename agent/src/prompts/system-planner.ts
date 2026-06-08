@@ -165,13 +165,13 @@ CRITICAL: Respond with ONLY a single JSON object.
     {
       "path": "src/stores/itemStore.ts",
       "type": "store",
-      "description": "Zustand store for items. State: { items: Item[] }. Actions: addItem(input), updateItem(id, patch), removeItem(id), clearAll(). Selectors for sorting by date/title. Persists to AsyncStorage via zustand persist middleware.",
+      "description": "Zustand store for items. State: { items: Item[] }. Actions: addItem(input), updateItem(id, patch), removeItem(id), clearAll(). Selectors for sorting by date/title. Persists user data through the @/services/db layer (createCollection): load with getAll() on init and write through save/remove on every mutation.",
       "dependencies": ["src/types/index.ts"]
     },
     {
       "path": "src/stores/settingsStore.ts",
       "type": "store",
-      "description": "Zustand store for preferences. State: { theme: 'light' | 'dark'; sortOrder: 'date' | 'title' }. Actions: toggleTheme(), setSortOrder(order). Persisted to AsyncStorage.",
+      "description": "Zustand store for preferences. State: { theme: 'light' | 'dark'; sortOrder: 'date' | 'title' }. Actions: toggleTheme(), setSortOrder(order). Persisted through the @/services/db layer (kv.get/kv.set).",
       "dependencies": ["src/types/index.ts"]
     },
     {

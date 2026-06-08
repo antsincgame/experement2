@@ -122,8 +122,48 @@ export const advanceGenerationCheckpoint = (
   persistState(projectName, { ...state, checkpoint, savedAt: new Date().toISOString() });
 };
 
+/**
+ * Structural completeness heuristic — true when the file PARSES as a finished module
+ * even though it has no `// EOF` marker. We strip comments and string/template
+ * literals, then require balanced braces/parens/brackets and at least one `export`.
+ *
+ * Why: a genuinely truncated file is cut mid-construct, so its braces don't balance →
+ * this returns false and the heal loop still rescues it. But a COMPLETE file that
+ * merely omitted the `// EOF` comment (local models drop trailing meta-comments, and
+ * the polish stage strips the marker) is now recognized as done — instead of being
+ * "continued" (which appends garbage onto working code) or, on resume, regenerated
+ * from scratch.
+ */
+export const isStructurallyComplete = (content: string | null | undefined): boolean => {
+  if (!content || content.trim().length < 20) return false;
+
+  const stripped = content
+    .replace(/\/\*[\s\S]*?\*\//g, "")     // block comments
+    .replace(/\/\/[^\n]*/g, "")            // line comments
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')   // double-quoted strings
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''")   // single-quoted strings
+    .replace(/`(?:[^`\\]|\\.)*`/g, "``")   // template literals (naive)
+    .replace(/\/(?:\\.|\[(?:\\.|[^\]\n\\])*\]|[^/\n\\])+\/[gimsuy]*/g, "//"); // regex literals (so /[}{]/ braces don't skew the count)
+
+  if (!/\bexport\b/.test(stripped)) return false;
+
+  let curly = 0;
+  let paren = 0;
+  let square = 0;
+  for (const ch of stripped) {
+    if (ch === "{") curly++;
+    else if (ch === "}") curly--;
+    else if (ch === "(") paren++;
+    else if (ch === ")") paren--;
+    else if (ch === "[") square++;
+    else if (ch === "]") square--;
+    if (curly < 0 || paren < 0 || square < 0) return false; // closed something never opened
+  }
+  return curly === 0 && paren === 0 && square === 0;
+};
+
 export const isPlanFileComplete = (content: string | null | undefined): boolean =>
-  Boolean(content?.trim() && content.includes(EOF_MARKER));
+  Boolean(content?.trim() && (content.includes(EOF_MARKER) || isStructurallyComplete(content)));
 
 export const listMissingPlanFiles = (projectName: string, plan: AppPlan): string[] =>
   plan.files

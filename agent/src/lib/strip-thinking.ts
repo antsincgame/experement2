@@ -28,8 +28,18 @@ const extractAfterUnclosedThinking = (text: string): string => {
 
 /**
  * Remove thinking/reasoning wrappers and markdown fences from model output.
+ *
+ * `preferJson` (set by the JSON callers — planner plan + editor analyze) makes the
+ * UNCLOSED-think recovery keep everything from the first `{`/`[` instead of the lossy
+ * "drop the first paragraph" heuristic. That heuristic emptied the result when JSON
+ * followed reasoning with a single newline, and dropped the leading brace when the JSON
+ * itself contained a blank line. Non-JSON callers (e.g. prompt enhance) keep the old
+ * behavior.
  */
-export const stripThinkingFromText = (raw: string): string => {
+export const stripThinkingFromText = (
+  raw: string,
+  opts: { preferJson?: boolean } = {},
+): string => {
   let text = raw.trim();
   if (!text) {
     return "";
@@ -44,9 +54,16 @@ export const stripThinkingFromText = (raw: string): string => {
     const openIdx = openMatch?.index ?? -1;
     if (openIdx >= 0) {
       const afterTag = text.slice(openIdx + (openMatch?.[0].length ?? 0));
-      const paragraphs = afterTag.split(/\n\n+/);
-      const tail = paragraphs.length > 1 ? paragraphs.slice(1).join("\n\n").trim() : "";
-      text = tail || extractAfterUnclosedThinking(text);
+      const jsonStart = opts.preferJson ? afterTag.search(/[{[]/) : -1;
+      if (jsonStart >= 0) {
+        // The answer is the JSON payload; the reasoning sits before the first {/[.
+        text = afterTag.slice(jsonStart).trim();
+      } else {
+        const paragraphs = afterTag.split(/\n\n+/);
+        const tail =
+          paragraphs.length > 1 ? paragraphs.slice(1).join("\n\n").trim() : "";
+        text = tail || extractAfterUnclosedThinking(text);
+      }
     } else {
       text = extractAfterUnclosedThinking(text);
     }

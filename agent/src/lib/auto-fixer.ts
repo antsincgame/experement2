@@ -29,6 +29,9 @@ interface AutoFixOptions {
   complete?: CompleteFn;
   maxAttempts?: number;
   onAttempt?: (attempt: number, maxAttempts: number) => void;
+  /** Fires for EVERY proposed block BEFORE it is applied — used for pre-write snapshots. */
+  onBeforeApply?: (block: SearchReplaceBlock) => void;
+  /** Fires ONLY for blocks that were actually applied (so callers never record/emit a fix that no-op'd). */
   onFix?: (block: SearchReplaceBlock) => void;
 }
 
@@ -104,6 +107,7 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
     complete = streamCompletion,
     maxAttempts = 3,
     onAttempt,
+    onBeforeApply,
     onFix,
   } = options;
 
@@ -185,9 +189,10 @@ export const autoFix = async (options: AutoFixOptions): Promise<AutoFixResult> =
       if ("type" in item && item.type === "thinking") continue;
 
       const block = item as SearchReplaceBlock;
-      onFix?.(block);
+      onBeforeApply?.(block); // snapshot point (pre-write) for the gate's revert
 
       if (applyBlock(projectName, block)) {
+        onFix?.(block); // record/emit only blocks that actually applied
         blocksApplied++;
       }
     }

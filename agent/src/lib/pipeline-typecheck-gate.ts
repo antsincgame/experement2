@@ -35,6 +35,7 @@ type AutoFixFn = (options: {
   complete?: import("../services/llm-proxy.js").CompleteFn;
   maxAttempts?: number;
   onAttempt?: (attempt: number, maxAttempts: number) => void;
+  onBeforeApply?: (block: SearchReplaceBlock) => void;
   onFix?: (block: SearchReplaceBlock) => void;
 }) => Promise<AutoFixResultLike>;
 
@@ -124,29 +125,52 @@ export const applyAutofixWithGate = async (
   const snapshots = new Map<string, string | null>();
   let lastAppliedBlock: { filepath: string; replace: string } | null = null;
 
-  const fixResult = await autoFix({
-    projectName,
-    error,
-    lmStudioUrl,
-    model,
-    complete,
-    maxAttempts: 1,
-    onAttempt,
-    onFix: (block) => {
-      if (block.filepath && !snapshots.has(block.filepath)) {
-        let snapshot: string | null = null;
-        try {
-          snapshot = readFile(block.filepath);
-        } catch (error) {
-          warnCaught("pipeline-typecheck-gate", error, `read pre-fix snapshot ${block.filepath}`);
-          snapshot = null;
+  let fixResult: AutoFixResultLike;
+  try {
+    fixResult = await autoFix({
+      projectName,
+      error,
+      lmStudioUrl,
+      model,
+      complete,
+      maxAttempts: 1,
+      onAttempt,
+      onBeforeApply: (block) => {
+        // Snapshot the pre-write content of every PROPOSED block so a revert restores
+        // exactly what existed before this attempt (runs before applyBlock writes).
+        if (block.filepath && !snapshots.has(block.filepath)) {
+          let snapshot: string | null = null;
+          try {
+            snapshot = readFile(block.filepath);
+          } catch (error) {
+            warnCaught("pipeline-typecheck-gate", error, `read pre-fix snapshot ${block.filepath}`);
+            snapshot = null;
+          }
+          snapshots.set(block.filepath, snapshot);
         }
-        snapshots.set(block.filepath, snapshot);
-      }
-      lastAppliedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
-      onFix?.(block);
-    },
-  });
+      },
+      onFix: (block) => {
+        // Fires only for APPLIED blocks → lastAppliedBlock/recordFix never store a no-op.
+        lastAppliedBlock = { filepath: block.filepath, replace: block.replace ?? "" };
+        onFix?.(block);
+      },
+    });
+  } catch (err) {
+    // autoFix threw (e.g. the LLM stream stalled and aborted with LLM_STREAM_IDLE, or a
+    // network error). Treat it as "no fix applied" so the build loop surfaces the honest
+    // build error rather than aborting the whole generation. Fail-safe by design.
+    return {
+      applied: false,
+      reverted: false,
+      fixResult: {
+        success: false,
+        attempts: 0,
+        lastError: err instanceof Error ? err.message : String(err),
+      },
+      lastAppliedBlock: null,
+      afterErrors: null,
+    };
+  }
 
   const applied = fixResult.success;
 
@@ -195,4 +219,96 @@ export const applyAutofixWithGate = async (
   });
 
   return { applied: false, reverted: true, fixResult, lastAppliedBlock: null, afterErrors };
+};
+
+export interface RepairGateDeps {
+  /** Authoritative typecheck. May be undefined/throw → gate is skipped (keep repairs). */
+  runTypecheck?: (projectPath: string) => Promise<CommandResultLike>;
+  /** Read a project file's content (path) => content|null. */
+  readFile: (filePath: string) => string | null;
+  /** Write a project file (path, content) => void. */
+  writeFile: (filePath: string, content: string) => void;
+  /** Emit a log/build line. */
+  emit?: (message: Record<string, unknown>) => void;
+}
+
+export interface RepairGateResult {
+  /** True if the repair phase was reverted because it regressed the typecheck. */
+  reverted: boolean;
+  /** How many files the repair phase changed. */
+  changed: number;
+  /** Type-error count of the repaired project (null when not measured). */
+  afterErrors: number | null;
+  /** Type-error count of the pre-repair project (null when not measured). */
+  beforeErrors: number | null;
+}
+
+/**
+ * Whole-phase anti-regression gate for the repair stages (3b contract-fix + 3c
+ * type-fix). Given each changed file's pre-repair content, it keeps the repairs only
+ * if they did NOT increase the project's total type-error count; otherwise it restores
+ * the pre-repair versions on disk. This guarantees repairs can only help or do nothing
+ * — never convert a passing (or less-broken) generation into a more-broken one.
+ *
+ * Cost-aware: skips entirely when nothing changed; a clean repaired project is kept
+ * without a second typecheck; at most two typechecks run, and only when a repair both
+ * changed a file AND left errors. Fail-safe: any missing/throwing typecheck keeps the
+ * repairs (identical to pre-gate behavior) and never throws.
+ */
+export const revertRepairPhaseIfWorse = async (
+  deps: RepairGateDeps,
+  projectPath: string,
+  preRepair: Map<string, string>,
+): Promise<RepairGateResult> => {
+  const { runTypecheck, readFile, writeFile, emit } = deps;
+
+  const changed = [...preRepair.keys()].filter((fp) => {
+    const now = readFile(fp);
+    return now != null && now !== preRepair.get(fp);
+  });
+
+  const skipped: RepairGateResult = {
+    reverted: false,
+    changed: changed.length,
+    afterErrors: null,
+    beforeErrors: null,
+  };
+  if (changed.length === 0 || !runTypecheck) return skipped;
+
+  try {
+    const afterTc = await runTypecheck(projectPath);
+    const afterErrors = afterTc.success ? 0 : countTypeErrors(afterTc.combinedOutput);
+
+    // A clean repaired project is always kept (and needs no second typecheck).
+    if (afterErrors === 0) return { ...skipped, afterErrors };
+
+    // Stash the repaired versions, restore the pre-repair versions, measure those.
+    const repaired = new Map<string, string>();
+    for (const fp of changed) {
+      const now = readFile(fp);
+      if (now != null) repaired.set(fp, now);
+      const before = preRepair.get(fp);
+      if (before !== undefined) writeFile(fp, before);
+    }
+
+    const beforeTc = await runTypecheck(projectPath);
+    const beforeErrors = beforeTc.success ? 0 : countTypeErrors(beforeTc.combinedOutput);
+
+    if (shouldKeepFix(beforeErrors, afterErrors)) {
+      // No regression → restore the repaired versions (keep the repairs).
+      for (const [fp, content] of repaired) writeFile(fp, content);
+      return { reverted: false, changed: changed.length, afterErrors, beforeErrors };
+    }
+
+    // Regression → leave the pre-repair versions on disk (already restored).
+    emit?.({
+      type: "build_event",
+      eventType: "self_healing",
+      message: `↩︎ Reverted repair phase: it added ${afterErrors - beforeErrors} type error(s) (${beforeErrors}→${afterErrors}); kept the pre-repair version`,
+    });
+    return { reverted: true, changed: changed.length, afterErrors, beforeErrors };
+  } catch {
+    // Typecheck unavailable/threw → cannot judge regression → keep repairs.
+    return skipped;
+  }
 };

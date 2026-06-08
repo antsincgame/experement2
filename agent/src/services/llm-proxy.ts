@@ -243,10 +243,12 @@ export const streamCompletion = async (
     const IDLE_TIMEOUT_MS =
       Number(process.env.LLM_STREAM_IDLE_MS) || 180_000;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let idleAborted = false;
 
     const resetIdleTimer = (): void => {
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
+        idleAborted = true;
         console.warn(`[LLM] Idle timeout ${IDLE_TIMEOUT_MS}ms — no chunks received, aborting stream`);
         controller.abort();
       }, IDLE_TIMEOUT_MS);
@@ -279,11 +281,22 @@ export const streamCompletion = async (
           }
         }
       }
+    } catch (err) {
+      // Re-throw real stream errors. An idle-abort surfaces below as a clear,
+      // dedicated error so the planner/editor never treat a stalled, truncated
+      // stream as a COMPLETE response (which would parse half a plan as final).
+      if (!idleAborted) throw err;
     } finally {
       if (idleTimer) clearTimeout(idleTimer);
       reader.releaseLock();
       activeControllers.delete(taskId);
       activeRequestCount = Math.max(0, activeRequestCount - 1);
+    }
+
+    if (idleAborted) {
+      throw new Error(
+        `LLM_STREAM_IDLE: model produced no output for ${IDLE_TIMEOUT_MS}ms — stream ended incomplete`,
+      );
     }
   }
 

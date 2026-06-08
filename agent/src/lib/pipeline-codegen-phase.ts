@@ -10,11 +10,14 @@ import { parseTypeErrors, groupDiagnosticsByFile, isFixableProjectFile } from ".
 import { validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
-import { formatModelRoleLabel } from "./model-roles.js";
+import { formatModelRoleLabel, resolveJudgeModel } from "./model-roles.js";
+import { scoreProjectQuality } from "./quality-score.js";
+import { judgeProject } from "./quality-judge.js";
 import { autoFix } from "./auto-fixer.js";
-import { applyAutofixWithGate, countTypeErrors } from "./pipeline-typecheck-gate.js";
+import { applyAutofixWithGate, countTypeErrors, revertRepairPhaseIfWorse } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
 import { recordExemplar } from "./exemplar-store.js";
+import { recordLedgerEntry } from "./ledger.js";
 import { buildResumeStatusMessage } from "./pipeline-resume-status.js";
 import { gitCommit, gitInit } from "./git.js";
 import type { PipelineContext } from "./pipeline-types.js";
@@ -139,6 +142,8 @@ export const runCodegenAndShip = async (
       onFileComplete: (filepath) =>
         emitOperation({ type: "file_complete", filepath }),
       skipExistingFiles,
+      // Phase 2 test-time compute, flag-gated. Default (unset/1) = today's single-sample path.
+      bestOfN: Math.max(1, Number(process.env.BEST_OF_N) || 1),
     });
 
     emitOperation({ type: "generation_complete", filesCount: files.length });
@@ -152,6 +157,18 @@ export const runCodegenAndShip = async (
   // the whole project from being used as teaching material (quality-drift guard).
   let didContractFix = false;
   let didTypeFix = false;
+
+  // Anti-regression snapshot for the WHOLE repair phase (3b contract-fix + 3c
+  // type-fix). Capture each plan file's content BEFORE any repair runs; after the
+  // repair phase, if it left the project typechecking WORSE than it started, restore
+  // these snapshots. Repairs can then only help or do nothing — never break working
+  // code. Cheap: in-memory file reads now, and at most two extra `tsc` runs later, only
+  // when a repair actually changed a file.
+  const preRepairContents = new Map<string, string>();
+  for (const fp of files) {
+    const content = readProjectFile(projectSlug, fp);
+    if (content != null) preRepairContents.set(fp, content);
+  }
 
   // ── Step 3b: Contract Validation + Auto-Fix ────────────
   {
@@ -290,6 +307,22 @@ export const runCodegenAndShip = async (
     }
   }
   
+  // ── Repair anti-regression gate ───────────────────────
+  // If the repair phase (3b + 3c) left the project typechecking WORSE than before it
+  // ran, restore every file it changed to its pre-repair snapshot. Repairs can then
+  // only help or do nothing — never convert a passing (or less-broken) generation into
+  // a more-broken one. Fail-safe: a missing/throwing typecheck keeps the repairs.
+  await revertRepairPhaseIfWorse(
+    {
+      runTypecheck,
+      readFile: (fp) => readProjectFile(projectSlug, fp),
+      writeFile: (fp, content) => writeProjectFile(projectSlug, fp, content),
+      emit: emitOperation,
+    },
+    projectPath,
+    preRepairContents,
+  );
+
   // ── Step 4: Git init ──────────────────────────────────
   gitInit(projectPath, runGitCommand);
   
@@ -574,41 +607,110 @@ export const runCodegenAndShip = async (
     }
   }
 
-  // ── Learned-exemplar capture (win-rate lever #4, path B) ──
-  // STRICT GATE: learn exemplars ONLY from a CLEAN generation — the project reached
-  // build success / ready preview AND required ZERO repair (no Metro autofix, no
-  // contract-fix, no type-fix). When all three are true, every file is known
-  // first-pass-correct, so a few representative ones (one screen, one store, one
-  // component) become teaching material for future generations. Captured BEFORE the
-  // opt-in auto-polish stage so we learn the model's first-pass output, never polished
-  // edits. Fully wrapped in try/catch + best-effort store: capture can NEVER affect the
-  // already-verified generation result. When in doubt (any repair flag set, or capture
-  // throws), we DON'T learn — the prompt simply falls back to the curated golden one.
+  // ── Quality score + accretive-memory capture (Phase 1 + Phase 3) ──
+  // On a verified-ready build, compute the deterministic quality score ONCE and use it to
+  // (a) RANK what is learned, and (b) emit the quality_score trend signal. Best-effort
+  // throughout: nothing here can affect the already-shipped result.
+  //
+  // Capture tiers (the quality-ranked store evicts the weakest, so a weaker capture can
+  // never displace a stronger one):
+  //  - TIER 1 "clean": a zero-repair generation (no Metro autofix / contract-fix / type-fix)
+  //    — every file is first-pass-correct (highest trust).
+  //  - TIER 2 "repaired": a generation that needed repair but ended EXCELLENT (score ≥ 90)
+  //    — closes the "great app that needed one fix teaches nothing" gap.
+  // Captured BEFORE the opt-in polish stage so we learn the model's own output.
   const cleanGeneration =
     buildSuccess && autoFixAttempts === 0 && !didContractFix && !didTypeFix;
-  if (cleanGeneration) {
+
+  if (buildSuccess) {
+    let quality: ReturnType<typeof scoreProjectQuality> | null = null;
     try {
-      const seenTypes = new Set<string>();
-      for (const fileSpec of plan.files) {
-        const type = fileSpec.type.toLowerCase().trim();
-        // One representative file per type (screen/store/component) keeps the store
-        // diverse and bounded; the per-type cap in recordExemplar does the rest.
-        if (!["screen", "store", "component"].includes(type)) continue;
-        if (seenTypes.has(type)) continue;
-        const code = readProjectFile(projectSlug, fileSpec.path);
-        if (!code) continue;
-        recordExemplar({
-          type: fileSpec.type,
-          description: fileSpec.description,
-          code,
-        });
-        seenTypes.add(type);
-      }
+      quality = scoreProjectQuality({
+        files,
+        readFile: (rel) => readProjectFile(projectSlug, rel),
+        typeErrorCount: 0,
+        contractViolationCount: 0,
+        webExportOk: true,
+      });
     } catch (err) {
       console.warn(
-        `[Pipeline] Exemplar capture failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+        `[Pipeline] Quality score failed (ignored): ${err instanceof Error ? err.message : String(err)}`
       );
     }
+
+    const HIGH_QUALITY_CAPTURE = 90;
+    const captureSource: "clean" | "repaired" | null = cleanGeneration
+      ? "clean"
+      : quality && quality.score >= HIGH_QUALITY_CAPTURE
+        ? "repaired"
+        : null;
+    if (captureSource) {
+      try {
+        const seenTypes = new Set<string>();
+        for (const fileSpec of plan.files) {
+          const type = fileSpec.type.toLowerCase().trim();
+          // One representative file per type keeps the store diverse and bounded.
+          if (!["screen", "store", "component"].includes(type)) continue;
+          if (seenTypes.has(type)) continue;
+          const code = readProjectFile(projectSlug, fileSpec.path);
+          if (!code) continue;
+          recordExemplar({
+            type: fileSpec.type,
+            description: fileSpec.description,
+            code,
+            score: quality?.score ?? 0,
+            source: captureSource,
+          });
+          seenTypes.add(type);
+        }
+      } catch (err) {
+        console.warn(
+          `[Pipeline] Exemplar capture failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+
+    // Quality trend signal (+ optional LLM judge behind QUALITY_JUDGE) — observe-only.
+    try {
+      let judgeNote = "";
+      if (process.env.QUALITY_JUDGE === "true") {
+        const sampled = plan.files
+          .map((f) => ({ path: f.path, content: readProjectFile(projectSlug, f.path) ?? "" }))
+          .filter((f) => f.content.length > 0);
+        const judged = await judgeProject({
+          plan: {
+            displayName: typeof plan.displayName === "string" ? plan.displayName : undefined,
+            description: typeof plan.description === "string" ? plan.description : undefined,
+          },
+          files: sampled,
+          complete,
+          model: resolveJudgeModel(undefined, fixModel, generationModel),
+          lmStudioUrl,
+        });
+        if (judged) judgeNote = ` · judge ${judged.overall}`;
+      }
+      const q = quality ?? { score: 0, axes: { states: 0, idiomatic: 0, completeness: 0 } };
+      emitOperation({
+        type: "build_event",
+        eventType: "quality_score",
+        message: `⚖️ Quality ${q.score}/100 (states ${q.axes.states} · idiomatic ${q.axes.idiomatic} · complete ${q.axes.completeness})${judgeNote}`,
+      });
+    } catch (err) {
+      console.warn(
+        `[Pipeline] Quality emit failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+
+    // Self-improvement ledger (Phase 3): persist this generation's quality + repair effort
+    // so cumulative improvement is observable on REAL usage and the Phase-4 export can mine
+    // the high-score history. recordLedgerEntry never throws.
+    recordLedgerEntry({
+      score: quality?.score ?? 0,
+      source: captureSource ?? "scored",
+      repairs: autoFixAttempts + (didContractFix ? 1 : 0) + (didTypeFix ? 1 : 0),
+      bestOfN: Math.max(1, Number(process.env.BEST_OF_N) || 1),
+      buildSuccess: true,
+    });
   }
 
   // ── Step 7 (OPT-IN): Auto-polish design loop ──────────

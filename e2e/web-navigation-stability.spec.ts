@@ -122,8 +122,14 @@ test("settings drawer opens and closes without breaking UI state", async ({ page
   await page.goto("/");
   await expect(page.getByText("Connected")).toBeVisible({ timeout: 30_000 });
 
-  await openSettings(page);
-  await closeSettings(page);
+  // Assert the drawer actually opened and closed — no silent pass on missing UI.
+  await page.getByLabel("Open settings").click();
+
+  const lmStudioLabel = page.getByText(/LM Studio/i).first();
+  await expect(lmStudioLabel).toBeVisible({ timeout: 5_000 });
+
+  await page.getByLabel("Close settings").click();
+  await expect(lmStudioLabel).not.toBeVisible({ timeout: 5_000 });
 
   await expect(page.getByText(FIXTURE_PROJECT.name)).toBeVisible({ timeout: 10_000 });
 });

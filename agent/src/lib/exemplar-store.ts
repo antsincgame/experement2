@@ -27,6 +27,10 @@ export interface ExemplarRecord {
   /** Content hash for dedup. */
   hash: string;
   timestamp: number;
+  /** Phase-1 quality score 0..100 at capture (legacy records ⇒ 0). Ranks + evicts. */
+  score?: number;
+  /** Provenance: "clean" (zero-repair, tier-1) | "repaired" | "polished" (high-score after fix). */
+  source?: "clean" | "repaired" | "polished";
 }
 
 /** Keep at most this many exemplars PER type (most-recent win; oldest dropped). */
@@ -114,7 +118,7 @@ const overlapScore = (a: string[], bSet: Set<string>): number => {
  * file must never affect the generation result.
  */
 export const recordExemplar = (
-  record: { type: string; description: string; code: string },
+  record: { type: string; description: string; code: string; score?: number; source?: ExemplarRecord["source"] },
   opts: { dir?: string } = {}
 ): void => {
   const dir = opts.dir ?? defaultDir();
@@ -130,9 +134,19 @@ export const recordExemplar = (
     // Dedup by content hash — re-capturing the same file is a no-op.
     if (existing.some((e) => e.hash === hash)) return;
 
-    existing.push({ type, description, code, hash, timestamp: Date.now() });
+    existing.push({
+      type,
+      description,
+      code,
+      hash,
+      timestamp: Date.now(),
+      score: record.score ?? 0,
+      source: record.source ?? "clean",
+    });
 
-    // Cap PER type: keep the MAX_PER_TYPE most-recent of each type, drop the oldest.
+    // Cap PER type: keep the MAX_PER_TYPE HIGHEST-QUALITY of each type (recency breaks
+    // ties), dropping the lowest-score. This structurally prevents drift — a low-quality
+    // capture can never displace a high-quality one (Phase 3 accretive memory).
     const byType = new Map<string, ExemplarRecord[]>();
     for (const entry of existing) {
       const list = byType.get(entry.type) ?? [];
@@ -141,8 +155,8 @@ export const recordExemplar = (
     }
     const trimmed: ExemplarRecord[] = [];
     for (const list of byType.values()) {
-      list.sort((a, b) => a.timestamp - b.timestamp);
-      trimmed.push(...list.slice(-MAX_PER_TYPE));
+      list.sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || b.timestamp - a.timestamp);
+      trimmed.push(...list.slice(0, MAX_PER_TYPE));
     }
 
     fs.mkdirSync(dir, { recursive: true });
@@ -174,24 +188,34 @@ export const findBestExemplar = (
 
     const queryTokens = tokenize(file.description ?? "");
 
+    // Combine relevance (description overlap) with QUALITY: a higher-score exemplar wins
+    // among close matches, and when the description signal is weak (no overlap) the
+    // highest-quality same-type example is returned instead of merely the most recent.
+    const qualityWeight = (q: number): number =>
+      0.4 + 0.6 * (Math.max(0, Math.min(100, q)) / 100); // 0.4..1.0
     const scored = exemplars
       // `index` preserves storage order so ties break toward the most-recent record
       // even when two were captured in the same millisecond (timestamps can collide).
-      .map((exemplar, index) => ({
-        exemplar,
-        index,
-        score: overlapScore(queryTokens, new Set(tokenize(exemplar.description))),
-      }))
+      .map((exemplar, index) => {
+        const overlap = overlapScore(queryTokens, new Set(tokenize(exemplar.description)));
+        const quality = exemplar.score ?? 0;
+        return {
+          exemplar,
+          index,
+          quality,
+          // overlap alone can be 0 for many; the +small quality term breaks those ties
+          // toward the best exemplar rather than the newest.
+          final: overlap * qualityWeight(quality) + quality / 100000,
+        };
+      })
       .sort(
         (a, b) =>
-          b.score - a.score ||
+          b.final - a.final ||
+          b.quality - a.quality ||
           b.exemplar.timestamp - a.exemplar.timestamp ||
           b.index - a.index
       );
 
-    // With no query tokens (or no overlap) we still return the most-recent exemplar of
-    // this type — a learned same-type example is a better teacher than the generic
-    // golden fallback even when the description signal is weak.
     return scored[0]?.exemplar.code ?? null;
   } catch (error) {
     warnCaught("exemplar-store", error, "find best exemplar");

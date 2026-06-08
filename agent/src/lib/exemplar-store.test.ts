@@ -134,3 +134,42 @@ describe("findBestExemplar", () => {
     expect(findBestExemplar({ type: "screen", description: "feed" }, { dir })).toBeNull();
   });
 });
+
+describe("exemplar-store quality ranking (Phase 3)", () => {
+  it("evicts the LOWEST-score exemplar when over the per-type cap (keeps the best)", () => {
+    for (let i = 1; i <= 9; i++) {
+      recordExemplar(
+        { type: "component", description: `card variant ${i}`, code: `export const C${i} = 1;\n// EOF`, score: i * 10 },
+        { dir },
+      );
+    }
+    const stored = loadExemplars(dir).filter((e) => e.type === "component");
+    expect(stored).toHaveLength(8); // MAX_PER_TYPE
+    const scores = stored.map((e) => e.score ?? 0).sort((a, b) => a - b);
+    expect(scores[0]).toBe(20); // the score-10 record was evicted, not the oldest
+    expect(scores).not.toContain(10);
+  });
+
+  it("returns the HIGHEST-quality same-type exemplar when the description has no overlap", () => {
+    recordExemplar({ type: "screen", description: "alpha beta", code: "export const LOW = 1;\n// EOF", score: 30 }, { dir });
+    recordExemplar({ type: "screen", description: "gamma delta", code: "export const HIGH = 1;\n// EOF", score: 95 }, { dir });
+    const best = findBestExemplar({ type: "screen", description: "wholly unrelated zzz" }, { dir });
+    expect(best).toContain("HIGH"); // quality wins the no-overlap tie, not recency
+  });
+
+  it("prefers the higher-quality exemplar among close (overlapping) matches", () => {
+    recordExemplar({ type: "screen", description: "expense tracker dashboard", code: "export const LOWQ = 1;\n// EOF", score: 40 }, { dir });
+    recordExemplar({ type: "screen", description: "expense tracker dashboard", code: "export const HIGHQ = 1;\n// EOF", score: 92 }, { dir });
+    const best = findBestExemplar({ type: "screen", description: "expense tracker dashboard" }, { dir });
+    expect(best).toContain("HIGHQ");
+  });
+
+  it("treats legacy records (no score field) as score 0 and still ranks/loads them", () => {
+    fs.writeFileSync(
+      storeFile(dir),
+      JSON.stringify([{ type: "store", description: "cart", code: "export const Legacy = 1;\n// EOF", hash: "x", timestamp: 1 }]),
+      "utf-8",
+    );
+    expect(findBestExemplar({ type: "store", description: "cart" }, { dir })).toContain("Legacy");
+  });
+});

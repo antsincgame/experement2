@@ -47,6 +47,8 @@ export interface GenerationFile {
 export interface ProjectChat {
   messages: ChatMessage[];
   versions: Version[];
+  /** Index of the version highlighted as "current" in the timeline — persisted so the highlight survives reload/switch. */
+  currentVersion?: number;
   fileTree: FileNode[];
   openFiles: string[];
   activeFile: string | null;

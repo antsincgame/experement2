@@ -373,3 +373,34 @@ describe("extractExportContracts — split store union", () => {
     );
   });
 });
+
+describe("validateFileContracts — path-scoped destructure keys (M4)", () => {
+  it("does NOT validate a hook imported from a non-generated module (e.g. react-native)", () => {
+    // A store named useWindow exists, but the screen destructures a DIFFERENT useWindow
+    // imported from react-native — must not be flagged against the store's keys.
+    const contracts: Record<string, ExportContract[]> = {
+      "src/stores/useWindow.ts": [makeContract({ name: "useWindow", kind: "hook", returnObjectKeys: ["a", "b"] })],
+    };
+    const content = `import { useWindow } from "react-native";\nconst { width, height } = useWindow();\n`;
+    expect(validateFileContracts(content, "app/x.tsx", contracts)).toHaveLength(0);
+  });
+
+  it("validates against the OWNING store only when name collides across modules", () => {
+    const contracts: Record<string, ExportContract[]> = {
+      "src/stores/a.ts": [makeContract({ name: "useThing", kind: "hook", returnObjectKeys: ["x"] })],
+      "src/stores/b.ts": [makeContract({ name: "useThing", kind: "hook", returnObjectKeys: ["y"] })],
+    };
+    const content = `import { useThing } from "@/stores/b";\nconst { y } = useThing();\n`;
+    // imported from b → validate against [y]; old name-only code could pick a's [x] and flag y.
+    expect(validateFileContracts(content, "app/x.tsx", contracts)).toHaveLength(0);
+  });
+
+  it("still flags a genuinely invalid key on the correctly-resolved store", () => {
+    const contracts: Record<string, ExportContract[]> = {
+      "src/stores/counter.ts": [makeContract({ name: "useCounter", kind: "hook", returnObjectKeys: ["count", "increment"] })],
+    };
+    const content = `import { useCounter } from "@/stores/counter";\nconst { count, bogus } = useCounter();\n`;
+    const violations = validateFileContracts(content, "app/x.tsx", contracts);
+    expect(violations.some((v) => v.code === "invalid_destructured_key" && v.message.includes("bogus"))).toBe(true);
+  });
+});

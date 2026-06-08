@@ -1,7 +1,7 @@
 // Unit tests for plan-depth assessment and the bounded silent re-plan.
 import { describe, it, expect } from "vitest";
 import { streamOf } from "../test-support/llm-mock.js";
-import { assessPlanDepth, planApp } from "./planner.js";
+import { assessPlanDepth, planApp, scorePlanQuality } from "./planner.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
 
 const makePlan = (files: { path: string; type: string; deps?: string[] }[]): AppPlan => ({
@@ -146,6 +146,51 @@ describe("planApp re-plan on shallow output", () => {
 
     expect(call).toBe(2);
     expect(plan.name).toBe("thin");
+  });
+});
+
+describe("scorePlanQuality", () => {
+  it("scores a rich, balanced plan higher than a thin one", () => {
+    const rich = makePlan([
+      { path: "app/(tabs)/index.tsx", type: "screen" },
+      { path: "app/(tabs)/two.tsx", type: "screen" },
+      { path: "src/stores/store.ts", type: "store" },
+      { path: "src/components/Card.tsx", type: "component" },
+    ]);
+    const thin = makePlan([{ path: "app/(tabs)/index.tsx", type: "screen" }]);
+    expect(scorePlanQuality(rich)).toBeGreaterThan(scorePlanQuality(thin));
+  });
+});
+
+describe("planApp plan-level best-of-N (bestOfNPlan)", () => {
+  // DI via options (NOT process.env) so concurrent test files never leak the flag.
+  it("samples N plans and keeps the richest valid one (no extra re-plan needed)", async () => {
+    let call = 0;
+    const plan = await planApp({
+      description: "habit tracker",
+      bestOfNPlan: 2,
+      complete: async () => {
+        call += 1;
+        return streamOf(call === 1 ? thinPlan : richPlan);
+      },
+    });
+    expect(call).toBe(2); // two candidates sampled
+    expect(plan.name).toBe("rich"); // the richer valid plan wins the rerank
+  });
+
+  it("falls back to a single attempt if all N candidates are invalid", async () => {
+    let call = 0;
+    await expect(
+      planApp({
+        description: "x",
+        bestOfNPlan: 2,
+        complete: async () => {
+          call += 1;
+          return streamOf("not json at all");
+        },
+      }),
+    ).rejects.toThrow();
+    expect(call).toBe(3); // 2 best-of-N samples + 1 fallback attempt, all invalid
   });
 });
 

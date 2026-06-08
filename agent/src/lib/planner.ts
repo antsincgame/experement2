@@ -23,6 +23,8 @@ interface PlannerOptions {
   /** Model-completion seam; defaults to the real streamCompletion. */
   complete?: CompleteFn;
   onChunk?: (chunk: string) => void;
+  /** Plan-level best-of-N count (DI; falls back to BEST_OF_N_PLAN env). 1 = single plan. */
+  bestOfNPlan?: number;
 }
 
 export interface PlanDepthAssessment {
@@ -67,6 +69,24 @@ export const assessPlanDepth = (plan: AppPlan): PlanDepthAssessment => {
   }
 
   return { thin: reasons.length > 0, reasons };
+};
+
+/**
+ * Numeric plan-quality score for plan-level best-of-N reranking (Phase 2 extension). All
+ * candidates have already passed AppPlanSchema + validateAppPlan inside runPlannerOnce, so
+ * this differentiates VALID plans by richness/balance: a non-thin plan with a real data
+ * layer + reusable components + sensible file count scores highest. Higher = better.
+ */
+export const scorePlanQuality = (plan: AppPlan): number => {
+  const depth = assessPlanDepth(plan);
+  const stores = countByType(plan, (p) => p.includes("/stores/"));
+  const components = countByType(plan, (p) => p.includes("/components/"));
+  let s = depth.thin ? 30 : 70;
+  s -= depth.reasons.length * 5;
+  s += Math.min(20, plan.files.length); // more (capped) files = more complete
+  if (stores > 0) s += 5;
+  if (components > 0) s += 5;
+  return s;
 };
 
 const buildDepthFeedback = (reasons: string[]): string =>
@@ -139,7 +159,7 @@ const runPlannerOnce = async (
 
   // Strip reasoning-model blocks (<think>, <thinking>, redacted_thinking) and
   // markdown fences via the shared utility so planner/editor behave identically.
-  const trimmed = stripThinkingFromText(fullJson);
+  const trimmed = stripThinkingFromText(fullJson, { preferJson: true });
 
   const parsed = safeJsonParse(trimmed);
   if (parsed === null) {
@@ -173,15 +193,55 @@ const runPlannerOnce = async (
   return result.data;
 };
 
+/**
+ * Plan-level best-of-N: draw N plans (temperature-spread), keep the richest VALID one by
+ * scorePlanQuality. Streams only the first candidate to the UI; invalid/timed-out
+ * candidates are discarded. Falls back to a normal single attempt if all N fail, so the
+ * caller gets the same clear error it would have without best-of-N.
+ */
+const planBestOfN = async (
+  options: PlannerOptions,
+  basePrompt: string,
+  n: number,
+): Promise<AppPlan> => {
+  const candidates: AppPlan[] = [];
+  for (let i = 0; i < n; i++) {
+    try {
+      const plan = await runPlannerOnce(
+        { ...options, temperature: (options.temperature ?? 0.3) + i * 0.15 },
+        basePrompt,
+        i === 0,
+      );
+      candidates.push(plan);
+    } catch {
+      // An invalid/timed-out plan candidate is simply discarded.
+    }
+  }
+  if (candidates.length === 0) {
+    return runPlannerOnce(options, basePrompt, true);
+  }
+  return candidates.reduce(
+    (best, c) => (scorePlanQuality(c) > scorePlanQuality(best) ? c : best),
+    candidates[0],
+  );
+};
+
 export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   const { description } = options;
   const basePrompt = PLAN_USER_PROMPT(description);
 
-  const plan = await runPlannerOnce(options, basePrompt, true);
+  // Plan-level best-of-N (Phase 2 extension), flag-gated. The plan is the highest-leverage
+  // artifact — a weak plan dooms the whole app — so sampling N and keeping the richest
+  // valid one lifts everything downstream. Default (BEST_OF_N_PLAN unset/1) = today's path.
+  const planN = Math.max(1, options.bestOfNPlan ?? (Number(process.env.BEST_OF_N_PLAN) || 1));
+  const plan =
+    planN > 1
+      ? await planBestOfN(options, basePrompt, planN)
+      : await runPlannerOnce(options, basePrompt, true);
 
-  // One bounded re-plan if the first plan is hollow. It streams to the UI (so the
+  // One bounded re-plan if the (winning) plan is hollow. It streams to the UI (so the
   // Plan stage shows live progress instead of appearing frozen) and falls back to
-  // the first plan if it fails, so depth enforcement never breaks a working plan.
+  // the current plan if it fails, so depth enforcement never breaks a working plan.
   const depth = assessPlanDepth(plan);
   if (!depth.thin) {
     return plan;

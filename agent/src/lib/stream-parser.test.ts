@@ -666,4 +666,26 @@ describe("parseStream", () => {
     // Empty replaceBuffer is falsy, so the yield condition is not met
     expect(results).toHaveLength(0);
   });
+
+  it("strips markdown wrappers around a bolded filepath value", async () => {
+    const input = [
+      "**filepath:** `src/components/Card.tsx`\n",
+      "<<<<<<< SEARCH\n",
+      "const a = 1;\n",
+      "=======\n",
+      "const a = 2;\n",
+      ">>>>>>> REPLACE\n",
+    ].join("");
+
+    const results = await collect(parseStream(toStream(input, 1000)));
+    const block = results.find((r) => "filepath" in r) as SearchReplaceBlock;
+    expect(block.filepath).toBe("src/components/Card.tsx");
+  });
+
+  it("strips markdown wrappers around a DELETE path", async () => {
+    const input = "DELETE: `src/old.tsx`\n";
+    const results = await collect(parseStream(toStream(input, 1000)));
+    const del = results.find((r) => "type" in r && r.type === "delete") as SearchReplaceBlock;
+    expect(del.filepath).toBe("src/old.tsx");
+  });
 });
