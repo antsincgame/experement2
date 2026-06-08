@@ -1,5 +1,5 @@
 // Unit tests for plan-depth assessment and the bounded silent re-plan.
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { streamOf } from "../test-support/llm-mock.js";
 import { assessPlanDepth, planApp, scorePlanQuality } from "./planner.js";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
@@ -162,16 +162,13 @@ describe("scorePlanQuality", () => {
   });
 });
 
-describe("planApp plan-level best-of-N (BEST_OF_N_PLAN)", () => {
-  afterEach(() => {
-    delete process.env.BEST_OF_N_PLAN;
-  });
-
+describe("planApp plan-level best-of-N (bestOfNPlan)", () => {
+  // DI via options (NOT process.env) so concurrent test files never leak the flag.
   it("samples N plans and keeps the richest valid one (no extra re-plan needed)", async () => {
-    process.env.BEST_OF_N_PLAN = "2";
     let call = 0;
     const plan = await planApp({
       description: "habit tracker",
+      bestOfNPlan: 2,
       complete: async () => {
         call += 1;
         return streamOf(call === 1 ? thinPlan : richPlan);
@@ -182,11 +179,11 @@ describe("planApp plan-level best-of-N (BEST_OF_N_PLAN)", () => {
   });
 
   it("falls back to a single attempt if all N candidates are invalid", async () => {
-    process.env.BEST_OF_N_PLAN = "2";
     let call = 0;
     await expect(
       planApp({
         description: "x",
+        bestOfNPlan: 2,
         complete: async () => {
           call += 1;
           return streamOf("not json at all");

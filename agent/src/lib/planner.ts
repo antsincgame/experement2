@@ -22,6 +22,8 @@ interface PlannerOptions {
   /** Model-completion seam; defaults to the real streamCompletion. */
   complete?: CompleteFn;
   onChunk?: (chunk: string) => void;
+  /** Plan-level best-of-N count (DI; falls back to BEST_OF_N_PLAN env). 1 = single plan. */
+  bestOfNPlan?: number;
 }
 
 export interface PlanDepthAssessment {
@@ -230,7 +232,7 @@ export const planApp = async (options: PlannerOptions): Promise<AppPlan> => {
   // Plan-level best-of-N (Phase 2 extension), flag-gated. The plan is the highest-leverage
   // artifact — a weak plan dooms the whole app — so sampling N and keeping the richest
   // valid one lifts everything downstream. Default (BEST_OF_N_PLAN unset/1) = today's path.
-  const planN = Math.max(1, Number(process.env.BEST_OF_N_PLAN) || 1);
+  const planN = Math.max(1, options.bestOfNPlan ?? (Number(process.env.BEST_OF_N_PLAN) || 1));
   const plan =
     planN > 1
       ? await planBestOfN(options, basePrompt, planN)
