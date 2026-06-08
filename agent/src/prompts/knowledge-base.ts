@@ -3,11 +3,11 @@
 export const KNOWLEDGE_BASE = {
   tamaguiCore: `## 📚 RAG DOCS: TAMAGUI 1.x CORE (CRITICAL)
 1. LAYOUT: ALWAYS use <YStack> (col), <XStack> (row). NEVER use React Native View. Import ALL primitives (YStack, XStack, Text, Paragraph, H1-H4, Button, Input, TextArea, ScrollView, Card, Switch, Slider, Spinner, Sheet, Dialog, Icon) from "@/ui" — NEVER from "tamagui" directly. Use \`separator={<Separator />}\` for lists.
-2. TEXT: Use <Text>, <Paragraph>, <H1>-<H6>. NEVER use React Native Text.
+2. TEXT: Use <Text>, <Paragraph>, <H1>-<H4> (only H1-H4 exist in @/ui). NEVER use React Native Text.
 3. TOKENS: p="$4", m="$2", gap="$3", br="$4", w="100%", h="$4", flex={1}.
 4. COLORS: Prefer Tamagui tokens like bg="$background", color="$color", borderColor="$borderColor" for Tamagui components. Hex/RGBA values are acceptable for planner theme values and third-party library configs.
 5. BORDERS: borderWidth={1} (or bw={1}). NEVER use boolean 'bordered'.
-6. THEMING: Use <ThemeInverse> to automatically invert colors for a section.
+6. THEMING: for a contrasting/highlighted section use <Theme name="dark"> (or "light") around it, or inline conditional props (bg={isDark ? "$color12" : "$color2"}). Do NOT use <ThemeInverse> — it is not exported by @/ui.
 7. COMPONENTS: <Button backgroundColor="$primary" size="$4">Text</Button>. NEVER use the 'theme' prop on ANY component (it causes TS2322 errors). Use direct color props instead.
 8. ICONS: import { Icon } from "@/ui"; then <Icon name="..." size={24} color="#333" />.
    The "name" prop is a plain string, so any descriptive name works (e.g. "calculator", "heart", "trash-2", "bar-chart-2"). Unknown names safely degrade to a neutral glyph — they NEVER cause a type or runtime error. NEVER import from "@expo/vector-icons" directly.
@@ -37,7 +37,7 @@ export const KNOWLEDGE_BASE = {
    <Switch size="$4" checked={val} onCheckedChange={setVal}><Switch.Thumb animation="bouncy" /></Switch>
 3. SLIDER: from "@/ui" — pass simple props, NEVER children. value is a number[].
    <Slider value={[amount]} min={0} max={5000} step={10} onValueChange={(v) => setAmount(v[0])} />
-4. RADIO/CHECKBOX: Use native Tamagui <RadioGroup> or <Checkbox>.
+4. RADIO/CHECKBOX: @/ui has NO RadioGroup/Checkbox. For a boolean use <Switch checked onCheckedChange>. For single-select, render a row/list of pressable <Card>s (or <Button>s) and style the active one inline (bg={selected === opt ? "$primary" : "$background"}).
 5. DATE: NEVER use DatePickerIOS/Android. Use a formatted <Input placeholder="YYYY-MM-DD" />.`,
 
   overlays: `## 📚 RAG DOCS: TAMAGUI OVERLAYS (Sheet, Dialog, Toast)
