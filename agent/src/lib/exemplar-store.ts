@@ -14,6 +14,7 @@
 // agent's .rag directory, load/save with try/catch, and an injectable `dir` for tests.
 import fs from "fs";
 import path from "path";
+import { atomicWriteFileSync } from "./atomic-write.js";
 import crypto from "crypto";
 import { warnCaught } from "./catch-log.js";
 
@@ -159,8 +160,7 @@ export const recordExemplar = (
       trimmed.push(...list.slice(0, MAX_PER_TYPE));
     }
 
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(storePath(dir), JSON.stringify(trimmed, null, 2), "utf-8");
+    atomicWriteFileSync(storePath(dir), JSON.stringify(trimmed, null, 2));
   } catch (error) {
     warnCaught("exemplar-store", error, "record exemplar");
   }

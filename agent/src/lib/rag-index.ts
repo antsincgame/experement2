@@ -5,6 +5,7 @@
 // unavailable, letting callers fall back to the keyword RAG.
 import fs from "fs";
 import path from "path";
+import { atomicWriteFileSync } from "./atomic-write.js";
 import { embedTexts, type EmbedOptions } from "../services/embeddings.js";
 import { resolveEmbeddingModel } from "../services/embedding-model.js";
 import { extractExportContracts } from "./context-builder.js";
@@ -143,8 +144,7 @@ const readCache = (dir: string, model: string): CachedIndex | null => {
 
 const writeCache = (dir: string, index: CachedIndex): void => {
   try {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(cacheFilePath(dir, index.model), JSON.stringify(index), "utf-8");
+    atomicWriteFileSync(cacheFilePath(dir, index.model), JSON.stringify(index));
   } catch (error) {
     warnCaught("rag-index", error, "write RAG index cache");
   }

@@ -3,6 +3,7 @@
 // small JSON file under the agent's .rag directory; capped and deduped by signature.
 import fs from "fs";
 import path from "path";
+import { atomicWriteFileSync } from "./atomic-write.js";
 import { warnCaught } from "./catch-log.js";
 
 export interface RagFixRecord {
@@ -164,8 +165,7 @@ export const recordFix = (
       timestamp: Date.now(),
     });
     const trimmed = existing.slice(-MAX_FIX_RECORDS);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(storePath(dir), JSON.stringify(trimmed, null, 2), "utf-8");
+    atomicWriteFileSync(storePath(dir), JSON.stringify(trimmed, null, 2));
   } catch (error) {
     warnCaught("error-fix-store", error, "record fix");
   }

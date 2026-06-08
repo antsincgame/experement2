@@ -61,7 +61,6 @@ type FetchResponse = globalThis.Response;
 
 const activeControllers = new Map<string, AbortController>();
 const MAX_CONCURRENT_LLM_REQUESTS = 3;
-let activeRequestCount = 0;
 
 export const streamCompletion = async (
   messages: ChatMessage[],
@@ -77,10 +76,11 @@ export const streamCompletion = async (
 ): Promise<AsyncGenerator<string>> => {
   const baseUrl = assertLlmUrl(options.lmStudioUrl ?? DEFAULT_LM_STUDIO_URL);
 
-  if (activeRequestCount >= MAX_CONCURRENT_LLM_REQUESTS) {
+  // activeControllers.size is the live request count — set on start, deleted on
+  // every exit path — so it needs no separate hand-maintained counter.
+  if (activeControllers.size >= MAX_CONCURRENT_LLM_REQUESTS) {
     throw new Error(`Too many concurrent LLM requests (max ${MAX_CONCURRENT_LLM_REQUESTS})`);
   }
-  activeRequestCount++;
   const controller = new AbortController();
   const taskId = options.taskId ?? crypto.randomUUID();
 
@@ -152,7 +152,6 @@ export const streamCompletion = async (
         // No headers within budget — a stuck/loading model, not a user cancel.
         // Fail fast with a clear message instead of looping another 120s.
         activeControllers.delete(taskId);
-        activeRequestCount = Math.max(0, activeRequestCount - 1);
         throw new Error(
           `LLM_TIMEOUT: ${baseUrl} sent no response within ${HEADER_TIMEOUT_MS / 1000}s ` +
           `(the model may be loading or stuck). Try a smaller/faster model.`
@@ -162,7 +161,6 @@ export const streamCompletion = async (
       if (msg.includes("abort") || msg.includes("cancel")) {
         // User aborted — don't retry
         activeControllers.delete(taskId);
-        activeRequestCount = Math.max(0, activeRequestCount - 1);
         throw new Error(`LLM request aborted`);
       }
 
@@ -175,7 +173,6 @@ export const streamCompletion = async (
 
       // All retries exhausted
       activeControllers.delete(taskId);
-      activeRequestCount = Math.max(0, activeRequestCount - 1);
       if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed") || msg.includes("ENOTFOUND")) {
         throw new Error(`LLM_SERVER_DOWN: Cannot connect to ${baseUrl} after ${MAX_RETRIES} retries. Check that LM Studio is running.`);
       }
@@ -185,7 +182,6 @@ export const streamCompletion = async (
 
   if (!response) {
     activeControllers.delete(taskId);
-    activeRequestCount = Math.max(0, activeRequestCount - 1);
     throw new Error(`LLM_SERVER_DOWN: No response after ${MAX_RETRIES} retries. Last error: ${lastError}`);
   }
 
@@ -217,14 +213,12 @@ export const streamCompletion = async (
 
     if (!response.ok) {
       activeControllers.delete(taskId);
-      activeRequestCount = Math.max(0, activeRequestCount - 1);
       throw new Error(`LLM error (${response.status}): ${errorText}`);
     }
   }
 
   if (!response.body) {
     activeControllers.delete(taskId);
-    activeRequestCount = Math.max(0, activeRequestCount - 1);
     throw new Error("LM Studio returned no body");
   }
 
@@ -232,7 +226,6 @@ export const streamCompletion = async (
   const responseBody = streamResponse.body;
   if (!responseBody) {
     activeControllers.delete(taskId);
-    activeRequestCount = Math.max(0, activeRequestCount - 1);
     throw new Error("LM Studio returned no body");
   }
 
@@ -290,7 +283,6 @@ export const streamCompletion = async (
       if (idleTimer) clearTimeout(idleTimer);
       reader.releaseLock();
       activeControllers.delete(taskId);
-      activeRequestCount = Math.max(0, activeRequestCount - 1);
     }
 
     if (idleAborted) {
@@ -390,7 +382,7 @@ export const completeNonStreaming = async (
   throw lastError ?? new Error("completeNonStreaming failed after retries");
 };
 
-export const getActiveRequestCount = (): number => activeRequestCount;
+export const getActiveRequestCount = (): number => activeControllers.size;
 
 export const abortTask = (taskId: string): boolean => {
   const controller = activeControllers.get(taskId);

@@ -9,6 +9,7 @@
 // a ledger entry can NEVER affect a generation.
 import fs from "fs";
 import path from "path";
+import { atomicWriteFileSync } from "./atomic-write.js";
 
 export interface LedgerEntry {
   /** ISO timestamp. */
@@ -52,8 +53,7 @@ export const recordLedgerEntry = (
     const ledger = loadLedger(dir);
     ledger.push({ at: new Date().toISOString(), ...entry });
     const trimmed = ledger.slice(-MAX_LEDGER);
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(ledgerPath(dir), JSON.stringify(trimmed, null, 2), "utf-8");
+    atomicWriteFileSync(ledgerPath(dir), JSON.stringify(trimmed, null, 2));
   } catch {
     // Best-effort: a ledger write must never break the pipeline.
   }

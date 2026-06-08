@@ -143,7 +143,7 @@ export const runCodegenAndShip = async (
         emitOperation({ type: "file_complete", filepath }),
       skipExistingFiles,
       // Phase 2 test-time compute, flag-gated. Default (unset/1) = today's single-sample path.
-      bestOfN: Math.max(1, Number(process.env.BEST_OF_N) || 1),
+      bestOfN: Math.max(1, Math.min(8, Number(process.env.BEST_OF_N) || 1)),
     });
 
     emitOperation({ type: "generation_complete", filesCount: files.length });
@@ -708,7 +708,7 @@ export const runCodegenAndShip = async (
       score: quality?.score ?? 0,
       source: captureSource ?? "scored",
       repairs: autoFixAttempts + (didContractFix ? 1 : 0) + (didTypeFix ? 1 : 0),
-      bestOfN: Math.max(1, Number(process.env.BEST_OF_N) || 1),
+      bestOfN: Math.max(1, Math.min(8, Number(process.env.BEST_OF_N) || 1)),
       buildSuccess: true,
     });
   }
