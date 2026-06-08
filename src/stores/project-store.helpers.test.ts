@@ -191,6 +191,31 @@ describe("buildPersistedProjectChats", () => {
     expect(Object.keys(persisted)).toEqual(["alpha"]);
     expect(persisted.__creating__).toBeUndefined();
   });
+
+  it("coerces in-flight (streaming) generation files to done so a reload is not stuck-busy", () => {
+    const persisted = buildPersistedProjectChats({
+      alpha: {
+        messages: [],
+        versions: [],
+        fileTree: [],
+        openFiles: [],
+        activeFile: null,
+        fileContents: {},
+        streamingContent: "",
+        previewUrl: null,
+        previewPort: null,
+        generationFiles: [
+          { path: "app/index.tsx", code: "x", status: "streaming" },
+          { path: "app/two.tsx", code: "y", status: "done" },
+        ],
+      },
+    });
+
+    expect(persisted.alpha?.generationFiles).toEqual([
+      { path: "app/index.tsx", code: "x", status: "done" },
+      { path: "app/two.tsx", code: "y", status: "done" },
+    ]);
+  });
 });
 
 describe("buildProjectSwitchState", () => {

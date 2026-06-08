@@ -1,6 +1,6 @@
 ﻿// Keeps one reconnecting WebSocket instance synchronized with the active agent URL and scoped request metadata.
 import { useCallback, useEffect } from "react";
-import { createProcessMessage, type ChatMessage } from "@/features/chat/schemas/message.schema";
+import { createProcessMessage } from "@/features/chat/schemas/message.schema";
 import { apiClient, normalizeBaseUrl } from "@/shared/lib/api-client";
 import {
   parseIncomingWsMessage,

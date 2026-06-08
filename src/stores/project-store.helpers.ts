@@ -307,7 +307,14 @@ export const buildPersistedProjectChats = (
         fileContents: {},
         streamingContent: chat.streamingContent ?? "",
         plan: chat.plan ?? null,
-        generationFiles: (chat.generationFiles ?? []).slice(-40),
+        // Coerce in-flight files to "done" before persisting: after a reload the
+        // generation is no longer running, so a persisted "streaming" file would
+        // make isPipelineBusy() report a stuck-busy UI until a resume refresh.
+        generationFiles: (chat.generationFiles ?? [])
+          .slice(-40)
+          .map((file) =>
+            file.status === "streaming" ? { ...file, status: "done" as const } : file,
+          ),
         generationProgress: chat.generationProgress ?? 0,
         currentGeneratingFile: chat.currentGeneratingFile ?? null,
         previewUrl: null,

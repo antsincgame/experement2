@@ -776,6 +776,26 @@ describe("createWsHandler", () => {
     expect(harness.getState().status).toBe("building");
   });
 
+  it("applies previewStatus even when the generation status is regressive", () => {
+    const harness = createHarness();
+    harness.getState().setProjectName("alpha");
+    harness.getState().setStatus("error"); // terminal generation phase
+
+    // Re-previewing after an error emits a regressive `building` status that
+    // still carries real preview transport — it must not be dropped by the gate.
+    harness.handle({
+      type: "status",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+      status: "building",
+      previewStatus: "starting",
+      buildId: BUILD_ID,
+    });
+
+    expect(harness.getState().status).toBe("error"); // phase stays monotonic
+    expect(harness.getState().previewStatus).toBe("starting"); // preview applied
+  });
+
   // ── project_created gate (H2) ──
   it("ignores project_created from a foreign requestId while creating", () => {
     const harness = createHarness();

@@ -2,7 +2,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { closeSettings, openSettings } from "./support/settings-helpers";
 
 const AGENT_URL = "http://127.0.0.1:3100";
 const MOCK_LLM_URL = "http://127.0.0.1:1235";

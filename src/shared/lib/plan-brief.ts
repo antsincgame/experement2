@@ -26,7 +26,7 @@ export interface PlanBriefInput {
   };
   navigation?: {
     type?: string;
-    screens?: Array<{ name: string; path: string; icon?: string }>;
+    screens?: { name: string; path: string; icon?: string }[];
   };
 }
 

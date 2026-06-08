@@ -372,6 +372,16 @@ export const createWsHandler = (
           logRegressive: { source: "status", from: previousStatus, to: msg.status },
         },
       );
+      // Preview transport is independent of the monotonic generation phase: a
+      // regressive status (e.g. a re-preview that emits `building` while the UI
+      // is already `ready`/`error`) must still update preview state, so apply it
+      // before the phase-advance gate below can `break`.
+      if (msg.previewStatus) {
+        applyPreviewStatus(store, msg.previewStatus, {
+          buildId: msg.buildId ?? null,
+          clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error",
+        });
+      }
       if (!advanced) {
         break;
       }
@@ -393,12 +403,6 @@ export const createWsHandler = (
       if (msg.status === "planning") {
         store.resetGenerationFiles();
         store.ensurePlanDraftingMessage();
-      }
-      if (msg.previewStatus) {
-        applyPreviewStatus(store, msg.previewStatus, {
-          buildId: msg.buildId ?? null,
-          clearPreview: msg.previewStatus === "starting" || msg.previewStatus === "error",
-        });
       }
       if (msg.status === "error" && msg.previewStatus === "error") {
         applyErrorState(store, get().status, {
@@ -556,7 +560,10 @@ export const createWsHandler = (
         }
       }
       const existing = store.projectList.find((p) => p.name === projectName);
-      const entryBase: AppStatus = existing?.status ?? store.status ?? "idle";
+      // Base a just-scaffolded project's phase on its OWN prior entry, not on the
+      // currently-viewed project's status — otherwise a background scaffold
+      // inherits the active project's phase.
+      const entryBase: AppStatus = existing?.status ?? "scaffolding";
       const entryStatus: AppStatus =
         resolveGenerationPhase(entryBase, { kind: "scaffold_complete" }) ?? "generating";
       store.addProject({
