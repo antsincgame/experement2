@@ -564,59 +564,71 @@ export const runCodegenAndShip = async (
     }
   }
 
-  // ── Learned-exemplar capture (win-rate lever #4, path B) ──
-  // STRICT GATE: learn exemplars ONLY from a CLEAN generation — the project reached
-  // build success / ready preview AND required ZERO repair (no Metro autofix, no
-  // contract-fix, no type-fix). When all three are true, every file is known
-  // first-pass-correct, so a few representative ones (one screen, one store, one
-  // component) become teaching material for future generations. Captured BEFORE the
-  // opt-in auto-polish stage so we learn the model's first-pass output, never polished
-  // edits. Fully wrapped in try/catch + best-effort store: capture can NEVER affect the
-  // already-verified generation result. When in doubt (any repair flag set, or capture
-  // throws), we DON'T learn — the prompt simply falls back to the curated golden one.
+  // ── Quality score + accretive-memory capture (Phase 1 + Phase 3) ──
+  // On a verified-ready build, compute the deterministic quality score ONCE and use it to
+  // (a) RANK what is learned, and (b) emit the quality_score trend signal. Best-effort
+  // throughout: nothing here can affect the already-shipped result.
+  //
+  // Capture tiers (the quality-ranked store evicts the weakest, so a weaker capture can
+  // never displace a stronger one):
+  //  - TIER 1 "clean": a zero-repair generation (no Metro autofix / contract-fix / type-fix)
+  //    — every file is first-pass-correct (highest trust).
+  //  - TIER 2 "repaired": a generation that needed repair but ended EXCELLENT (score ≥ 90)
+  //    — closes the "great app that needed one fix teaches nothing" gap.
+  // Captured BEFORE the opt-in polish stage so we learn the model's own output.
   const cleanGeneration =
     buildSuccess && autoFixAttempts === 0 && !didContractFix && !didTypeFix;
-  if (cleanGeneration) {
-    try {
-      const seenTypes = new Set<string>();
-      for (const fileSpec of plan.files) {
-        const type = fileSpec.type.toLowerCase().trim();
-        // One representative file per type (screen/store/component) keeps the store
-        // diverse and bounded; the per-type cap in recordExemplar does the rest.
-        if (!["screen", "store", "component"].includes(type)) continue;
-        if (seenTypes.has(type)) continue;
-        const code = readProjectFile(projectSlug, fileSpec.path);
-        if (!code) continue;
-        recordExemplar({
-          type: fileSpec.type,
-          description: fileSpec.description,
-          code,
-        });
-        seenTypes.add(type);
-      }
-    } catch (err) {
-      console.warn(
-        `[Pipeline] Exemplar capture failed (ignored): ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
 
-  // ── Quality score (Phase 1) — OBSERVE-ONLY: measures, never mutates ──
-  // Runs only on a verified-ready build (it already passed the HARD typecheck + web-export
-  // gates, so those axes are clean; the score differentiates passing apps by content
-  // quality: states / idiomatic / completeness). Emits a quality_score build_event the
-  // mass-test trends over time (cumulative-improvement metric) and surfaces in the UI log.
-  // Fully best-effort: a score/judge failure can NEVER affect the already-shipped result.
   if (buildSuccess) {
+    let quality: ReturnType<typeof scoreProjectQuality> | null = null;
     try {
-      const quality = scoreProjectQuality({
+      quality = scoreProjectQuality({
         files,
         readFile: (rel) => readProjectFile(projectSlug, rel),
         typeErrorCount: 0,
         contractViolationCount: 0,
         webExportOk: true,
       });
+    } catch (err) {
+      console.warn(
+        `[Pipeline] Quality score failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
 
+    const HIGH_QUALITY_CAPTURE = 90;
+    const captureSource: "clean" | "repaired" | null = cleanGeneration
+      ? "clean"
+      : quality && quality.score >= HIGH_QUALITY_CAPTURE
+        ? "repaired"
+        : null;
+    if (captureSource) {
+      try {
+        const seenTypes = new Set<string>();
+        for (const fileSpec of plan.files) {
+          const type = fileSpec.type.toLowerCase().trim();
+          // One representative file per type keeps the store diverse and bounded.
+          if (!["screen", "store", "component"].includes(type)) continue;
+          if (seenTypes.has(type)) continue;
+          const code = readProjectFile(projectSlug, fileSpec.path);
+          if (!code) continue;
+          recordExemplar({
+            type: fileSpec.type,
+            description: fileSpec.description,
+            code,
+            score: quality?.score ?? 0,
+            source: captureSource,
+          });
+          seenTypes.add(type);
+        }
+      } catch (err) {
+        console.warn(
+          `[Pipeline] Exemplar capture failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+
+    // Quality trend signal (+ optional LLM judge behind QUALITY_JUDGE) — observe-only.
+    try {
       let judgeNote = "";
       if (process.env.QUALITY_JUDGE === "true") {
         const sampled = plan.files
@@ -634,15 +646,15 @@ export const runCodegenAndShip = async (
         });
         if (judged) judgeNote = ` · judge ${judged.overall}`;
       }
-
+      const q = quality ?? { score: 0, axes: { states: 0, idiomatic: 0, completeness: 0 } };
       emitOperation({
         type: "build_event",
         eventType: "quality_score",
-        message: `⚖️ Quality ${quality.score}/100 (states ${quality.axes.states} · idiomatic ${quality.axes.idiomatic} · complete ${quality.axes.completeness})${judgeNote}`,
+        message: `⚖️ Quality ${q.score}/100 (states ${q.axes.states} · idiomatic ${q.axes.idiomatic} · complete ${q.axes.completeness})${judgeNote}`,
       });
     } catch (err) {
       console.warn(
-        `[Pipeline] Quality score failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+        `[Pipeline] Quality emit failed (ignored): ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
