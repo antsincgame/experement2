@@ -10,7 +10,9 @@ import { parseTypeErrors, groupDiagnosticsByFile, isFixableProjectFile } from ".
 import { validateFileContracts, autoHealImportContracts } from "./project-validator.js";
 import { extractExportContracts, type ExportContract } from "./context-builder.js";
 import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
-import { formatModelRoleLabel } from "./model-roles.js";
+import { formatModelRoleLabel, resolveJudgeModel } from "./model-roles.js";
+import { scoreProjectQuality } from "./quality-score.js";
+import { judgeProject } from "./quality-judge.js";
 import { autoFix } from "./auto-fixer.js";
 import { applyAutofixWithGate, countTypeErrors, revertRepairPhaseIfWorse } from "./pipeline-typecheck-gate.js";
 import { recordFix } from "./error-fix-store.js";
@@ -593,6 +595,52 @@ export const runCodegenAndShip = async (
     } catch (err) {
       console.warn(
         `[Pipeline] Exemplar capture failed (ignored): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  // ── Quality score (Phase 1) — OBSERVE-ONLY: measures, never mutates ──
+  // Runs only on a verified-ready build (it already passed the HARD typecheck + web-export
+  // gates, so those axes are clean; the score differentiates passing apps by content
+  // quality: states / idiomatic / completeness). Emits a quality_score build_event the
+  // mass-test trends over time (cumulative-improvement metric) and surfaces in the UI log.
+  // Fully best-effort: a score/judge failure can NEVER affect the already-shipped result.
+  if (buildSuccess) {
+    try {
+      const quality = scoreProjectQuality({
+        files,
+        readFile: (rel) => readProjectFile(projectSlug, rel),
+        typeErrorCount: 0,
+        contractViolationCount: 0,
+        webExportOk: true,
+      });
+
+      let judgeNote = "";
+      if (process.env.QUALITY_JUDGE === "true") {
+        const sampled = plan.files
+          .map((f) => ({ path: f.path, content: readProjectFile(projectSlug, f.path) ?? "" }))
+          .filter((f) => f.content.length > 0);
+        const judged = await judgeProject({
+          plan: {
+            displayName: typeof plan.displayName === "string" ? plan.displayName : undefined,
+            description: typeof plan.description === "string" ? plan.description : undefined,
+          },
+          files: sampled,
+          complete,
+          model: resolveJudgeModel(undefined, fixModel, generationModel),
+          lmStudioUrl,
+        });
+        if (judged) judgeNote = ` · judge ${judged.overall}`;
+      }
+
+      emitOperation({
+        type: "build_event",
+        eventType: "quality_score",
+        message: `⚖️ Quality ${quality.score}/100 (states ${quality.axes.states} · idiomatic ${quality.axes.idiomatic} · complete ${quality.axes.completeness})${judgeNote}`,
+      });
+    } catch (err) {
+      console.warn(
+        `[Pipeline] Quality score failed (ignored): ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }

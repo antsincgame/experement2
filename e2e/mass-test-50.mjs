@@ -311,6 +311,8 @@ function runTest(index, name, description) {
       errors: [],
       autofixes: 0,
       contractViolations: 0,
+      qualityScore: null,
+      judgeScore: null,
       timeSeconds: 0,
       events: [],
       requestId: crypto.randomUUID(),
@@ -351,6 +353,12 @@ function runTest(index, name, description) {
       if (msg.type === "generation_complete") result.filesGenerated = msg.filesCount;
       if (msg.type === "autofix_start") result.autofixes++;
       if (msg.type === "preview_status" && msg.previewStatus) result.events.push(`preview:${msg.previewStatus}`);
+      if (msg.type === "build_event" && msg.eventType === "quality_score" && typeof msg.message === "string") {
+        const m = msg.message.match(/Quality (\d+)\/100/);
+        if (m) result.qualityScore = Number(m[1]);
+        const j = msg.message.match(/judge (\d+)/);
+        if (j) result.judgeScore = Number(j[1]);
+      }
       if (msg.type === "system_error") {
         result.errors.push(msg.error.substring(0, 300));
         if (msg.error.includes("Contract violation") || msg.error.includes("Contract violations")) {
@@ -433,6 +441,33 @@ async function main() {
   console.log(`❌ ERROR:   ${fails}/${total}`);
   console.log(`⏰ TIMEOUT: ${timeouts}/${total}`);
   console.log(`⏱  Total:   ${elapsed}s (~${Math.round(elapsed / 60)}min)`);
+
+  // Cumulative-quality metric (Phase 1 of the highest-level harness): beyond binary
+  // pass/fail, the median/avg quality score of scored apps, trended across runs so
+  // accretive improvement ("Google-grade cumulative excellence") is visible over time.
+  const scored = results.filter((r) => typeof r.qualityScore === "number");
+  if (scored.length > 0) {
+    const vals = scored.map((r) => r.qualityScore).sort((a, b) => a - b);
+    const median = vals[Math.floor(vals.length / 2)];
+    const avg = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+    const judged = results.filter((r) => typeof r.judgeScore === "number");
+    const judgeAvg = judged.length
+      ? Math.round(judged.reduce((s, r) => s + r.judgeScore, 0) / judged.length)
+      : null;
+    console.log(
+      `⚖️  QUALITY: median ${median}/100 · avg ${avg}/100 (${scored.length} scored${judgeAvg != null ? ` · judge avg ${judgeAvg}` : ""})`,
+    );
+    try {
+      const trendPath = path.join(repoRoot, "e2e", "mass-test-quality-trend.json");
+      const trend = fs.existsSync(trendPath)
+        ? JSON.parse(fs.readFileSync(trendPath, "utf-8"))
+        : [];
+      trend.push({ at: new Date().toISOString(), apps: total, wins, medianQuality: median, avgQuality: avg, judgeAvg });
+      fs.writeFileSync(trendPath, JSON.stringify(trend.slice(-200), null, 2), "utf-8");
+    } catch {
+      /* best-effort trend ledger */
+    }
+  }
   console.log("=".repeat(70));
 
   console.log("\nERROR CATEGORIES:");
