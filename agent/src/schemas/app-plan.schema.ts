@@ -9,8 +9,6 @@ export const FileInPlanSchema = z.object({
   dependencies: z.array(z.string()).default([]),
 });
 
-export type FileInPlan = z.infer<typeof FileInPlanSchema>;
-
 export const NavigationScreenSchema = z.object({
   path: z.string().min(1),
   name: z.string().min(1),

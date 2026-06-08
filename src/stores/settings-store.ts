@@ -270,7 +270,3 @@ export const applySettingsDraft = (draft: SettingsDraft): void => {
   flushSettingsToStorage(draft);
 };
 
-export const saveSettingsNow = (): void => {
-  flushSettingsToStorage(useSettingsStore.getState());
-};
-

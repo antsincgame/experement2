@@ -7,7 +7,6 @@ const MAX_STACK_LINES = 5;
 // fatal error in a following chunk can still cancel it.
 const SUCCESS_DEBOUNCE_MS = 2000;
 
-export type BuildStatus = "building" | "success" | "error" | "idle";
 export type BuildIssueCategory =
   | "dependency"
   | "syntax"

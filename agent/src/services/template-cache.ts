@@ -347,5 +347,3 @@ export const createProjectFromCache = async (
   return projectPath;
 };
 
-export const isCacheReady = (): boolean => cacheReady;
-

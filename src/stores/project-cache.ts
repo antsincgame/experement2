@@ -10,14 +10,6 @@ export type ProjectWorkspaceCache = {
   streamingContent: string;
 };
 
-export const DEFAULT_WORKSPACE_CACHE: ProjectWorkspaceCache = {
-  plan: null,
-  generationFiles: [],
-  generationProgress: 0,
-  currentGeneratingFile: null,
-  streamingContent: "",
-};
-
 export const readProjectWorkspaceCache = (
   chats: ProjectState["projectChats"],
   projectName: string,

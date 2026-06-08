@@ -15,16 +15,3 @@ export const warnCaught = (
   }
   console.warn(`[${context}] ${message}`);
 };
-
-export const errorCaught = (
-  context: string,
-  error: unknown,
-  detail?: string,
-): void => {
-  const message = formatCaught(error);
-  if (detail) {
-    console.error(`[${context}] ${detail}: ${message}`);
-    return;
-  }
-  console.error(`[${context}] ${message}`);
-};

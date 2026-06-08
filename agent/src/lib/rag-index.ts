@@ -206,6 +206,3 @@ export const buildOrLoadIndex = async (
   writeCache(dir, { hash, model, chunks: embedded });
   return embedded;
 };
-
-/** Test/maintenance helper: drop the in-memory index cache. */
-export const clearIndexMemory = (): void => memory.clear();

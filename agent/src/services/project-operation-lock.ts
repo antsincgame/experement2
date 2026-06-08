@@ -115,6 +115,3 @@ export const attachOperationToQueueKey = (
       cleanupQueueEntry(key, entry);
     });
 };
-
-export const getPendingOperationCount = (key: string): number =>
-  queueEntries.get(key)?.pending ?? 0;

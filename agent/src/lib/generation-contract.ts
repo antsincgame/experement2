@@ -128,12 +128,6 @@ export const WEB_INCOMPATIBLE_MODULES = [
   "expo-maps",
 ] as const;
 
-/** True when `specifier` is (or is a subpath of) a web-incompatible native module. */
-export const isWebIncompatibleModule = (specifier: string): boolean => {
-  const bare = getBareModuleName(specifier);
-  return (WEB_INCOMPATIBLE_MODULES as readonly string[]).includes(bare);
-};
-
 export const REQUIRED_TEMPLATE_FILES = [
   "app.json",
   "tsconfig.json",
