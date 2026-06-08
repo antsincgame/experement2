@@ -53,6 +53,7 @@ import {
   startExpo,
   getActivePort,
   touchPreview,
+  evictIdlePreviews,
 } from "./services/process-manager.js";
 import { initTemplateCache } from "./services/template-cache.js";
 
@@ -221,6 +222,9 @@ app.get("/api/projects/:name/export", async (req, res) => {
 // Wire LRU protection: a preview being actively viewed (proxied) is kept hot so a
 // new project's bundler evicts a truly idle one instead of the one on screen.
 setPreviewAccessHook(touchPreview);
+// Idle-eviction backstop: free RAM from previews left unviewed too long. Unref'd so
+// it never keeps the process alive past shutdown.
+setInterval(() => evictIdlePreviews(), 60_000).unref();
 app.use("/preview", handlePreviewRequest);
 
 // Last-resort JSON error handler: catches synchronous throws in route handlers

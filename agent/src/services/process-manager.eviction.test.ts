@@ -120,4 +120,29 @@ describe("process-manager multi-Metro previews", () => {
 
     expect(broadcast).toHaveBeenCalledWith(stoppedFor("alpha"));
   });
+
+  it("idle-eviction backstop kills previews not accessed within the idle timeout", async () => {
+    process.env.MAX_LIVE_PREVIEWS = "3";
+    const mod = await import("./process-manager.js");
+    const onLog = vi.fn();
+
+    await mod.startExpo("alpha", "/tmp/alpha", onLog);
+    broadcast.mockClear();
+    mod.evictIdlePreviews(Date.now() + 11 * 60_000); // 11 min later; default window is 10
+
+    expect(mod.isRunning("alpha")).toBe(false);
+    expect(broadcast).toHaveBeenCalledWith(stoppedFor("alpha"));
+  });
+
+  it("idle backstop keeps a recently-active preview alive", async () => {
+    process.env.MAX_LIVE_PREVIEWS = "3";
+    const mod = await import("./process-manager.js");
+    const onLog = vi.fn();
+
+    await mod.startExpo("alpha", "/tmp/alpha", onLog);
+    mod.touchPreview("alpha");
+    mod.evictIdlePreviews(Date.now() + 1000); // 1 s later — well within the window
+
+    expect(mod.isRunning("alpha")).toBe(true);
+  });
 });

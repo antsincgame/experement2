@@ -18,6 +18,8 @@ interface ManagedProcess {
   cleanup: () => void;
   /** Recency for LRU eviction — bumped on start and on each preview access. */
   lastUsedAt: number;
+  /** Wall-clock ms of last activity — drives the idle-eviction backstop. */
+  lastActiveMs: number;
 }
 
 export interface CommandResult {
@@ -41,6 +43,14 @@ const MAX_LIVE_PREVIEWS = Math.max(1, Number(process.env.MAX_LIVE_PREVIEWS) || 3
 // several previews are started or touched within the same millisecond.
 let previewRecencyClock = 0;
 const nextRecency = (): number => (previewRecencyClock += 1);
+
+// Idle-eviction backstop: a preview not accessed for this long is evicted even when
+// under the live budget, so idle projects release RAM proactively (run on an interval
+// by server.ts). Override with PREVIEW_IDLE_TIMEOUT_MS.
+const IDLE_TIMEOUT_MS = Math.max(
+  60_000,
+  Number(process.env.PREVIEW_IDLE_TIMEOUT_MS) || 10 * 60_000,
+);
 
 const PREVIEW_EVICTED_REASON =
   "Preview paused to free resources — reopen this project to resume it.";
@@ -69,6 +79,7 @@ export const touchPreview = (projectName: string): void => {
   const managed = activeProcesses.get(projectName);
   if (managed) {
     managed.lastUsedAt = nextRecency();
+    managed.lastActiveMs = Date.now();
   }
 };
 
@@ -82,6 +93,20 @@ const evictToBudget = (keep: string): void => {
     );
     killManagedEntry(lru.projectName, lru);
     announcePreviewStopped(lru.projectName, PREVIEW_EVICTED_REASON);
+  }
+};
+
+/**
+ * Idle-eviction backstop: kill previews not accessed within IDLE_TIMEOUT_MS so RAM is
+ * freed proactively, not only under budget pressure. `now` is injectable for tests; the
+ * actively-viewed preview stays hot because the /preview proxy calls touchPreview.
+ */
+export const evictIdlePreviews = (now: number = Date.now()): void => {
+  for (const managed of [...activeProcesses.values()]) {
+    if (now - managed.lastActiveMs > IDLE_TIMEOUT_MS) {
+      killManagedEntry(managed.projectName, managed);
+      announcePreviewStopped(managed.projectName, PREVIEW_EVICTED_REASON);
+    }
   }
 };
 
@@ -175,7 +200,7 @@ const startExpoInner = async (
 
   const cleanup = watchProcess(child, onLog);
 
-  const managed: ManagedProcess = { process: child, port, projectName, cleanup, lastUsedAt: nextRecency() };
+  const managed: ManagedProcess = { process: child, port, projectName, cleanup, lastUsedAt: nextRecency(), lastActiveMs: Date.now() };
   activeProcesses.set(projectName, managed);
 
   child.on("exit", (code) => {
@@ -234,7 +259,7 @@ const startExpoClearCacheInner = async (
 
   const cleanup = watchProcess(child, onLog);
 
-  const managed: ManagedProcess = { process: child, port: boundPort, projectName, cleanup, lastUsedAt: nextRecency() };
+  const managed: ManagedProcess = { process: child, port: boundPort, projectName, cleanup, lastUsedAt: nextRecency(), lastActiveMs: Date.now() };
   activeProcesses.set(projectName, managed);
 
   child.on("exit", (code) => {
