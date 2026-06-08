@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:runtime": "node scripts/smoke-runtime.mjs"
+    "smoke:runtime": "node scripts/smoke-runtime.mjs",
+    "export:training": "node scripts/export-training-set.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
