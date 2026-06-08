@@ -75,7 +75,23 @@ export const ensureExistingProjectFixture = (): void => {
   }
 
   if (!fs.existsSync(fixturePath)) {
-    fs.cpSync(templateCachePath, fixturePath, { recursive: true });
+    // The warm template cache's node_modules contains platform-specific optional deps
+    // (e.g. lightningcss-linux-arm64-gnu on an x64 CI runner) left as broken/dangling
+    // entries. fs.cpSync's recursive walk throws ENOENT when it lstats them, so skip any
+    // symlink whose target is missing (and any entry that can't be stat'd at all). The
+    // platform-matching variant is a real file/dir and is copied normally.
+    fs.cpSync(templateCachePath, fixturePath, {
+      recursive: true,
+      filter: (src) => {
+        try {
+          const stat = fs.lstatSync(src);
+          if (stat.isSymbolicLink() && !fs.existsSync(src)) return false;
+        } catch {
+          return false;
+        }
+        return true;
+      },
+    });
   }
 
   fs.mkdirSync(path.join(fixturePath, "app"), { recursive: true });

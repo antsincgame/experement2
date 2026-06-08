@@ -137,19 +137,20 @@ test("URL change persists in localStorage after Save", async ({ page }) => {
   // The first input in the settings drawer is LM Studio URL.
   const inputs = page.locator("input[type='text'], input:not([type])").filter({ hasNot: page.locator("[hidden]") });
   const firstInput = inputs.first();
-  const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
+  // The LM Studio URL field is a static settings input — it MUST be present, or this
+  // persistence test verifies nothing. Assert it instead of silently skipping (the old
+  // `if (hasInput)` made a missing/renamed input pass as a false green).
+  await expect(firstInput).toBeVisible({ timeout: 5_000 });
 
-  if (hasInput) {
-    await firstInput.click({ clickCount: 3 });
-    await firstInput.fill("http://localhost:9999");
+  await firstInput.click({ clickCount: 3 });
+  await firstInput.fill("http://localhost:9999");
 
-    await saveSettings(page);
-    await page.waitForTimeout(300);
+  await saveSettings(page);
+  await page.waitForTimeout(300);
 
-    // Verify localStorage was updated
-    const updatedUrl = await readSettingsField(page, "lmStudioUrl");
-    expect(updatedUrl).toBe("http://localhost:9999");
-  }
+  // Verify localStorage was updated
+  const updatedUrl = await readSettingsField(page, "lmStudioUrl");
+  expect(updatedUrl).toBe("http://localhost:9999");
 });
 
 test("URL change is discarded when drawer closes without Save", async ({ page }) => {
@@ -166,17 +167,15 @@ test("URL change is discarded when drawer closes without Save", async ({ page })
 
   const inputs = page.locator("input[type='text'], input:not([type])").filter({ hasNot: page.locator("[hidden]") });
   const firstInput = inputs.first();
-  const hasInput = await firstInput.isVisible({ timeout: 3_000 }).catch(() => false);
+  await expect(firstInput).toBeVisible({ timeout: 5_000 }); // static URL field — assert, don't skip
 
-  if (hasInput) {
-    await firstInput.click({ clickCount: 3 });
-    await firstInput.fill("http://localhost:8888");
-    await closeSettings(page);
-    await page.waitForTimeout(300);
+  await firstInput.click({ clickCount: 3 });
+  await firstInput.fill("http://localhost:8888");
+  await closeSettings(page);
+  await page.waitForTimeout(300);
 
-    const urlAfterDiscard = await readSettingsField(page, "lmStudioUrl");
-    expect(urlAfterDiscard).toBe(MOCK_LLM_URL);
-  }
+  const urlAfterDiscard = await readSettingsField(page, "lmStudioUrl");
+  expect(urlAfterDiscard).toBe(MOCK_LLM_URL);
 });
 
 test("enhancer toggle persists through Save and reopen", async ({ page }) => {
@@ -195,14 +194,12 @@ test("enhancer toggle persists through Save and reopen", async ({ page }) => {
 
   await openSettings(page);
 
-  // Click the OFF toggle to turn it ON
+  // Click the OFF toggle to turn it ON. The enhancer toggle starts OFF (SETTINGS_SNAPSHOT)
+  // and is the whole subject of this test — assert it is present instead of skipping.
   const offButton = page.getByText("OFF", { exact: true }).first();
-  const hasOffButton = await offButton.isVisible({ timeout: 3_000 }).catch(() => false);
-
-  if (hasOffButton) {
-    await offButton.click();
-    await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
-  }
+  await expect(offButton).toBeVisible({ timeout: 5_000 });
+  await offButton.click();
+  await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
 
   await saveSettings(page);
   await page.waitForTimeout(300);
@@ -213,9 +210,7 @@ test("enhancer toggle persists through Save and reopen", async ({ page }) => {
 
   // Reopen and verify the UI still shows ON
   await openSettings(page);
-  if (hasOffButton) {
-    await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
-  }
+  await expect(page.getByText("ON", { exact: true }).first()).toBeVisible({ timeout: 3_000 });
   await closeSettings(page);
 });
 
