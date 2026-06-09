@@ -1,6 +1,7 @@
-﻿// Builds generated Expo templates from the shared contract so runtime scaffolding stays version-locked with prompts.
+// Builds generated Expo templates from the shared contract so runtime scaffolding stays version-locked with prompts.
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { getWorkspaceRoot, cloneTemplateInto, getProjectPath } from "./file-manager.js";
 import { npmInstall } from "./process-manager.js";
 import {
