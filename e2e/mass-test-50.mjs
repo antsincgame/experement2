@@ -96,8 +96,8 @@ function writeJson(filePath, value) {
 function sanitizeErrorText(errorText) {
   return String(errorText)
     .replace(/\r/g, "")
-    .replace(/D:\/experement2\/workspace\/[^\s"')]+/gi, "<workspace-project>")
-    .replace(/D:\\experement2\\workspace\\[^\s"')]+/gi, "<workspace-project>")
+    .replace(/[A-Za-z]:[\\/][^\s"')]*[\\/]workspace[\\/][^\s"')]+/gi, "<workspace-project>")
+    .replace(/\/[^\s"')]*\/workspace\/[^\s"')]+/g, "<workspace-project>")
     .replace(/\(\d+,\d+\)/g, "(line,col)")
     .replace(/line \d+/gi, "line <n>")
     .replace(/\b\d+\.\d+s\b/g, "<seconds>")
