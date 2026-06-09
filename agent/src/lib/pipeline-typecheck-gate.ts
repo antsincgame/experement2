@@ -55,6 +55,36 @@ export const shouldKeepFix = (beforeErrors: number, afterErrors: number): boolea
 export const countTypeErrors = (combinedOutput: string): number =>
   parseTypeErrors(combinedOutput).length;
 
+/** Опт-ин: при true гейт отклоняет фикс, вводящий НОВЫЙ класс ошибок, даже если
+ *  общий счётчик не вырос. Default off — решение по счётчику, как раньше (чтобы не
+ *  задеть win-rate без прогона harness). */
+const STRICT_REGRESSION_GATE = process.env.STRICT_REGRESSION_GATE === "true";
+
+/**
+ * Стабильные сигнатуры ошибок tsc (без путей/координат/литералов) для сравнения
+ * множеств до/после фикса. Позволяют отличить «нетто меньше ошибок» от «появился
+ * НОВЫЙ класс ошибок» (что счётчик маскирует).
+ */
+export const typeErrorSignatures = (combinedOutput: string): Set<string> => {
+  const sigs = new Set<string>();
+  for (const line of combinedOutput.split(/\r?\n/)) {
+    if (!/error\s+TS\d+/i.test(line)) continue;
+    const sig = line
+      .replace(/[A-Za-z]:[\\/][^\s:(]+/g, "<path>")
+      .replace(/\(\d+,\d+\)/g, "")
+      .replace(/:\d+:\d+/g, "")
+      .replace(/['"`][^'"`]*['"`]/g, "<literal>")
+      .replace(/\s+/g, " ")
+      .trim();
+    sigs.add(sig);
+  }
+  return sigs;
+};
+
+/** Сигнатуры, появившиеся в `after`, которых не было в `before`. */
+export const newErrorSignatures = (before: Set<string>, after: Set<string>): string[] =>
+  [...after].filter((s) => !before.has(s));
+
 export interface GatedAutofixDeps {
   autoFix: AutoFixFn;
   /** ctx.runTypecheck — authoritative typecheck. May be undefined/throw. */
