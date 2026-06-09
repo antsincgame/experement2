@@ -41,8 +41,12 @@ export default function Index() {
 };
 
 export const getRootLayout = (
-  _navigation: AppPlan["navigation"]
+  _navigation: AppPlan["navigation"],
+  theme?: Partial<AppPlan["theme"]>,
 ): string => {
+  const isDark = theme?.isDark ?? false;
+  const themeName = isDark ? "dark" : "light";
+  const statusBarStyle = isDark ? "light" : "dark";
   return `import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -52,9 +56,9 @@ import config from "../tamagui.config";
 export default function RootLayout() {
   return (
     <TamaguiProvider config={config}>
-      <Theme name="light">
+      <Theme name="${themeName}">
         <SafeAreaProvider>
-          <StatusBar style="dark" />
+          <StatusBar style="${statusBarStyle}" />
           <Stack screenOptions={{ headerShown: false }} />
         </SafeAreaProvider>
       </Theme>
