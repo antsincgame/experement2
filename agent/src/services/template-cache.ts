@@ -270,11 +270,23 @@ export const initTemplateCache = async (): Promise<void> => {
     try {
       const templatePath = getTemplatePath();
       const nodeModulesPath = path.join(templatePath, "node_modules");
+      const versionPath = path.join(templatePath, TEMPLATE_VERSION_FILE);
+      const expectedVersion = computeTemplateVersion();
 
       if (fs.existsSync(nodeModulesPath)) {
-        console.log("[TemplateCache] Cache already exists, skipping init");
-        cacheReady = true;
-        return;
+        let cachedVersion: string | null = null;
+        try {
+          cachedVersion = fs.readFileSync(versionPath, "utf-8").trim();
+        } catch {
+          cachedVersion = null;
+        }
+        if (cachedVersion === expectedVersion) {
+          console.log("[TemplateCache] Cache up to date, skipping init");
+          cacheReady = true;
+          return;
+        }
+        console.log("[TemplateCache] Contract changed — rebuilding template cache");
+        fs.rmSync(templatePath, { recursive: true, force: true });
       }
 
       console.log("[TemplateCache] Creating pre-warmed Expo template...");
