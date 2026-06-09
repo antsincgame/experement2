@@ -305,6 +305,11 @@ export const initTemplateCache = async (): Promise<void> => {
       console.log("[TemplateCache] Running npm install (this may take a minute)...");
       await npmInstall(templatePath);
 
+      try {
+        fs.writeFileSync(versionPath, expectedVersion, "utf-8");
+      } catch (error) {
+        warnCaught("template-cache", error, "write template version stamp");
+      }
       cacheReady = true;
       console.log("[TemplateCache] Template cache ready");
     } catch (error) {
