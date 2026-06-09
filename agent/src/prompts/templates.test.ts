@@ -26,6 +26,19 @@ describe("templates", () => {
     expect(tabsLayout).toContain('name="settings"');
     expect(tabsLayout).toContain('title: "Settings"');
   });
+
+  it("honours theme.isDark in the root layout", () => {
+    const dark = getRootLayout(
+      { type: "stack", screens: [] },
+      { isDark: true, primary: "#00F0FF" },
+    );
+    expect(dark).toContain('<Theme name="dark">');
+    expect(dark).toContain('<StatusBar style="light" />');
+
+    const light = getRootLayout({ type: "stack", screens: [] });
+    expect(light).toContain('<Theme name="light">');
+    expect(light).toContain('<StatusBar style="dark" />');
+  });
 });
 
 describe("getIndexRedirect", () => {
