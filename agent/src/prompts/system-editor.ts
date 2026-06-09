@@ -52,7 +52,7 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 10. ${PATH_ALIAS.importPrefix} resolves to ${PATH_ALIAS.resolvedPrefix}; never generate ${PATH_ALIAS.importPrefix}src/... imports.
 
 ## FORBIDDEN in Expo runtime files (app/**, src/**) — instant crash:
-- \`import { View, Text } from "react-native"\` — use YStack/XStack/Text from "tamagui" (Pressable from "react-native" is fine)
+- \`import { View, Text } from "react-native"\` — use YStack/XStack/Text from "@/ui" (Pressable from "react-native" is fine)
 - \`StyleSheet.create(...)\` — use Tamagui inline props (p="$4", bg="$background", br="$4")
 - \`import { Pressable } from "tamagui"\` — Pressable comes from "react-native"
 - icons from "${ICON_CONTRACT.packageName}" — use \`{ ${UI_KIT.iconComponent} }\` from "${UI_KIT.importPath}"
