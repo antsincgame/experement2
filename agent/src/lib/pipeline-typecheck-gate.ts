@@ -325,7 +325,27 @@ export const revertRepairPhaseIfWorse = async (
     const beforeTc = await runTypecheck(projectPath);
     const beforeErrors = beforeTc.success ? 0 : countTypeErrors(beforeTc.combinedOutput);
 
-    if (shouldKeepFix(beforeErrors, afterErrors)) {
+    // По умолчанию решаем по счётчику (как раньше). При STRICT_REGRESSION_GATE
+    // дополнительно сравниваем МНОЖЕСТВА ошибок: фикс может убрать 2 и внести 1
+    // новую (нетто −1), что счётчик маскирует. Опт-ин — чтобы не задеть win-rate
+    // без прогона harness.
+    let regressed = !shouldKeepFix(beforeErrors, afterErrors);
+    if (STRICT_REGRESSION_GATE && !regressed) {
+      const newSigs = newErrorSignatures(
+        typeErrorSignatures(beforeTc.combinedOutput),
+        typeErrorSignatures(afterTc.combinedOutput),
+      );
+      if (newSigs.length > 0) {
+        emit?.({
+          type: "build_event",
+          eventType: "self_healing",
+          message: `⚠️ Repair внёс ${newSigs.length} новый класс ошибок при том же счётчике — откатываю (STRICT_REGRESSION_GATE)`,
+        });
+        regressed = true;
+      }
+    }
+
+    if (!regressed) {
       // No regression → restore the repaired versions (keep the repairs).
       for (const [fp, content] of repaired) writeFile(fp, content);
       return { reverted: false, changed: changed.length, afterErrors, beforeErrors };
