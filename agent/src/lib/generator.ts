@@ -18,6 +18,7 @@ import { broadcast } from "./event-bus.js";
 import { warnCaught } from "./catch-log.js";
 import {
   BOILERPLATE_TEMPLATES,
+  buildTamaguiConfig,
   getIndexRedirect,
   getRootLayout,
   getTabsLayout,
@@ -416,8 +417,14 @@ export const generateFiles = async (options: GeneratorOptions): Promise<string[]
 
   // Write dynamic layouts from the validated navigation contract.
   const navType = plan.navigation?.type ?? "stack";
-  writeFile(projectName, "app/_layout.tsx", getRootLayout(plan.navigation));
+  writeFile(projectName, "app/_layout.tsx", getRootLayout(plan.navigation, plan.theme));
   generatedFiles.push("app/_layout.tsx");
+
+  // Тема приложения генерится из plan.theme: tamagui.config.ts перезаписывается
+  // per-project, чтобы $primary/$background/$color реально соответствовали палитре
+  // плана. Файл уже есть из шаблона-клона — перезаписываем его themed-версией.
+  // (heal-loop ниже tamagui.config.ts намеренно пропускает.)
+  writeFile(projectName, "tamagui.config.ts", buildTamaguiConfig(plan.theme));
 
   if (navType === "tabs") {
     writeFile(projectName, "app/(tabs)/_layout.tsx", getTabsLayout(plan.navigation));

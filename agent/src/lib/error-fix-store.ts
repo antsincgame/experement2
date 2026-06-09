@@ -154,6 +154,14 @@ export const recordFix = (
   const signature = normalizeErrorSignature(record.errorSignature);
   if (!signature || !record.fixSummary.trim()) return;
 
+  // Не учим обходным «фиксам»: as any / @ts-ignore / @ts-expect-error / eslint-disable
+  // проходят anti-regression гейт (число ошибок не растёт), но это не настоящее
+  // исправление. Реинжект такого паттерна как «apply the same approach» деградирует
+  // будущие починки, поэтому в базу их не пишем.
+  if (/\bas\s+any\b|@ts-ignore|@ts-expect-error|eslint-disable/i.test(record.fixSummary)) {
+    return;
+  }
+
   try {
     const existing = loadFixes(dir).filter(
       (entry) => entry.errorSignature !== signature

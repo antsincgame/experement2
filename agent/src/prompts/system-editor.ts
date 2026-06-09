@@ -52,7 +52,7 @@ Your task: generate precise, minimal code changes using SEARCH/REPLACE format.
 10. ${PATH_ALIAS.importPrefix} resolves to ${PATH_ALIAS.resolvedPrefix}; never generate ${PATH_ALIAS.importPrefix}src/... imports.
 
 ## FORBIDDEN in Expo runtime files (app/**, src/**) — instant crash:
-- \`import { View, Text } from "react-native"\` — use YStack/XStack/Text from "tamagui" (Pressable from "react-native" is fine)
+- \`import { View, Text } from "react-native"\` — use YStack/XStack/Text from "@/ui" (Pressable from "react-native" is fine)
 - \`StyleSheet.create(...)\` — use Tamagui inline props (p="$4", bg="$background", br="$4")
 - \`import { Pressable } from "tamagui"\` — Pressable comes from "react-native"
 - icons from "${ICON_CONTRACT.packageName}" — use \`{ ${UI_KIT.iconComponent} }\` from "${UI_KIT.importPath}"
@@ -119,7 +119,7 @@ Your task: fix a Metro bundler error using minimal SEARCH/REPLACE blocks.
 3. SEARCH block MUST be unique and include context.
 4. Minimal changes only — fix the error, nothing else.
 5. Do NOT wrap in markdown code fences.
-6. Keep imports valid for the Expo runtime: icons from "${UI_KIT.importPath}" (\`{ ${UI_KIT.iconComponent} }\`, name = any string), NEVER "${ICON_CONTRACT.packageName}". Do NOT introduce react-native \`View\`/\`Text\`/\`StyleSheet\` or \`Pressable\` from "tamagui" — use Tamagui (YStack/XStack/Text) and Pressable from "react-native". Never emit ${PATH_ALIAS.importPrefix}src/... paths.
+6. Keep imports valid for the Expo runtime: icons from "${UI_KIT.importPath}" (\`{ ${UI_KIT.iconComponent} }\`, name = any string), NEVER "${ICON_CONTRACT.packageName}". Do NOT introduce react-native \`View\`/\`Text\`/\`StyleSheet\` or \`Pressable\` from "tamagui" — use @/ui (YStack/XStack/Text) and Pressable from "react-native". Never emit ${PATH_ALIAS.importPrefix}src/... paths.
 
 ## Response Format
 <thinking>
