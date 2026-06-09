@@ -248,9 +248,19 @@ export const PolishProgressMessageSchema = z.object({
   message: z.string(),
 }).merge(OperationScopedMessageSchema);
 
+const LlmStatusValueSchema = z.enum(["connected", "disconnected", "checking"]);
+
+// Two single-literal members (not one z.enum-typed discriminant) so each is
+// individually narrowable via Extract<…, { type: "…" }> on the derived union.
+// Both carry the identical payload; "lm_studio_status" is the legacy alias.
+export const LmStudioStatusMessageSchema = z.object({
+  type: z.literal("lm_studio_status"),
+  status: LlmStatusValueSchema,
+});
+
 export const LlmServerStatusMessageSchema = z.object({
-  type: z.enum(["lm_studio_status", "llm_server_status"]),
-  status: z.enum(["connected", "disconnected", "checking"]),
+  type: z.literal("llm_server_status"),
+  status: LlmStatusValueSchema,
 });
 
 export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
@@ -285,6 +295,7 @@ export const IncomingWsMessageSchema = z.discriminatedUnion("type", [
   AutofixAttemptMessageSchema,
   AutofixBlockMessageSchema,
   PolishProgressMessageSchema,
+  LmStudioStatusMessageSchema,
   LlmServerStatusMessageSchema,
 ]);
 

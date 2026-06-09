@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { IncomingWsMessageSchema } from "../../../src/shared/schemas/ws-messages.js";
 import { buildResumeStatusMessage } from "./pipeline-resume-status.js";
+import { withRouting } from "./ws-contract.js";
 
 // Routing fields the delivery layer injects (event-bus scope + emitBuildScoped); the
 // tests add them so each object mirrors the actual wire shape the client receives.
@@ -92,5 +93,30 @@ describe("outbound WS contract (single source of truth with the frontend schema)
         originalType: "start_preview",
       }),
     ).toBe(false);
+  });
+});
+
+describe("withRouting", () => {
+  it("attaches only the defined routing fields and leaves the payload intact", () => {
+    const out = withRouting({ type: "preview_status", previewStatus: "ready" }, { projectName: "alpha", buildId: BUILD_ID });
+    expect(out).toEqual({ type: "preview_status", previewStatus: "ready", projectName: "alpha", buildId: BUILD_ID });
+    // requestId was not provided → not attached (delivery scope injects it later).
+    expect("requestId" in out).toBe(false);
+  });
+
+  it("lets routing fields take precedence over fields already on the message", () => {
+    const out = withRouting(
+      { type: "status", status: "ready", projectName: "stale" } as Parameters<typeof withRouting>[0],
+      { projectName: "alpha" },
+    );
+    expect(out).toMatchObject({ projectName: "alpha" });
+  });
+
+  it("produces a wire shape the frontend contract accepts", () => {
+    const out = withRouting(
+      { type: "preview_ready", port: 8082, proxyUrl: "/preview/alpha/" },
+      { projectName: "alpha", requestId: REQUEST_ID, buildId: BUILD_ID },
+    );
+    expect(accepts(out)).toBe(true);
   });
 });

@@ -21,7 +21,7 @@ import { isLocalAuthEnabled, verifyHttpToken, verifyWsToken } from "./lib/local-
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { resumeProjectGeneration } from "./lib/resume-generation.js";
 import type { CodegenShipResult } from "./lib/pipeline-codegen-phase.js";
-import type { OutboundMessage } from "./lib/ws-contract.js";
+import { withRouting, type OutboundMessage } from "./lib/ws-contract.js";
 import { isErrorReported } from "./lib/reported-error.js";
 import { triggerMetroBuild, waitForMetroReady } from "./lib/metro-ready.js";
 import { resolveFixModel } from "./lib/model-roles.js";
@@ -617,14 +617,13 @@ const handleWsMessage = (clientId: string, message: WsMessage): void => {
         requestId: message.requestId,
       };
       const emitPreviewEvent = (payload: OutboundMessage): void => {
-        broadcast({
-          ...payload,
-          projectName: message.projectName,
-          requestId: message.requestId,
-        } as OutboundMessage, previewEventScope);
+        broadcast(
+          withRouting(payload, { projectName: message.projectName, requestId: message.requestId }),
+          previewEventScope,
+        );
       };
       const emitBuildScopedEvent = (payload: OutboundMessage): void => {
-        emitPreviewEvent({ ...payload, buildId } as OutboundMessage);
+        emitPreviewEvent(withRouting(payload, { buildId }));
       };
 
       const pName = message.projectName as string;

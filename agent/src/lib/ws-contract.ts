@@ -24,3 +24,27 @@ type DistributiveOptional<T, K extends PropertyKey> = T extends unknown
  * `type` and all payload fields are required, the injected routing fields are optional.
  */
 export type OutboundMessage = DistributiveOptional<IncomingWsMessage, InjectedField>;
+
+export interface MessageRouting {
+  projectName?: string;
+  requestId?: string;
+  buildId?: string;
+}
+
+/**
+ * Attach delivery-layer routing fields to an outbound message. This is the ONE place the
+ * spread-widening cast lives: spreading a discriminated union widens its `type`, so we
+ * re-assert OutboundMessage here once instead of casting at every emit wrapper. Only
+ * defined routing fields are attached, and they take precedence over the message (the
+ * emitter is authoritative for the scope it owns).
+ */
+export const withRouting = (
+  message: OutboundMessage,
+  routing: MessageRouting,
+): OutboundMessage =>
+  ({
+    ...message,
+    ...(routing.projectName !== undefined ? { projectName: routing.projectName } : {}),
+    ...(routing.requestId !== undefined ? { requestId: routing.requestId } : {}),
+    ...(routing.buildId !== undefined ? { buildId: routing.buildId } : {}),
+  }) as OutboundMessage;

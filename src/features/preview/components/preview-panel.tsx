@@ -21,11 +21,11 @@ const MAX_KEPT_FRAMES = 3;
 // src (a fresh build id every preview_ready) and reliably reloads off the frozen
 // frame onto the newly-respawned Metro — even if port and revision coincide.
 const buildPreviewSrc = (
+  baseUrl: string,
   port: number,
   revision: number,
   buildId: string | null,
-): string =>
-  `${apiClient.getPreviewDirectUrl(port)}?v=${port}-${revision}-${buildId ?? "0"}`;
+): string => `${baseUrl}?v=${port}-${revision}-${buildId ?? "0"}`;
 
 const PreviewPlaceholder = ({
   isError,
@@ -167,19 +167,21 @@ const PreviewPanel = () => {
   // query forces an iframe reload on manual refresh and port changes.
   const previewBaseUrl = previewPort ? apiClient.getPreviewDirectUrl(previewPort) : "";
   const isActiveReady = !!previewBaseUrl && !!projectName && previewStatus === "ready";
-  const liveSrc = isActiveReady
-    ? buildPreviewSrc(previewPort as number, previewRevision, previewBuildId)
+  // One src serves both the web keep-alive pool and the native surface (only one branch
+  // renders, gated by IS_WEB); null when there is no live preview to show.
+  const previewSrc = isActiveReady
+    ? buildPreviewSrc(previewBaseUrl, previewPort as number, previewRevision, previewBuildId)
     : null;
 
   // When the ACTIVE project's preview is ready, upsert its iframe as MRU with the
   // fresh src (reloading it to live). Background frames are left untouched, so they
   // keep their last painted frame after the server evicts their Metro process.
   useEffect(() => {
-    if (!IS_WEB || !liveSrc || !projectName) {
+    if (!IS_WEB || !previewSrc || !projectName) {
       return;
     }
-    setFrames((prev) => upsertPreviewFrame(prev, projectName, liveSrc, MAX_KEPT_FRAMES));
-  }, [liveSrc, projectName]);
+    setFrames((prev) => upsertPreviewFrame(prev, projectName, previewSrc, MAX_KEPT_FRAMES));
+  }, [previewSrc, projectName]);
 
   // Forget iframes whose project was removed so a dead one is not kept mounted.
   useEffect(() => {
@@ -210,11 +212,6 @@ const PreviewPanel = () => {
   const handleOpenExternal = useCallback(() => {
     if (previewBaseUrl) void Linking.openURL(previewBaseUrl);
   }, [previewBaseUrl]);
-
-  // Native keeps the single-surface behaviour: no pool, no keep-alive.
-  const nativeSrc = isActiveReady
-    ? buildPreviewSrc(previewPort as number, previewRevision, previewBuildId)
-    : "";
 
   return (
     <View className="flex-1" style={{ backgroundColor: "rgba(18,18,31,0.6)" }}>
@@ -255,9 +252,7 @@ const PreviewPanel = () => {
       {/* Content */}
       {IS_WEB ? (
         <View className="flex-1">
-          {frames.length > 0 && (
-            <KeepAliveFrames frames={frames} activeProjectName={projectName} />
-          )}
+          <KeepAliveFrames frames={frames} activeProjectName={projectName} />
           {showPlaceholder && (
             <View
               className="items-center justify-center"
@@ -285,9 +280,9 @@ const PreviewPanel = () => {
             </View>
           )}
         </View>
-      ) : nativeSrc ? (
+      ) : previewSrc ? (
         <View className="flex-1">
-          <NativePreviewSurface iframeSrc={nativeSrc} />
+          <NativePreviewSurface iframeSrc={previewSrc} />
         </View>
       ) : (
         <View className="flex-1 items-center justify-center">

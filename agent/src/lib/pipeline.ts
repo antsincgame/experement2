@@ -23,7 +23,7 @@ import {
   restartProjectPreview,
 } from "./preview-restart.js";
 import type { PipelineContext } from "./pipeline-types.js";
-import type { OutboundMessage } from "./ws-contract.js";
+import { withRouting, type OutboundMessage } from "./ws-contract.js";
 import { createDefaultContext } from "./pipeline-types.js";
 import { runProjectQualityGates } from "./pipeline-gates.js";
 import { GIT_HASH_PATTERN, runGitCommand, gitCommit, getVersionNumber } from "./git.js";
@@ -143,10 +143,7 @@ const _createProjectInner = async (
   const { complete, createProjectFromCache: scaffoldFromCache } = ctx;
 
   const emitPreSlug = (message: OutboundMessage): void => {
-    ctx.broadcast({
-      ...message,
-      ...(requestId ? { requestId } : {}),
-    } as OutboundMessage);
+    ctx.broadcast(withRouting(message, { requestId }));
   };
 
   emitPreSlug({ type: "status", status: "planning" });
@@ -253,11 +250,7 @@ const _iterateProjectInner = async (
   const fixModel = resolveFixModel(editorModel, model);
   const projectPath = getProjectPath(projectName);
   const emitProject = (message: OutboundMessage): void => {
-    broadcast({
-      ...message,
-      projectName,
-      ...(requestId ? { requestId } : {}),
-    } as OutboundMessage);
+    broadcast(withRouting(message, { projectName, requestId }));
   };
 
   emitProject({ type: "status", status: "analyzing" });
@@ -356,11 +349,7 @@ export const revertVersion = async (
 ): Promise<void> => {
   const projectPath = getProjectPath(projectName);
   const emitProject = (message: OutboundMessage): void => {
-    broadcast({
-      ...message,
-      projectName,
-      ...(requestId ? { requestId } : {}),
-    } as OutboundMessage);
+    broadcast(withRouting(message, { projectName, requestId }));
   };
 
   if (!GIT_HASH_PATTERN.test(commitHash)) {
