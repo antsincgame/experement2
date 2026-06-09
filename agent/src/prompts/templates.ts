@@ -100,5 +100,47 @@ ${tabsScreens}
 `;
 };
 
-/** Static boilerplate — Tamagui handles theming via tamagui.config.ts. */
+/**
+ * tamagui.config.ts для проекта, собранный из plan.theme. Палитру плана
+ * (primary/background/primaryText/accent) подмешиваем и в light-, и в dark-тему
+ * Tamagui, поэтому токены $primary/$background/$color/$accent резолвятся в цвета
+ * плана. Активную тему (light/dark) выбирает root layout по theme.isDark. Без темы
+ * возвращаем дефолтный premium-фиолетовый — поведение как раньше.
+ *
+ * Раньше конфиг был фиксированным (PRIMARY='#7C4DFF') и генерировался один раз в
+ * template-cache, из-за чего кастомные палитры (cyberpunk/neon/dark) и isDark не
+ * применялись к собранному приложению вовсе.
+ */
+export const buildTamaguiConfig = (theme?: Partial<AppPlan["theme"]>): string => {
+  const primary = theme?.primary ?? "#7C4DFF";
+  const overrides = (base: "light" | "dark"): string => {
+    const parts = [`...config.themes.${base}`, `primary: ${JSON.stringify(primary)}`];
+    if (theme?.background) parts.push(`background: ${JSON.stringify(theme.background)}`);
+    if (theme?.primaryText) parts.push(`color: ${JSON.stringify(theme.primaryText)}`);
+    if (theme?.accent) parts.push(`accent: ${JSON.stringify(theme.accent)}`);
+    return `{ ${parts.join(", ")} }`;
+  };
+  return `import { config } from '@tamagui/config/v3'
+import { createTamagui } from 'tamagui'
+
+const tamaguiConfig = createTamagui({
+  ...config,
+  themes: {
+    ...config.themes,
+    light: ${overrides("light")},
+    dark: ${overrides("dark")},
+  },
+})
+
+export type AppConfig = typeof tamaguiConfig
+
+declare module 'tamagui' {
+  interface TamaguiCustomConfig extends AppConfig {}
+}
+
+export default tamaguiConfig
+`;
+};
+
+/** Static boilerplate — динамические файлы (layouts, tamagui.config) пишутся отдельно. */
 export const BOILERPLATE_TEMPLATES: Record<string, string> = {};
