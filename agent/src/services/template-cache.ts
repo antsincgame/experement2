@@ -234,6 +234,28 @@ dist/
 `,
 };
 
+const TEMPLATE_VERSION_FILE = ".template-version";
+
+/**
+ * Хэш всего, что вмораживается в тёплый шаблон (boilerplate/scaffold/metro/stub).
+ * При изменении generation-contract (deps, scripts, web-стабы) хэш меняется → кэш
+ * пересобирается вместо отдачи устаревшего package.json/scaffold. Закрывает грабли:
+ * раньше initTemplateCache пропускал инициализацию по факту наличия node_modules, и
+ * новые проекты клонировались со старыми зависимостями до ручного удаления кэша.
+ */
+const computeTemplateVersion = (): string =>
+  crypto
+    .createHash("sha1")
+    .update(
+      JSON.stringify({
+        boilerplate: BOILERPLATE_FILES,
+        scaffold: SCAFFOLD_FILES,
+        metro: buildMetroConfig(),
+        stub: NATIVE_MODULE_WEB_STUB,
+      })
+    )
+    .digest("hex");
+
 let cacheReady = false;
 let cacheInitPromise: Promise<void> | null = null;
 
