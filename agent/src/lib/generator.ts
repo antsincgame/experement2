@@ -18,6 +18,7 @@ import { broadcast } from "./event-bus.js";
 import { warnCaught } from "./catch-log.js";
 import {
   BOILERPLATE_TEMPLATES,
+  buildTamaguiConfig,
   getIndexRedirect,
   getRootLayout,
   getTabsLayout,
