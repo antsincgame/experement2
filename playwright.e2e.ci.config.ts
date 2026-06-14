@@ -19,6 +19,13 @@ import base from "./playwright.e2e.config";
 
 export default defineConfig({
   ...base,
+  // Stability levers for the shared-backend gate (§ CODE_AUDIT M6 / handoff P1):
+  //   - workers:1 (from base) — one Expo + agent + workspace backs every spec.
+  //   - retries:2 here — absorb transient flakiness (WS reconnect timing, a slow
+  //     first paint) without re-introducing the live-Metro-preview specs, whose
+  //     2-core cold-bundle timeout is NOT a retry problem. Those belong in a nightly
+  //     / dedicated-runner job with a warm template cache, not the PR gate.
+  retries: 2,
   testMatch: [
     "**/web-settings-persistence.spec.ts",
     "**/web-navigation-stability.spec.ts",
