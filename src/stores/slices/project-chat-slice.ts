@@ -4,7 +4,7 @@ import {
   createReasoningMessage,
   type ChatMessage,
 } from "@/features/chat/schemas/message.schema";
-import { formatPlanBrief, PLAN_DRAFTING_PLACEHOLDER } from "@/shared/lib/plan-brief";
+import { formatPlanBriefForChat, PLAN_DRAFTING_PLACEHOLDER } from "@/shared/lib/plan-brief";
 import type { PlanBriefInput } from "@/shared/lib/plan-brief";
 import {
   applyProjectWorkspaceCache,
@@ -42,7 +42,7 @@ const applyPlanBrief = (
 ): ChatMessage[] => {
   const brief =
     planBrief?.trim() ||
-    formatPlanBrief(plan as PlanBriefInput);
+    formatPlanBriefForChat(plan as PlanBriefInput);
   const next = [...messages];
   let planIndex = -1;
   for (let index = next.length - 1; index >= 0; index -= 1) {

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  formatPlanBrief,
   formatPlanBriefForChat,
   formatPlanBriefForModels,
 } from "./plan-brief";
@@ -62,9 +61,9 @@ describe("formatPlanBriefForChat", () => {
   });
 });
 
-describe("formatPlanBrief", () => {
+describe("formatPlanBriefForChat (brief render)", () => {
   it("renders screens and blueprint path without JSON", () => {
-    const text = formatPlanBrief({
+    const text = formatPlanBriefForChat({
       displayName: "MatchMate",
       description: "A dating app for matching by interests.",
       navigation: { type: "tabs", screens: [{ name: "Home", path: "app/(tabs)/index.tsx" }] },

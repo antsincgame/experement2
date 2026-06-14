@@ -125,6 +125,14 @@ export const restartProjectPreview = async (
   });
 
   if (!(await waitForMetroReady(restartedPort, 60))) {
+    // Without a terminal event the client stays stuck on the `starting` state we
+    // emitted above. Surface the failure so the UI leaves the spinner and shows why.
+    emit({
+      type: "preview_status",
+      previewStatus: "error",
+      buildId,
+      error: `Metro did not become ready on port ${restartedPort} after restart.`,
+    });
     return { restarted: false, port: restartedPort };
   }
 

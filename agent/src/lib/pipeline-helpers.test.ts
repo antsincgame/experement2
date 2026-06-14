@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { AppPlan } from "../schemas/app-plan.schema.js";
-import { summarizePlanForChat } from "./plan-brief.js";
+import { formatPlanBriefForChat } from "./plan-brief.js";
 import {
   summarizeOutput,
   dedupeProjectSlug,
@@ -15,7 +15,7 @@ const makePlan = (files: PlanFile[]): AppPlan =>
 const file = (path: string, dependencies: string[] = []): PlanFile =>
   ({ path, type: "screen", description: path, dependencies } as PlanFile);
 
-describe("summarizePlanForChat", () => {
+describe("formatPlanBriefForChat", () => {
   it("summarizes screens, components, state and libraries", () => {
     const plan = {
       name: "notes",
@@ -31,7 +31,7 @@ describe("summarizePlanForChat", () => {
       ],
     } as unknown as AppPlan;
 
-    const summary = summarizePlanForChat(plan);
+    const summary = formatPlanBriefForChat(plan);
 
     expect(summary).toContain("**Notes**");
     expect(summary).toContain("**2** screen");
@@ -56,7 +56,7 @@ describe("summarizePlanForChat", () => {
       ],
     } as unknown as AppPlan;
 
-    const summary = summarizePlanForChat(plan);
+    const summary = formatPlanBriefForChat(plan);
 
     expect(summary).toContain("premium");
     expect(summary).toContain("tabs");

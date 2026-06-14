@@ -61,6 +61,16 @@ const METRO_BUNDLE_READY = /Metro bundle ready/i;
 const FILE_TREE_REFRESH_MS = 350;
 const fileTreeRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// One-shot guard against the preview-revision DOUBLE-BUMP. The restart path
+// (preview-restart.ts) emits `preview_ready` THEN a trailing `build_success` for the
+// SAME buildId; preview_ready already bumps + reloads the iframe, so the trailing
+// build_success must NOT bump again — two rapid reloads can leave a stale/blank frame
+// on slow Metro (notably Windows). We record the buildId preview_ready bumped for and
+// skip exactly the next matching build_success, then clear so a later genuine HMR
+// rebundle of the same build still reloads. Keyed by the store's `get` identity so it
+// is isolated per store instance (and per test harness) without growing store state.
+const previewReadyBumpedBuildIdByStore = new WeakMap<StoreGet, string | null>();
+
 const reconcileStalledGenerationFiles = (
   get: StoreGet,
   store: ReturnType<StoreGet>,
@@ -739,7 +749,14 @@ export const createWsHandler = (
         // port). Bump the cache-busting revision so the iframe re-fetches the bundle AFTER
         // build_success — not on iteration_complete, which races Metro's 2s debounce.
         if (isActive && get().previewStatus === "ready") {
-          store.bumpPreviewRevision();
+          const bumpedFor = previewReadyBumpedBuildIdByStore.get(get) ?? null;
+          if (bumpedFor !== null && bumpedFor === get().previewBuildId) {
+            // Trailing build_success that pairs with the preview_ready we just reloaded
+            // for (same build) — consume the one-shot instead of double-bumping.
+            previewReadyBumpedBuildIdByStore.set(get, null);
+          } else {
+            store.bumpPreviewRevision();
+          }
         }
       } else {
         log({ level: "info", source: "metro", message: msg.message || eventType });
@@ -813,6 +830,9 @@ export const createWsHandler = (
         // After iteration/revert restart previewStatus may still be "starting" when
         // build_success arrives — bump here so the iframe reloads once Metro is ready.
         store.bumpPreviewRevision();
+        // Arm the one-shot: the trailing build_success for this same build must not
+        // bump again (it would double-reload and can stale the iframe on slow Metro).
+        previewReadyBumpedBuildIdByStore.set(get, msg.buildId);
       }
       log({ level: "info", source: "preview", message: `Preview: ${msg.projectName} → port ${msg.port}` });
       break;

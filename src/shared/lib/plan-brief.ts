@@ -193,12 +193,6 @@ export const formatPlanBriefForChat = (plan: PlanBriefInput): string => {
   return lines.join("\n");
 };
 
-/** @deprecated Alias — use formatPlanBriefForChat */
-export const summarizePlanForChat = formatPlanBriefForChat;
-
-/** @deprecated Alias — use formatPlanBriefForChat */
-export const formatPlanBrief = formatPlanBriefForChat;
-
 export const PLAN_DRAFTING_PLACEHOLDER =
   "**Drafting the blueprint…**\n\n" +
   "Mapping screens, navigation, theme, and product story. " +

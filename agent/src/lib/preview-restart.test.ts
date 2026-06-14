@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
   startExpoClearCache: vi.fn(),
   triggerMetroBuild: vi.fn(),
   waitForMetroReady: vi.fn(),
+  spawnSync: vi.fn(() => ({ stdout: "" })),
 }));
+
+vi.mock("child_process", () => ({ spawnSync: mocks.spawnSync }));
 
 vi.mock("./event-bus.js", () => ({
   getPreviewPort: mocks.getPreviewPort,
@@ -29,7 +32,8 @@ vi.mock("./metro-ready.js", () => ({
   waitForMetroReady: mocks.waitForMetroReady,
 }));
 
-const { resolveTrackedPreviewPort, restartProjectPreview } = await import("./preview-restart.js");
+const { resolveTrackedPreviewPort, restartProjectPreview, killOrphanedListenerOnPort } =
+  await import("./preview-restart.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -39,6 +43,30 @@ beforeEach(() => {
   mocks.startExpoClearCache.mockResolvedValue({ port: 8081 });
   mocks.triggerMetroBuild.mockResolvedValue(undefined);
   mocks.waitForMetroReady.mockResolvedValue(true);
+  mocks.spawnSync.mockReturnValue({ stdout: "" });
+});
+
+describe("killOrphanedListenerOnPort", () => {
+  it("reclaims the port by killing the listening pids (unix path)", () => {
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+    mocks.spawnSync.mockReturnValueOnce({ stdout: "1234\n5678\n" });
+
+    killOrphanedListenerOnPort(9999);
+
+    expect(mocks.spawnSync).toHaveBeenCalledWith("lsof", ["-ti", "tcp:9999"], expect.any(Object));
+    expect(killSpy).toHaveBeenCalledWith(1234, "SIGTERM");
+    expect(killSpy).toHaveBeenCalledWith(5678, "SIGTERM");
+    killSpy.mockRestore();
+  });
+
+  it("is a no-op when nothing is listening on the port", () => {
+    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+
+    killOrphanedListenerOnPort(9999);
+
+    expect(killSpy).not.toHaveBeenCalled();
+    killSpy.mockRestore();
+  });
 });
 
 describe("resolveTrackedPreviewPort", () => {
@@ -94,6 +122,26 @@ describe("restartProjectPreview", () => {
           message.type === "build_event" && message.eventType === "build_success"
       )
     ).toBe(true);
+  });
+
+  it("emits preview_status:error when Metro never becomes ready (no stuck spinner)", async () => {
+    mocks.getActivePort.mockReturnValue(8081);
+    mocks.waitForMetroReady.mockResolvedValue(false);
+    const emit = vi.fn();
+
+    const result = await restartProjectPreview("demo", "/tmp/demo", emit);
+
+    expect(result).toEqual({ restarted: false, port: 8081 });
+    // Never announces ready…
+    const eventTypes = emit.mock.calls.map(([message]) => message.type);
+    expect(eventTypes).not.toContain("preview_ready");
+    // …but DOES surface a terminal error so the client leaves the `starting` state.
+    const errorEvent = emit.mock.calls.find(
+      ([message]) => message.type === "preview_status" && message.previewStatus === "error",
+    );
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent?.[0].error).toMatch(/did not become ready/i);
+    expect(errorEvent?.[0].buildId).toEqual(expect.any(String));
   });
 
   it("uses the event-bus port when the agent lost the ChildProcess handle", async () => {

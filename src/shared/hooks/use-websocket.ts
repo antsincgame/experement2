@@ -10,6 +10,10 @@ import { useProjectStore } from "@/stores/project-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { isCreatingRoute } from "@/shared/lib/creation-flow";
 import { buildIterateChatHistory } from "@/shared/lib/iterate-chat-history";
+import {
+  describeDroppedMessage,
+  shouldResyncActiveProjectOnReconnect,
+} from "@/shared/lib/ws-resilience";
 
 const logError = (source: string, message: string, details?: string) => {
   useSettingsStore.getState().addErrorLog({ level: "error", source, message, details });
@@ -37,21 +41,11 @@ interface WsRuntime {
 
 const createRequestId = (): string => crypto.randomUUID();
 
-const STALE_ACTIVE_STATUSES = new Set([
-  "planning",
-  "scaffolding",
-  "generating",
-  "analyzing",
-  "building",
-  "validating",
-]);
 
 /** After reconnect, nudge preview for projects stuck in non-terminal UI states. */
 const resyncActiveProjectAfterReconnect = (): void => {
   const { projectName, status } = useProjectStore.getState();
-  // The "__creating__" slug is a UI placeholder for an in-flight creation; the
-  // backend has no such project, so resyncing a preview for it would 404.
-  if (!projectName || isCreatingRoute(projectName) || !STALE_ACTIVE_STATUSES.has(status)) {
+  if (!shouldResyncActiveProjectOnReconnect(projectName, status)) {
     return;
   }
 
@@ -163,9 +157,10 @@ const scheduleReconnect = (): void => {
 
 const handleSocketMessage = (payload: string): void => {
   try {
-    const message = parseIncomingWsMessage(JSON.parse(payload));
+    const parsed = JSON.parse(payload);
+    const message = parseIncomingWsMessage(parsed);
     if (!message) {
-      logWarn("websocket", "Ignored unknown message shape from agent");
+      logWarn("websocket", describeDroppedMessage(parsed, payload));
       return;
     }
 

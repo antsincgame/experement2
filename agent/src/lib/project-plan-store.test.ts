@@ -18,7 +18,6 @@ import {
   listMissingPlanFiles,
   loadProjectPlan,
   saveGenerationState,
-  saveProjectPlan,
 } from "./generation-state.js";
 import { getProjectPath } from "../services/file-manager.js";
 
@@ -39,12 +38,12 @@ const minimalPlan = {
 
 describe("project-plan-store", () => {
   it("saves and loads plan json", () => {
-    saveProjectPlan("demo", minimalPlan);
+    saveGenerationState("demo", minimalPlan, "planned");
     expect(loadProjectPlan("demo")).toEqual(minimalPlan);
   });
 
   it("lists missing files without EOF marker", () => {
-    saveProjectPlan("demo", minimalPlan);
+    saveGenerationState("demo", minimalPlan, "planned");
     const storePath = path.join(getProjectPath("demo"), "src/stores/a.ts");
     fs.mkdirSync(path.dirname(storePath), { recursive: true });
     fs.writeFileSync(storePath, "export const x = 1;\n", "utf8");
@@ -54,7 +53,7 @@ describe("project-plan-store", () => {
   });
 
   it("reports canResume when plan exists and files are missing", () => {
-    saveProjectPlan("demo", minimalPlan);
+    saveGenerationState("demo", minimalPlan, "planned");
     const status = getProjectResumeStatus("demo");
     expect(status.canResume).toBe(true);
     expect(status.resumeMode).toBe("codegen");
