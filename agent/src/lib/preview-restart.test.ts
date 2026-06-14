@@ -96,6 +96,26 @@ describe("restartProjectPreview", () => {
     ).toBe(true);
   });
 
+  it("emits preview_status:error when Metro never becomes ready (no stuck spinner)", async () => {
+    mocks.getActivePort.mockReturnValue(8081);
+    mocks.waitForMetroReady.mockResolvedValue(false);
+    const emit = vi.fn();
+
+    const result = await restartProjectPreview("demo", "/tmp/demo", emit);
+
+    expect(result).toEqual({ restarted: false, port: 8081 });
+    // Never announces ready…
+    const eventTypes = emit.mock.calls.map(([message]) => message.type);
+    expect(eventTypes).not.toContain("preview_ready");
+    // …but DOES surface a terminal error so the client leaves the `starting` state.
+    const errorEvent = emit.mock.calls.find(
+      ([message]) => message.type === "preview_status" && message.previewStatus === "error",
+    );
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent?.[0].error).toMatch(/did not become ready/i);
+    expect(errorEvent?.[0].buildId).toEqual(expect.any(String));
+  });
+
   it("uses the event-bus port when the agent lost the ChildProcess handle", async () => {
     mocks.getPreviewPort.mockReturnValue(9090);
     const emit = vi.fn();
