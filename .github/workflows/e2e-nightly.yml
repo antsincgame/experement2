@@ -1,0 +1,40 @@
+# Nightly full browser E2E against live Metro (not in the PR gate).
+# Live-preview specs (happy-path, preview-refresh, revert) need warm template_cache
+# and long bundle timeouts — unreliable on 2-core PR runners.
+name: E2E Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  web-e2e-nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install && npm --prefix agent install
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full web E2E suite
+        run: npm run test:e2e:web
+        env:
+          CI: "1"
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-nightly
+          path: test-results/
+          retention-days: 7
