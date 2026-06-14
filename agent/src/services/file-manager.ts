@@ -177,6 +177,65 @@ export const getWorkspaceRoot = (): string => WORKSPACE_ROOT;
 export const projectExists = (projectName: string): boolean =>
   fs.existsSync(getProjectPath(projectName));
 
+export interface WorkspaceDeleteResult {
+  deleted: string[];
+  failed: Array<{ name: string; error: string }>;
+};
+
+const syncSleep = (ms: number): void => {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    // Busy-wait for EPERM/EBUSY retry on Windows file locks.
+  }
+};
+
+/** Best-effort recursive delete with retries — Metro/Expo can hold handles on Windows. */
+export const removeProjectDirectory = (dirPath: string): void => {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      fs.rmSync(dirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 500 });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EPERM" && code !== "EBUSY") {
+        throw error;
+      }
+      if (attempt === 7) {
+        throw error;
+      }
+      syncSleep(500);
+    }
+  }
+};
+
+export const deleteAllWorkspaceProjects = (): WorkspaceDeleteResult => {
+  const wsRoot = getWorkspaceRoot();
+  const deleted: string[] = [];
+  const failed: Array<{ name: string; error: string }> = [];
+
+  if (!fs.existsSync(wsRoot)) {
+    return { deleted, failed };
+  }
+
+  for (const entry of fs.readdirSync(wsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === "template_cache" || entry.name.startsWith(".")) {
+      continue;
+    }
+    const dirPath = path.join(wsRoot, entry.name);
+    try {
+      removeProjectDirectory(dirPath);
+      deleted.push(entry.name);
+    } catch (error) {
+      failed.push({
+        name: entry.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return { deleted, failed };
+};
+
 /**
  * Recursively recreate a directory tree, HARD-LINKING regular files instead of
  * copying their bytes. Hard links share the underlying inode, so cloning a large

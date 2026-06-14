@@ -196,5 +196,22 @@ describe("file-manager", () => {
     fs.writeFileSync(path.join(projectPath, "app.json"), `{"expo":{"name":"changed"}}`);
     expect(fs.readFileSync(path.join(templatePath, "app.json"), "utf-8")).toContain(`"name":"t"`);
   });
+
+  it("deleteAllWorkspaceProjects removes projects but keeps template_cache", async () => {
+    const fm = await loadModule();
+    const wsRoot = fm.getWorkspaceRoot();
+    fs.mkdirSync(path.join(wsRoot, "template_cache"), { recursive: true });
+    fs.writeFileSync(path.join(wsRoot, "template_cache", "marker.txt"), "keep");
+    fm.writeFile("proj-a", "index.ts", "a");
+    fm.writeFile("proj-b", "index.ts", "b");
+
+    const result = fm.deleteAllWorkspaceProjects();
+
+    expect(result.deleted.sort()).toEqual(["proj-a", "proj-b"]);
+    expect(result.failed).toEqual([]);
+    expect(fm.projectExists("proj-a")).toBe(false);
+    expect(fm.projectExists("proj-b")).toBe(false);
+    expect(fs.existsSync(path.join(wsRoot, "template_cache", "marker.txt"))).toBe(true);
+  });
 });
 

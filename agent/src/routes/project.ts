@@ -21,7 +21,9 @@ import {
   listAllFiles,
   projectExists,
   getWorkspaceRoot,
+  deleteAllWorkspaceProjects,
 } from "../services/file-manager.js";
+import { killAll, killExpo } from "../services/process-manager.js";
 
 export const projectRouter = Router();
 
@@ -64,28 +66,43 @@ projectRouter.get("/", (_req, res) => {
 });
 
 // DELETE all projects (wipe workspace)
-projectRouter.delete("/all", (req, res) => {
+projectRouter.delete("/all", async (req, res) => {
   if (!requireDangerousAction(req, res, DELETE_WORKSPACE_CONFIRMATION, "Workspace deletion")) {
     return;
   }
 
   const wsRoot = getWorkspaceRoot();
   if (!fs.existsSync(wsRoot)) {
-    res.json({ data: { deleted: 0 } });
+    res.json({ data: { deleted: 0, failed: [] } });
     return;
   }
 
   try {
-    const entries = fs.readdirSync(wsRoot, { withFileTypes: true });
-    let deleted = 0;
-    for (const entry of entries) {
-      if (entry.isDirectory() && entry.name !== "template_cache" && !entry.name.startsWith(".")) {
-        fs.rmSync(path.join(wsRoot, entry.name), { recursive: true, force: true });
-        deleted++;
+    killAll();
+    for (const entry of fs.readdirSync(wsRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name === "template_cache" || entry.name.startsWith(".")) {
+        continue;
       }
+      killExpo(entry.name);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+
+    const result = deleteAllWorkspaceProjects();
+    if (result.deleted.length === 0 && result.failed.length > 0) {
+      res.status(500).json({
+        error: result.failed.map((item) => `${item.name}: ${item.error}`).join("; "),
+        code: "WORKSPACE_DELETE_FAILED",
+        data: { deleted: 0, failed: result.failed.map((item) => item.name) },
+      });
+      return;
     }
 
-    res.json({ data: { deleted } });
+    res.json({
+      data: {
+        deleted: result.deleted.length,
+        failed: result.failed.map((item) => item.name),
+      },
+    });
   } catch (error) {
     res.status(500).json({
       error: error instanceof Error ? error.message : "Failed to delete projects",
