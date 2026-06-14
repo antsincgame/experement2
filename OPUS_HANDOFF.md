@@ -143,4 +143,98 @@ node e2e/functional-smoke.mjs <url> workspace/<project>   # manual
 
 ---
 
-*Сгенерировано Cursor после pull `c9bfd3e3` + Windows test fix. Код wins при расхождении.*
+## 8. Боевой приказ для Курсора (Terra) — env-dependent остаток
+
+> Это задачи, которые **нельзя закрыть в песочнице Opus** (нет браузеров / LM Studio /
+> CI-прогонов). У Курсора на Терре есть живой Metro, LM Studio и сеть. Каждый блок:
+> **цель → команды → acceptance**. Делать по порядку; не пушить флаки-спеки в CI-гейт.
+
+### 0. Pre-flight (всегда)
+
+```bash
+git pull origin main
+npm install && (cd agent && npm install)
+npx playwright install --with-deps chromium      # браузеры для e2e
+npm run check                                     # baseline: agent 599(+1 skip) · FE 126 · green
+```
+**Acceptance:** `npm run check` зелёный. Если нет — стоп, чинить до зелёного перед остальным.
+
+### P0 — подтвердить CI-гейт после `retries:2`
+
+```bash
+gh run list --branch main --limit 5              # последние прогоны CI
+gh run watch                                      # дождаться текущего
+```
+**Acceptance:** последние **3** прогона `CI` на `main` → `success`. Если retries:2 не помог конкретному тесту — открыть его trace из артефактов и чинить причину, не повышать retries вслепую.
+
+### P1 #3-4 — расширить CI e2e (эксперимент по флаки)
+
+**Цель:** вернуть в гейт спеки, что проходят **детерминированно**; live-Metro-preview оставить в nightly.
+
+```bash
+# 1. Замерить флаки каждого ИСКЛЮЧЁННОГО спека (5 прогонов):
+for spec in web-chat-history web-concurrent-chats web-offline-recovery web-error-recovery web-happy-path web-preview-refresh; do
+  pass=0; for i in 1 2 3 4 5; do npm run test:e2e:web -- e2e/$spec.spec.ts && pass=$((pass+1)); done
+  echo "RESULT $spec: $pass/5"
+done
+```
+**Acceptance / действие:**
+- спек **5/5** → добавить в `testMatch` в `playwright.e2e.ci.config.ts`, запушить, подтвердить **3** зелёных CI-прогона подряд;
+- спек **<5/5** → НЕ добавлять в PR-гейт; если это live-Metro (happy-path/preview-refresh) — создать отдельный **nightly** workflow (`.github/workflows/e2e-nightly.yml`, cron, `npm run test:e2e:web`, warm `template_cache`, retries:2, timeout↑).
+
+### P1 #5 — web-project-deletion self-isolation
+
+**Проблема:** тест «Clear All» удаляет **общую** фикстуру `e2e-existing-project` с диска → следующий тест в файле падает (order-dependent).
+**Фикс:** тест должен создавать и удалять **свой throwaway-проект**, не общую фикстуру.
+
+```bash
+# после правки e2e/web-project-deletion.spec.ts:
+for i in 1 2 3; do npm run test:e2e:web -- e2e/web-project-deletion.spec.ts || echo "FAIL $i"; done
+```
+**Acceptance:** 3/3 зелёных в любом порядке → добавить спек в `playwright.e2e.ci.config.ts`.
+
+### P1 #6 — e2e revert → iframe (новый спек)
+
+**Цель:** `e2e/web-revert.spec.ts` — создать/открыть проект → итерация (текст A→B) → VersionTimeline revert на предыдущий коммит → **assert: iframe показывает текст A**.
+Интеграционный путь уже покрыт (`pipeline-revert.test.ts`); здесь нужен браузерный E2E против живого Metro.
+
+```bash
+for i in 1 2 3; do npm run test:e2e:web -- e2e/web-revert.spec.ts || echo "FAIL $i"; done
+```
+**Acceptance:** 3/3 зелёных. Карта влияния — §4 выше.
+
+### P2 #8 — functional-smoke против живого превью (нужен LM Studio)
+
+```bash
+npm run dev                                        # терминал 1: agent :3100 + UI :8081
+# в UI создать проект; узнать preview-порт (URL-бар превью или [Preview] лог агента)
+node e2e/functional-smoke.mjs http://127.0.0.1:<metro-port> workspace/<project>   # терминал 2
+```
+**Acceptance:** smoke зелёный (не падает + не пусто + клик не роняет). Затем **расширить**: сценарии из плана (ввод в форму → assert, что элемент появился) — `TODO.md:6`.
+
+### P2 #9 — STRICT_REGRESSION_GATE: решение по данным (нужен LM Studio)
+
+```bash
+node e2e/mass-test-50.mjs                               > /tmp/baseline.txt   # win-rate X
+STRICT_REGRESSION_GATE=true node e2e/mass-test-50.mjs   > /tmp/gated.txt      # win-rate Y
+grep -i "win" /tmp/baseline.txt /tmp/gated.txt
+```
+**Acceptance / действие:** если регресс `X−Y ≤ ~2%` → включить по умолчанию: `agent/src/lib/pipeline-typecheck-gate.ts:61` (`STRICT_REGRESSION_GATE` default `true`), + обновить `TODO.md:7`. Если просадка больше — оставить opt-in, записать цифры в `AUDIT.md`.
+
+### P2 — M7 / L2 (по месту, repro на Терре)
+
+```bash
+npm run dev    # M7: ловить "exited with code 1" после первого bundle → captures concurrently-логи; вероятна гонка портов (:8081 / :3100 / metro-pool)
+# L2: если ENOENT-спам по @tamagui/*/node_modules — добавить ignore в metro.config.js (resolver.blockList)
+```
+**Acceptance:** M7 — стабильный repro + причина (порт/таймінг); L2 — лог чистый после ignore.
+
+### Правила пуша для Курсора
+
+- Каждый код-фикс — **под тестом** и `npm run check` зелёный перед пушем.
+- НЕ добавлять спек в `playwright.e2e.ci.config.ts` без **5/5** (новые) / **3/3** (фикс) локально.
+- Живой канон — `AUDIT.md` + этот файл; результаты прогонов (win-rate, флаки-статы) писать в `AUDIT.md` новым Round.
+
+---
+
+*Сгенерировано Cursor после pull `c9bfd3e3` + Windows test fix. §8 — боевой приказ от Opus (2026-06-14). Код wins при расхождении.*
