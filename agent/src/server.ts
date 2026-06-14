@@ -17,7 +17,7 @@ import {
 import { formatZodError } from "./lib/request-validation.js";
 import { assertLlmUrl, llmFetch } from "./lib/llm-url.js";
 import { getAllowedOrigins, isOriginAllowed } from "./lib/origin-allowlist.js";
-import { isLocalAuthEnabled, verifyHttpToken, verifyWsToken } from "./lib/local-auth.js";
+import { describeInsecureBind, isLocalAuthEnabled, verifyHttpToken, verifyWsToken } from "./lib/local-auth.js";
 import { createProject, iterateProject, revertVersion } from "./lib/pipeline.js";
 import { resumeProjectGeneration } from "./lib/resume-generation.js";
 import type { CodegenShipResult } from "./lib/pipeline-codegen-phase.js";
@@ -866,6 +866,11 @@ server.on("error", (err: NodeJS.ErrnoException) => {
 server.listen(PORT, HOST, async () => {
   console.log(`[Agent] Server: http://${HOST}:${PORT}`);
   console.log(`[Agent] WebSocket: ws://${HOST}:${PORT}`);
+
+  const insecureBind = describeInsecureBind(HOST, isLocalAuthEnabled());
+  if (insecureBind) {
+    console.warn(`[Agent] ⚠️  SECURITY: ${insecureBind}`);
+  }
 
   // Reclaim preview bundlers orphaned by a previous run before accepting work.
   killOrphanedPreviewProcesses();

@@ -417,6 +417,21 @@ describe("createWsHandler", () => {
     expect(harness.getState().previewRevision).toBe(before + 2);
   });
 
+  it("posts a system message to chat when the agent reloads the preview", () => {
+    const harness = createHarness();
+    const before = harness.getState().messages.length;
+
+    harness.handle({
+      type: "reloading_preview",
+      requestId: REQUEST_ID,
+      projectName: "alpha",
+    });
+
+    const messages = harness.getState().messages;
+    expect(messages.length).toBe(before + 1);
+    expect(messages[messages.length - 1].content).toMatch(/Reloading preview/i);
+  });
+
   it("clears generation file buffer when status becomes ready", () => {
     const harness = createHarness();
     harness.getState().setStatus("generating");
