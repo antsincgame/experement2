@@ -345,3 +345,32 @@ node e2e/functional-smoke.mjs http://127.0.0.1:<metro-port> workspace/<project>
 ---
 
 *Документ сгенерирован для handoff в Opus. При расхождении с кодом — код wins.*
+
+---
+
+## 15. Round 4 — Resolution (Opus, 2026-06-14)
+
+> Снимок после серии фиксов. База: **agent 599 (+1 skip) · frontend 126**, оба typecheck чисты, CI green.
+
+**Закрыто и заперто тестами:**
+
+| ID | Статус | Где |
+|----|--------|-----|
+| **H1** Metro restart timeout без терминального события | ✅ CLOSED | `preview-restart.ts:127` эмитит `preview_status:error`; `preview-restart.test.ts` |
+| **H2** `revertVersion` без тестов | ✅ CLOSED | `pipeline-revert.test.ts` (hash/git-fail/happy/no-port) |
+| **M1** double-bump iframe | ✅ CLOSED | one-shot по `buildId` в `ws-handler.ts` — точнее варианта A: сохраняет in-place HMR-reload; +тест |
+| **M3** устаревший AUDIT | ✅ CLOSED | Round 4 в `AUDIT.md`; противоречие Round 2/3↔4 помечено historical |
+| **M5** silent WS-drop | ✅ CLOSED | `describeDroppedMessage` (тип+payload) в `ws-resilience.ts` |
+| **C4** reconnect-resync без тестов | ✅ CLOSED | `shouldResyncActiveProjectOnReconnect` + `ws-resilience.test.ts` |
+| **TS2578** `@ts-expect-error` убивал превью | ✅ CLOSED | `stripSuppressionDirectives` в `code-style-repairs.ts` |
+| **H3/M8** (выбор: **local-only**) | ✅ CLOSED | `describeInsecureBind` warn на non-loopback bind + `.env.example` doc |
+| **§6** `reloading_preview` тест (≡ handoff P1 #7) | ✅ CLOSED | `ws-handler.test.ts` |
+| **§6** `killOrphanedListenerOnPort` тест | ✅ CLOSED | `preview-restart.test.ts` (unix + win, platform-guarded) |
+| **L3** dead `refreshPreviewBundle` | ✅ CLOSED | удалён (ноль прод-вызывателей) |
+| **L6** deprecated-алиасы | ✅ CLOSED | мигрированы на канон + удалены (`formatPlanBrief`/`summarizePlanForChat`/`saveProjectPlan`) |
+
+**Решение владельца:** **H3/M8 → только локальный запуск** (бинд `127.0.0.1`, auth не требуется; страж предупреждает при случайной LAN-экспозиции).
+
+**Остаётся (вне песочницы — см. `OPUS_HANDOFF.md`):** M2 · M6 (CI e2e 7/26) · M7 · A3 (`json_schema`) · e2e revert spec (P1) · `functional-smoke`/`STRICT_REGRESSION_GATE` (env) · L1/L2/L4/L5 (косметика/конфиг).
+
+**Ответы на §12:** (1) нужны ОБА — `buildId` форсит reload на свежий Metro, `revision` даёт Refresh + in-place HMR; (2) не нужно — корректность держится на `buildId`+`revision`+one-shot; (3) nightly/self-hosted джоба с retries + longer-timeout, PR-CI на детерминированном сабсете; (4) `STRICT_REGRESSION_GATE` по умолчанию при регрессе win-rate ≤ ~2% (нужен mass-test); (5) интеграционного `pipeline-revert.test.ts` достаточно для P0, e2e — P1.
