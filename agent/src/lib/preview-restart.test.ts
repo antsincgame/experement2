@@ -47,17 +47,51 @@ beforeEach(() => {
 });
 
 describe("killOrphanedListenerOnPort", () => {
-  it("reclaims the port by killing the listening pids (unix path)", () => {
-    const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
-    mocks.spawnSync.mockReturnValueOnce({ stdout: "1234\n5678\n" });
+  it.skipIf(process.platform === "win32")(
+    "reclaims the port by killing the listening pids (unix path)",
+    () => {
+      const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+      mocks.spawnSync.mockReturnValueOnce({ stdout: "1234\n5678\n" });
 
-    killOrphanedListenerOnPort(9999);
+      killOrphanedListenerOnPort(9999);
 
-    expect(mocks.spawnSync).toHaveBeenCalledWith("lsof", ["-ti", "tcp:9999"], expect.any(Object));
-    expect(killSpy).toHaveBeenCalledWith(1234, "SIGTERM");
-    expect(killSpy).toHaveBeenCalledWith(5678, "SIGTERM");
-    killSpy.mockRestore();
-  });
+      expect(mocks.spawnSync).toHaveBeenCalledWith(
+        "lsof",
+        ["-ti", "tcp:9999"],
+        expect.any(Object),
+      );
+      expect(killSpy).toHaveBeenCalledWith(1234, "SIGTERM");
+      expect(killSpy).toHaveBeenCalledWith(5678, "SIGTERM");
+      killSpy.mockRestore();
+    },
+  );
+
+  it.skipIf(process.platform !== "win32")(
+    "reclaims the port by killing the listening pids (windows path)",
+    () => {
+      mocks.spawnSync
+        .mockReturnValueOnce({ stdout: "1234\n5678\n" })
+        .mockReturnValue({ stdout: "" });
+
+      killOrphanedListenerOnPort(9999);
+
+      expect(mocks.spawnSync).toHaveBeenCalledWith(
+        "powershell",
+        expect.arrayContaining(["-Command", expect.stringContaining("9999")]),
+        expect.objectContaining({ windowsHide: true }),
+      );
+      expect(mocks.spawnSync).toHaveBeenCalledWith(
+        "taskkill",
+        ["/pid", "1234", "/T", "/F"],
+        expect.objectContaining({ windowsHide: true }),
+      );
+      expect(mocks.spawnSync).toHaveBeenCalledWith(
+        "taskkill",
+        ["/pid", "5678", "/T", "/F"],
+        expect.objectContaining({ windowsHide: true }),
+      );
+    },
+  );
 
   it("is a no-op when nothing is listening on the port", () => {
     const killSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
