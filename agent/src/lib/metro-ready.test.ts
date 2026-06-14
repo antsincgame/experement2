@@ -2,7 +2,7 @@
 // an app without a root route must not look like a dead bundler) and that the
 // lazy-build trigger lands a request to start compilation.
 import { describe, expect, it, vi } from "vitest";
-import { refreshPreviewBundle, triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
+import { triggerMetroBuild, waitForMetroReady } from "./metro-ready.js";
 
 const response = (init: { ok: boolean; status: number; html?: string }): Response =>
   ({
@@ -50,19 +50,6 @@ describe("waitForMetroReady", () => {
 
     expect(ready).toBe(false);
     expect(fetchFn).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("refreshPreviewBundle", () => {
-  it("triggers a build request then waits for Metro to serve", async () => {
-    const fetchFn = vi
-      .fn()
-      .mockResolvedValue(response({ ok: true, status: 200, text: async () => '<script src="/index.bundle"></script>' }));
-
-    const ready = await refreshPreviewBundle(7777, fetchFn as unknown as typeof fetch);
-
-    expect(ready).toBe(true);
-    expect(fetchFn.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
 

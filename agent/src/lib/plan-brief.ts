@@ -13,6 +13,3 @@ export const formatPlanBriefForModels = (p: PlanBriefInput): string =>
   shared.formatPlanBriefForModels(p);
 export const formatPlanBriefForChat = (p: PlanBriefInput): string =>
   shared.formatPlanBriefForChat(p);
-export const formatPlanBrief = (p: PlanBriefInput): string => shared.formatPlanBrief(p);
-export const summarizePlanForChat = (p: PlanBriefInput): string =>
-  shared.summarizePlanForChat(p);

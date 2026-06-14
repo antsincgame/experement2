@@ -199,9 +199,5 @@ export const getProjectResumeStatus = (projectName: string): ProjectResumeStatus
   };
 };
 
-/** @deprecated Use saveGenerationState — kept for incremental migration of call sites. */
-export const saveProjectPlan = (projectName: string, plan: AppPlan): void =>
-  saveGenerationState(projectName, plan, "planned");
-
 export const loadProjectPlan = (projectName: string): AppPlan | null =>
   loadGenerationState(projectName)?.plan ?? null;

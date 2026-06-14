@@ -1,6 +1,5 @@
 // Re-exports generation-state for backward compatibility.
 export {
-  saveProjectPlan,
   loadProjectPlan,
   isPlanFileComplete,
   listMissingPlanFiles,
