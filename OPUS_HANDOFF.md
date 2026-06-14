@@ -2,7 +2,7 @@
 
 > **Для:** Claude Opus (следующая итерация)  
 > **Снимок:** `main` после merge `f34d1648` + локальный fix platform tests  
-> **Предшественник:** `CODE_AUDIT.md` @ `91dc0719`, `AUDIT.md` Round 4  
+> **Предшественник:** `docs/archive/CODE_AUDIT.md` (архив) @ `91dc0719`, `AUDIT.md` Round 4  
 > **Контекст:** Cursor исправил то, что можно локально; ниже — задачи, требующие решения/инфры/прогона.
 
 ---
@@ -39,12 +39,12 @@
 
 ## 3. Задачи для Opus (нельзя закрыть без твоего участия)
 
-### P0 — документация
+### P0 — документация ✅ ЗАКРЫТО (Opus, 2026-06-14)
 
-| # | Задача | Файл | Детали |
-|---|--------|------|--------|
-| 1 | **Синхронизировать противоречие в AUDIT.md** | `AUDIT.md:333-342` vs `:370+` | Таблица «Ещё открыто» всё ещё помечает B2/E4 open; Round 4 говорит FIXED. Пометить historical или удалить дубликат. |
-| 2 | **Обновить CODE_AUDIT.md** | `CODE_AUDIT.md` | Добавить Round 4 статусы; пометить H1/H2/M1/L3/L6 CLOSED; обновить test count. |
+| # | Задача | Статус |
+|---|--------|--------|
+| 1 | Синхронизировать противоречие в AUDIT.md (B2/E4 open vs FIXED) | ✅ Round 2/3-таблицы помечены historical, снято в Round 4 |
+| 2 | Обновить CODE_AUDIT.md (Round 4 статусы, CLOSED, test count) | ✅ §15 Round 4 Resolution; файл **архивирован** в `docs/archive/CODE_AUDIT.md` |
 
 ### P1 — CI / infra (нужен GitHub + стабильный runner)
 
@@ -115,7 +115,7 @@ Missing: Playwright e2e ❌
 
 ```
 1. Merge platform test fix (если ещё не в main)
-2. AUDIT.md + CODE_AUDIT.md sync (30 min)
+2. AUDIT.md + CODE_AUDIT.md sync ✅ (CODE_AUDIT.md архивирован в docs/archive/)
 3. E2E revert spec (2-3 h)
 4. CI e2e expansion experiment (infra, 1-2 h + CI runs)
 5. functional-smoke + STRICT_REGRESSION_GATE (env, когда LM Studio доступен)
@@ -139,7 +139,7 @@ node e2e/functional-smoke.mjs <url> workspace/<project>   # manual
 1. CI e2e: retries=1 + workers=1 достаточно для Metro stability, или нужен mock preview server?
 2. Revert e2e: mock git fixture с 2 commits или real git in fixture project?
 3. `STRICT_REGRESSION_GATE` default ON — какой regression win-rate % acceptable?
-4. Стоит ли `CODE_AUDIT.md` архивировать и вести только `AUDIT.md` + этот handoff?
+4. ✅ Решено: `CODE_AUDIT.md` архивирован в `docs/archive/`; живой канон — `AUDIT.md` + `OPUS_HANDOFF.md`.
 
 ---
 

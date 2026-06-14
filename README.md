@@ -89,8 +89,18 @@ Open the settings drawer, change LM Studio URL and per-role models, then click *
 │   ├── src/prompts/        # System prompts for Planner/Generator
 │   └── src/schemas/        # Zod validation schemas
 │
-└── workspace/              # Generated projects live here
+├── workspace/              # Generated projects live here
+└── docs/archive/           # Frozen historical audit snapshots
 ```
+
+## Maintenance & audit docs
+
+| Doc | Purpose |
+|-----|---------|
+| [`AUDIT.md`](AUDIT.md) | **Living** audit — findings by cluster + Rounds 1–4 (verified fixes) |
+| [`OPUS_HANDOFF.md`](OPUS_HANDOFF.md) | Open tasks & owner decisions for the next iteration |
+| [`TODO.md`](TODO.md) | Env-dependent remainder (live preview / mass-test) |
+| [`docs/archive/`](docs/archive/) | Frozen snapshots (e.g. `CODE_AUDIT.md` @ `91dc0719` — superseded by AUDIT Round 4) |
 
 ## Contributing
 
