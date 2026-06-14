@@ -13,7 +13,7 @@ import { getGenerationContext } from "./rag-retrieve.js";
 import { findSimilarFixes, buildPastFixBlock } from "./error-fix-store.js";
 import { buildGoldenExampleBlock } from "./golden-examples.js";
 import { composeTeachingContext } from "./teaching-context.js";
-import { applyDeterministicCodeRepairs } from "./code-style-repairs.js";
+import { applyDeterministicCodeRepairs, stripSuppressionDirectives } from "./code-style-repairs.js";
 import { broadcast } from "./event-bus.js";
 import { warnCaught } from "./catch-log.js";
 import {
@@ -184,6 +184,9 @@ export const sanitizeGeneratedCode = (code: string, filePath = ""): string => {
   result = normalizeImportDeclarations(result);
 
   result = applyDeterministicCodeRepairs(result);
+  // Shipped app code must never hide type errors behind @ts-expect-error/@ts-ignore:
+  // an unused directive fails tsc with TS2578 (a hard gate) and kills the preview.
+  result = stripSuppressionDirectives(result);
 
   // Fix: React.useState/useEffect/useCallback → direct import (if React not imported)
   if (result.includes("React.use") && !result.includes("import React")) {
