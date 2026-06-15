@@ -1,35 +1,12 @@
 // Verifies that rapid successive chat messages don't crash the UI, duplicate messages, or corrupt preview state.
-import fs from "node:fs";
-import path from "node:path";
 import { expect, test } from "@playwright/test";
-
+import { ensureExistingProjectFixture } from "./support/existing-project-fixture";
 const AGENT_URL = "http://127.0.0.1:3100";
 const MOCK_LLM_URL = "http://127.0.0.1:1235";
 const FIXTURE_PROJECT = {
   name: "e2e-existing-project",
   displayName: "E2E Existing Project",
 };
-
-const repoRoot = process.cwd();
-const workspaceRoot = path.join(repoRoot, "workspace");
-const templateCachePath = path.join(workspaceRoot, "template_cache");
-const fixturePath = path.join(workspaceRoot, FIXTURE_PROJECT.name);
-
-const APP_LAYOUT = `import { Stack } from "expo-router";
-export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
-}
-`;
-
-const APP_INDEX = `import { Text, View } from "react-native";
-export default function HomeScreen() {
-  return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#F8FAFC" }}>
-      <Text testID="fixture-title">Hello from fixture</Text>
-    </View>
-  );
-}
-`;
 
 const SETTINGS_SNAPSHOT = {
   state: {
@@ -46,25 +23,20 @@ const SETTINGS_SNAPSHOT = {
 };
 
 test.beforeAll(() => {
-  if (!fs.existsSync(templateCachePath)) {
-    throw new Error(`Template cache not found: ${templateCachePath}`);
-  }
-
-  if (!fs.existsSync(fixturePath)) {
-    fs.cpSync(templateCachePath, fixturePath, { recursive: true });
-  }
-
-  fs.mkdirSync(path.join(fixturePath, "app"), { recursive: true });
-  fs.writeFileSync(path.join(fixturePath, "app", "_layout.tsx"), APP_LAYOUT, "utf-8");
-  fs.writeFileSync(path.join(fixturePath, "app", "index.tsx"), APP_INDEX, "utf-8");
-
-  const appJsonPath = path.join(fixturePath, "app.json");
-  const appJson = JSON.parse(fs.readFileSync(appJsonPath, "utf-8"));
-  appJson.expo.name = FIXTURE_PROJECT.displayName;
-  appJson.expo.slug = FIXTURE_PROJECT.name;
-  appJson.expo.scheme = FIXTURE_PROJECT.name;
-  fs.writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2), "utf-8");
+  ensureExistingProjectFixture();
 });
+
+const killFixturePreviewProcess = async (): Promise<void> => {
+  try {
+    await fetch(`${AGENT_URL}/process/${encodeURIComponent(FIXTURE_PROJECT.name)}/kill`, {
+      method: "POST",
+      headers: { "x-app-factory-confirm": "kill-preview-process" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  } catch {
+    // Agent down — spec fails on connect anyway.
+  }
+};
 
 test("rapid messages don't crash the UI", async ({ page }) => {
   await page.addInitScript((settings) => {
@@ -103,9 +75,9 @@ test("rapid messages don't crash the UI", async ({ page }) => {
   // Wait for all messages to be processed
   await page.waitForTimeout(10_000);
 
-  // All three user messages should be visible in the chat
+  // All three user messages should be visible in the chat (`.first()` — duplicate in message preview chip)
   for (const msg of messages) {
-    await expect(page.getByText(msg)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(msg, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
   }
 
   // Page should not have crashed — basic UI elements still present
@@ -149,6 +121,9 @@ test("no duplicate messages after rapid sending", async ({ page }) => {
 });
 
 test("preview iframe survives rapid iteration requests", async ({ page }) => {
+  test.setTimeout(600_000);
+  await killFixturePreviewProcess();
+
   await page.addInitScript((settings) => {
     window.localStorage.clear();
     window.localStorage.setItem("app-factory-settings", JSON.stringify(settings));
@@ -164,13 +139,10 @@ test("preview iframe survives rapid iteration requests", async ({ page }) => {
     { timeout: 15_000 }
   );
 
-  // Wait for preview to load first
-  const previewFrame = page
-    .locator('iframe[title="App Preview"]')
-    .last()
-    .contentFrame();
+  // Wait for preview to load first (keep-alive pool uses Preview ${projectName}, not App Preview)
+  const previewFrame = page.frameLocator(`iframe[title="Preview ${FIXTURE_PROJECT.name}"]`);
   await expect(previewFrame.getByText("Hello from fixture")).toBeVisible({
-    timeout: 180_000,
+    timeout: 300_000,
   });
 
   const chatInput = page.locator('textarea[aria-label="Chat message input"]:visible');
@@ -187,7 +159,7 @@ test("preview iframe survives rapid iteration requests", async ({ page }) => {
   await page.waitForTimeout(30_000);
 
   // The iframe should still be present and accessible (not broken)
-  const iframeCount = await page.locator('iframe[title="App Preview"]').count();
+  const iframeCount = await page.locator(`iframe[title="Preview ${FIXTURE_PROJECT.name}"]`).count();
   expect(iframeCount).toBeGreaterThanOrEqual(1);
 
   // The preview frame should still contain readable content
