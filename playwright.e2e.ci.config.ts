@@ -29,5 +29,7 @@ export default defineConfig({
     "**/web-navigation-stability.spec.ts",
     "**/web-preview-error-state.spec.ts",
     "**/web-project-deletion.spec.ts",
+    "**/web-offline-recovery.spec.ts",
+    "**/web-error-recovery.spec.ts",
   ],
 });

@@ -1,0 +1,8 @@
+﻿Flakiness measurement 2026-06-15T02:12:46.4380934+03:00
+RESULT web-chat-history : 1/5
+RESULT web-concurrent-chats : 0/5
+RESULT web-offline-recovery : 5/5
+RESULT web-error-recovery : 5/5
+RESULT web-happy-path : 0/5
+RESULT web-preview-refresh : 0/5
+Done 2026-06-15T03:28:02.6721584+03:00
